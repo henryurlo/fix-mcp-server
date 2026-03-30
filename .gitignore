@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+*.whl
+.pytest_cache/
+
+# Environment
+.env
+*.env
+.env.*
+!.env.example
+
+# Claude / RuFlo internal scaffolding (not part of project source)
+.claude/
+.claude-flow/
+CHECKPOINT.md
+reverse-eng-comment.md
+
+# Demo build artifacts (video too large for git)
+demo/node_modules/
+demo/out/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

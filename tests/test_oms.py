@@ -1,0 +1,59 @@
+from datetime import datetime, timezone
+
+from fix_mcp.engine.oms import OMS, Order
+
+
+def _order(order_id: str, **overrides) -> Order:
+    now = datetime.now(timezone.utc).isoformat()
+    data = {
+        "order_id": order_id,
+        "cl_ord_id": f"CLO-{order_id}",
+        "symbol": "AAPL",
+        "cusip": "037833100",
+        "side": "buy",
+        "quantity": 100,
+        "order_type": "limit",
+        "venue": "NYSE",
+        "client_name": "Ridgemont Capital",
+        "created_at": now,
+        "updated_at": now,
+        "price": 200.0,
+        "status": "new",
+    }
+    data.update(overrides)
+    return Order(**data)
+
+
+def test_query_and_count_open_orders_by_venue() -> None:
+    oms = OMS()
+    oms.add_order(_order("ORD-1", venue="NYSE"))
+    oms.add_order(_order("ORD-2", venue="NYSE", status="filled"))
+    oms.add_order(_order("ORD-3", venue="ARCA", status="stuck", flags=["venue_down"]))
+
+    assert [o.order_id for o in oms.query_orders(venue="NYSE")] == ["ORD-1", "ORD-2"]
+    assert oms.count_by_venue() == {"NYSE": 1, "ARCA": 1}
+    assert [o.order_id for o in oms.get_stuck_orders()] == ["ORD-3"]
+
+
+def test_bulk_update_symbol_updates_open_orders_only() -> None:
+    oms = OMS()
+    oms.add_order(_order("ORD-1", symbol="ACME", status="new"))
+    oms.add_order(_order("ORD-2", symbol="ACME", status="partially_filled"))
+    oms.add_order(_order("ORD-3", symbol="ACME", status="filled"))
+
+    updated = oms.bulk_update_symbol("ACME", "ACMX")
+
+    assert updated == ["ORD-1", "ORD-2"]
+    assert oms.get_order("ORD-1").symbol == "ACMX"
+    assert oms.get_order("ORD-2").symbol == "ACMX"
+    assert oms.get_order("ORD-3").symbol == "ACME"
+
+
+def test_total_notional_at_risk_only_counts_institutional_new_and_stuck() -> None:
+    oms = OMS()
+    oms.add_order(_order("ORD-1", status="new", is_institutional=True, price=100.0, quantity=10))
+    oms.add_order(_order("ORD-2", status="stuck", is_institutional=True, price=50.0, quantity=20))
+    oms.add_order(_order("ORD-3", status="partially_filled", is_institutional=True, price=999.0))
+    oms.add_order(_order("ORD-4", status="new", is_institutional=False, price=999.0))
+
+    assert oms.total_notional_at_risk() == 2000.0

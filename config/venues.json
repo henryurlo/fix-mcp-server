@@ -1,0 +1,56 @@
+[
+  {
+    "name": "NYSE",
+    "mic_code": "XNYS",
+    "full_name": "New York Stock Exchange",
+    "supported_order_types": ["market", "limit", "stop", "stop_limit"],
+    "trading_hours": "09:30-16:00 ET",
+    "pre_market": "04:00-09:30 ET",
+    "fix_version": "FIX.4.2"
+  },
+  {
+    "name": "ARCA",
+    "mic_code": "ARCX",
+    "full_name": "NYSE Arca",
+    "supported_order_types": ["market", "limit", "stop", "stop_limit", "midpoint"],
+    "trading_hours": "09:30-16:00 ET",
+    "pre_market": "04:00-09:30 ET",
+    "fix_version": "FIX.4.2"
+  },
+  {
+    "name": "BATS",
+    "mic_code": "BATS",
+    "full_name": "Cboe BZX Exchange",
+    "supported_order_types": ["market", "limit", "stop", "stop_limit", "pegged"],
+    "trading_hours": "09:30-16:00 ET",
+    "pre_market": "08:00-09:30 ET",
+    "fix_version": "FIX.4.2"
+  },
+  {
+    "name": "IEX",
+    "mic_code": "IEXG",
+    "full_name": "Investors Exchange",
+    "supported_order_types": ["market", "limit", "midpoint_peg", "d_limit"],
+    "trading_hours": "09:30-16:00 ET",
+    "pre_market": "08:00-09:30 ET",
+    "fix_version": "FIX.4.2"
+  },
+  {
+    "name": "EDGX",
+    "mic_code": "EDGX",
+    "full_name": "Cboe EDGX Exchange",
+    "supported_order_types": ["market", "limit", "stop", "stop_limit", "midpoint", "pegged"],
+    "trading_hours": "09:30-16:00 ET",
+    "pre_market": "07:00-09:30 ET",
+    "fix_version": "FIX.4.2"
+  },
+  {
+    "name": "NASDAQ",
+    "mic_code": "XNAS",
+    "full_name": "Nasdaq Stock Market",
+    "supported_order_types": ["market", "limit", "stop", "stop_limit", "midpoint"],
+    "trading_hours": "09:30-16:00 ET",
+    "pre_market": "04:00-09:30 ET",
+    "fix_version": "FIX.4.2"
+  }
+]

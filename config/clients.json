@@ -1,0 +1,11 @@
+[
+  {"client_id": "CLI-001", "name": "Maple Capital", "tier": "institutional", "sla_minutes": 15, "active": true},
+  {"client_id": "CLI-002", "name": "Rowan Partners", "tier": "institutional", "sla_minutes": 20, "active": true},
+  {"client_id": "CLI-003", "name": "Sycamore Group", "tier": "institutional", "sla_minutes": 25, "active": true},
+  {"client_id": "CLI-004", "name": "Birch Funds", "tier": "institutional", "sla_minutes": 30, "active": true},
+  {"client_id": "CLI-005", "name": "Aspen Asset Management", "tier": "institutional", "sla_minutes": 30, "active": true},
+  {"client_id": "CLI-006", "name": "Willow Investments", "tier": "institutional", "sla_minutes": 20, "active": true},
+  {"client_id": "CLI-007", "name": "Cedar Trading", "tier": "retail", "sla_minutes": null, "active": true},
+  {"client_id": "CLI-008", "name": "Elm Securities", "tier": "retail", "sla_minutes": null, "active": true},
+  {"client_id": "CLI-009", "name": "Firm Prop Desk", "tier": "proprietary", "sla_minutes": null, "active": true}
+]

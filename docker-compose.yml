@@ -1,0 +1,129 @@
+# Production trading system — all services on a single host.
+# Run:  docker compose up -d
+# MCP stdio:  docker compose run --rm mcp-server
+# API:        http://localhost:8000
+# Dashboard:  http://localhost:8080
+
+services:
+
+  # ── MCP stdio server (AI agent interface) ───────────────────────────────────
+  mcp-server:
+    build: .
+    container_name: fix-mcp-server
+    environment:
+      - SCENARIO=${SCENARIO:-morning_triage}
+      - FIX_MCP_CONFIG_DIR=/app/config
+      - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./config:/app/config:ro
+
+  # ── REST API (Claude.ai integrations, dashboards, external OMS hooks) ───────
+  api-server:
+    build: .
+    container_name: fix-mcp-api
+    command: ["python", "-m", "fix_mcp.api"]
+    restart: on-failure
+    stdin_open: true
+    tty: true
+    ports:
+      - "8000:8000"
+    environment:
+      - SCENARIO=${SCENARIO:-morning_triage}
+      - FIX_MCP_CONFIG_DIR=/app/config
+      - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config:ro
+
+  # ── Operational dashboard (WebSocket real-time order/session view) ───────────
+  dashboard:
+    build: .
+    container_name: fix-mcp-dashboard
+    command: ["python", "-m", "fix_mcp.dashboard"]
+    restart: on-failure
+    stdin_open: true
+    tty: true
+    ports:
+      - "8787:8080"
+    environment:
+      - FIX_MCP_CONFIG_DIR=/app/config
+      - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - api-server
+    volumes:
+      - ./config:/app/config:ro
+
+  # ── FIX gateway process (real venue connectivity) ────────────────────────────
+  # Configure via FIX_HOST_NYSE, FIX_PORT_NYSE, etc. environment variables.
+  # Uncomment when connecting to real exchange gateways or QuickFIX UAT acceptors.
+  #
+  # fix-gateway:
+  #   build: .
+  #   container_name: fix-mcp-gateway
+  #   command: ["python", "-m", "fix_mcp.gateway"]
+  #   environment:
+  #     - FIX_HOST_NYSE=${FIX_HOST_NYSE:-127.0.0.1}
+  #     - FIX_PORT_NYSE=${FIX_PORT_NYSE:-4001}
+  #     - FIX_HOST_BATS=${FIX_HOST_BATS:-127.0.0.1}
+  #     - FIX_PORT_BATS=${FIX_PORT_BATS:-4003}
+  #     - FIX_SENDER_COMP_ID=${FIX_SENDER_COMP_ID:-FIRM_PROD}
+  #     - FIX_HEARTBEAT_INTERVAL=30
+  #     - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
+  #     - REDIS_URL=redis://redis:6379/0
+  #   depends_on:
+  #     - postgres
+  #     - redis
+
+  # ── PostgreSQL — persistent order store and FIX message log ─────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: fix-mcp-postgres
+    environment:
+      POSTGRES_USER: trading
+      POSTGRES_PASSWORD: trading
+      POSTGRES_DB: trading
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis — real-time pub/sub for fills, session events, algo updates ────────
+  redis:
+    image: redis:7-alpine
+    container_name: fix-mcp-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
