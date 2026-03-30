@@ -114,6 +114,28 @@ HTML = r"""<!doctype html>
     .btn-vcr  { background: #1e3a5f; color: #fff; }
     .btn-vcr.active { background: var(--blue); outline: 2px solid #7eb3ff; }
     .vcr-bar  { display:flex; gap:4px; align-items:center; padding:0 4px; border-left:1px solid #555; margin-left:4px; }
+
+    /* ── scenario brief banner ── */
+    .brief { background: #1d4e89; color: #fff; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
+    .brief .brief-time { font-family: var(--mono); font-size: 11px; color: #90b8e8; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .brief .brief-body { font-family: Arial, sans-serif; font-size: 13px; line-height: 1.6; }
+    .brief .brief-body strong { color: #ffd580; }
+
+    /* ── improved AI callouts ── */
+    .ai-auto     { font-family:Arial,sans-serif;font-size:11px;background:#e8f5e9;border-left:3px solid var(--ok);border-radius:0 6px 6px 0;padding:6px 8px;margin:4px 0 6px;line-height:1.5;color:#1a4a2e; }
+    .ai-approval { font-family:Arial,sans-serif;font-size:11px;background:#fff8e1;border-left:3px solid var(--warn);border-radius:0 6px 6px 0;padding:6px 8px;margin:4px 0 6px;line-height:1.5;color:#5c3800; }
+    .ai-auto::before     { content:"🤖 Auto: "; font-weight:700; }
+    .ai-approval::before { content:"✋ Needs OK: "; font-weight:700; color:var(--warn); }
+
+    /* ── playbook steps in main area ── */
+    .playbook { display:flex; flex-direction:column; gap:10px; }
+    .pb-step  { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+    .pb-step.done  { border-color:var(--ok); background:#f0fff8; }
+    .pb-step .pb-num  { font-family:Arial,sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:4px; }
+    .pb-step h5 { margin:0 0 4px;font-size:14px;font-family:Georgia,serif; }
+    .pb-step .pb-desc { margin:0 0 8px;font-family:Arial,sans-serif;font-size:12px;color:#555;line-height:1.5; }
+    .pb-output { background:#1a1a2e;color:#90ee90;font-family:var(--mono);font-size:12px;line-height:1.5;padding:14px 16px;border-radius:12px;white-space:pre-wrap;word-break:break-word;min-height:80px; }
+    .pb-output.error { color:#ff8080; }
   </style>
 </head>
 <body>
@@ -154,16 +176,12 @@ HTML = r"""<!doctype html>
       <div id="sessionCards"></div>
 
       <div class="divider"></div>
-      <div class="section-label">Guided Workflow</div>
-      <div id="workflowSteps" class="stack" style="display:flex;flex-direction:column;gap:8px"></div>
-
-      <div class="divider"></div>
       <div class="section-label">Quick Tools</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="btn-primary" onclick="runTool('run_premarket_check',{})">Pre-Market Check</button>
-        <button class="btn-primary" onclick="runTool('check_fix_sessions',{})">Check Sessions</button>
-        <button class="btn-primary" onclick="runTool('check_algo_status',{})">Check Algos</button>
-        <button class="btn-primary" onclick="runTool('list_scenarios',{action:'list'})">List Scenarios</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+        <button class="btn-primary" onclick="runTool('run_premarket_check',{})">Pre-Market</button>
+        <button class="btn-primary" onclick="runTool('check_fix_sessions',{})">Sessions</button>
+        <button class="btn-primary" onclick="runTool('check_algo_status',{})">Algos</button>
+        <button class="btn-neutral" onclick="switchTab('activity')">Activity Log</button>
       </div>
 
       <div class="divider"></div>
@@ -202,17 +220,17 @@ HTML = r"""<!doctype html>
     <!-- main content -->
     <div class="content">
       <div class="tabs" id="tabs">
-        <div class="tab active" onclick="switchTab('output')">Output</div>
+        <div class="tab active" onclick="switchTab('playbook')">▶ Playbook</div>
         <div class="tab" onclick="switchTab('sessions')">Sessions</div>
         <div class="tab" onclick="switchTab('orders')">Orders</div>
         <div class="tab" onclick="switchTab('algos')">Algos</div>
         <div class="tab" onclick="switchTab('activity')">Activity</div>
       </div>
 
-      <div class="tab-body active" id="tab-output">
-        <div class="card">
-          <pre id="output">Select a workflow step or quick tool on the left to get started.</pre>
-        </div>
+      <div class="tab-body active" id="tab-playbook">
+        <div id="scenarioBrief"></div>
+        <div class="playbook" id="workflowSteps"></div>
+        <div class="pb-output" id="output">Run a step above to see AI output here.</div>
       </div>
 
       <div class="tab-body" id="tab-sessions">
@@ -263,6 +281,23 @@ HTML = r"""<!doctype html>
   let currentStatus = null;
   let simState = {speed: 10, paused: false};
 
+  // ── scenario situation briefings ──────────────────────────────────────────
+  const SCENARIO_CONTEXT = {
+    morning_triage:       { time:'07:00 ET', headline:'Pre-Market Triage', body:'<strong>ARCA is down</strong> with a sequence gap. <strong>ACME rebrand → ACMX</strong> affects 23 open orders. <strong>ZEPH IPO</strong> has no reference data — 2 orders stuck. 3 additional orders blocked. You have 90 minutes before the 09:30 open.' },
+    bats_startup_0200:    { time:'02:05 ET', headline:'BATS Overnight Startup Failure', body:'<strong>BATS sent SequenceReset with NewSeqNo=1</strong> but our OMS expects seq 2,450. This breaks all GTC orders resting at BATS. Institutional DMA opens at 04:00 — you have 115 minutes.' },
+    predawn_adrs_0430:    { time:'04:35 ET', headline:'Shell ADR Rebrand + ARCA Latency', body:'<strong>RDSA officially renamed to SHEL</strong> effective today. Any order still using RDSA will be rejected at market open. <strong>ARCA latency is 220ms</strong> — a route flap on the Mahwah co-lo link. Pre-market opens in 25 min.' },
+    preopen_auction_0900: { time:'09:02 ET', headline:'Opening Auction Risk', body:'<strong>SPY has an MOO order imbalance</strong> — buy-side heavy. <strong>IEX feed is stale</strong> — last quote 4 minutes ago. Opening auction locks at 09:28. You have 26 minutes to validate and either cancel or accept the risk.' },
+    open_volatility_0930: { time:'09:35 ET', headline:'Market Open Volatility Event', body:'<strong>GME triggered a LULD circuit breaker</strong> — all GME orders are halted. <strong>BATS reporting 3.2% packet loss</strong> — potential for delayed ACKs and phantom fills. 14 orders are at immediate risk worth ~$2.3M.' },
+    venue_degradation_1030:{ time:'10:32 ET', headline:'NYSE Mahwah Route Flap', body:'<strong>NYSE latency spiked to 180ms</strong> — incident #44827, Mahwah co-lo route flap. <strong>12 orders worth $4.1M</strong> have venue_degraded + seq_backlog flags. Some are listing-venue-required and cannot be rerouted.' },
+    ssr_and_split_1130:   { time:'11:34 ET', headline:'SSR + Stock Split Collision', body:'<strong>RIDE hit SSR trigger</strong> — short-sell orders must be placed at or above NBBO. <strong>AAPL 4:1 split takes effect in 26 minutes.</strong> Any open AAPL stop/limit orders with pre-split prices will be invalid at 12:00.' },
+    iex_recovery_1400:    { time:'14:03 ET', headline:'IEX Session Recovery', body:'<strong>IEX is back after a 1-hour outage.</strong> Sequence gap: msgs 8938–8940 are missing. Orders were rerouted to BATS during the outage. <strong>D-Limit orders must return to IEX</strong> — they lose price improvement on other venues.' },
+    eod_moc_1530:         { time:'15:31 ET', headline:'End-of-Day MOC Crisis', body:'<strong>ARCA MOC cutoff already missed</strong> (15:28 deadline passed). <strong>NYSE MOC cutoff at 15:45 — 14 minutes away.</strong> Maple Capital has a 500K AAPL MOC worth ~$107M flagged for regulatory review. DAY orders purge at 16:00.' },
+    afterhours_dark_1630: { time:'16:32 ET', headline:'After-Hours Dark Pool Failure', body:'<strong>NYSE and ARCA have logged out</strong> (normal). <strong>Liquidnet went offline</strong> (SessionStatus=8 — abnormal). An NVDA block order worth ~$18M is orphaned. OMS day-order cleanup job failed — uncanceled DAY orders remain open.' },
+    twap_slippage_1000:   { time:'10:05 ET', headline:'TWAP Slippage Alert', body:'<strong>NVDA TWAP is 5.2 percentage points behind schedule</strong> — BATS degradation at 85ms is rejecting child slices. <strong>GME TWAP halted mid-execution</strong> by LULD halt. Without intervention, NVDA will finish significantly short of target.' },
+    vwap_vol_spike_1130:  { time:'11:35 ET', headline:'VWAP Over-Participation', body:'<strong>MSFT VWAP is participating at 15% vs 10% cap</strong> — vol spike widened spreads and triggered aggressive slice sizing. <strong>AMD POV also over-participating at 15% vs 8% limit.</strong> Both algos are creating visible market impact — client exposure.' },
+    is_dark_failure_1415: { time:'14:15 ET', headline:'IS Shortfall + Dark Pool Freeze', body:'<strong>TSLA Implementation Shortfall algo is 108bps over arrival price</strong> — avg fill 251.20 vs arrival 248.50. Client SLA breach at 50bps. <strong>AMZN dark aggregator has zero fills</strong> — Liquidnet and IEX dark are both rejecting. Dark venues are frozen.' },
+  };
+
   // ── workflow definitions — one step set per scenario ──────────────────────
   const SCENARIO_STEPS = {
 
@@ -277,106 +312,106 @@ HTML = r"""<!doctype html>
     ],
 
     bats_startup_0200: [
-      { id:'s1', label:'1. Check Sessions',       desc:'02:05 ET: BATS SequenceReset — NewSeqNo=1 but peer expects 2,450.', cls:'btn-primary', fn: () => runStep('s1','check_fix_sessions',{}) },
-      { id:'s2', label:'2. Reset BATS Sequence',  desc:'Send SequenceReset (35=4) to align BATS seq to peer expectation.', cls:'btn-danger', fn: () => runStep('s2','fix_session_issue',{venue:'BATS',action:'reset_sequence'}) },
-      { id:'s3', label:'3. Query Stuck Orders',   desc:'Find GTC orders blocked at BATS during overnight seq issue.', cls:'btn-primary', fn: () => runStep('s3','query_orders',{status:'stuck'}) },
-      { id:'s4', label:'4. Load BITO Symbol',     desc:'Load crypto ETF BITO pending IPO-day reference data.', cls:'btn-ok', fn: () => runStep('s4','load_ticker',{symbol:'BITO',cusip:'BITO00001',name:'ProShares Bitcoin ETF',listing_exchange:'NYSE'}) },
-      { id:'s5', label:'5. Re-Check BATS',        desc:'Confirm BATS session is active and seq gap resolved.', cls:'btn-primary', fn: () => runStep('s5','check_fix_sessions',{venue:'BATS'}) },
-      { id:'s6', label:'6. Validate Overnight',   desc:'Validate all GTC orders before institutional DMA opens at 04:00 ET.', cls:'btn-primary', fn: () => runStep('s6','validate_orders',{}) },
+      { id:'s1', label:'1. Check Sessions',       desc:'BATS sent SequenceReset NewSeqNo=1 — peer OMS expects 2,450. All BATS sessions flagged with unexpected_reset.', ai:'Reads all 6 session states, pinpoints BATS mismatch, calculates the 2,449-message delta. Surfaces the gap without taking action.', approval:false, cls:'btn-primary', fn: () => runStep('s1','check_fix_sessions',{}) },
+      { id:'s2', label:'2. Reset BATS Sequence',  desc:'Send SequenceReset (35=4) PossDupFlag to resync BATS seq counter to 2,450.', ai:'Sends 35=4 with GapFillFlag=N and NewSeqNo=2450. Waits for BATS ACK. If not confirmed within 30s, escalates to human.', approval:true, cls:'btn-danger', fn: () => runStep('s2','fix_session_issue',{venue:'BATS',action:'reset_sequence'}) },
+      { id:'s3', label:'3. Query Stuck Orders',   desc:'Find GTC orders at BATS that were blocked while the session was broken.', ai:'Queries all orders with venue=BATS and status=stuck. Lists ClOrdIDs, notionals, and how long each has been blocked. Auto-flags any >$500K.', approval:false, cls:'btn-primary', fn: () => runStep('s3','query_orders',{status:'stuck'}) },
+      { id:'s4', label:'4. Load BITO Symbol',     desc:'ProShares Bitcoin ETF BITO has no reference data — 2 IPO orders are blocked with unknown_symbol.', ai:'Loads CUSIP BITO00001 to the reference store and immediately unblocks the 2 BITO orders. Low-risk autonomous action — no large notional.', approval:false, cls:'btn-ok', fn: () => runStep('s4','load_ticker',{symbol:'BITO',cusip:'BITO00001',name:'ProShares Bitcoin ETF',listing_exchange:'NYSE'}) },
+      { id:'s5', label:'5. Re-Check BATS',        desc:'Confirm BATS session health after the sequence reset.', ai:'Re-reads BATS session state: checks last_sent_seq, expected_recv_seq gap, and latency. Prints a clean/broken verdict with supporting data.', approval:false, cls:'btn-primary', fn: () => runStep('s5','check_fix_sessions',{venue:'BATS'}) },
+      { id:'s6', label:'6. Validate Overnight',   desc:'Validate all GTC orders before institutional DMA opens at 04:00 ET.', ai:'Runs full pre-flight on every open order: price bands, duplicate ClOrdIDs, venue health match. Any order still stuck after BATS fix gets flagged for manual review.', approval:false, cls:'btn-primary', fn: () => runStep('s6','validate_orders',{}) },
     ],
 
     predawn_adrs_0430: [
-      { id:'s1', label:'1. Pre-Market Check',     desc:'04:35 ET: Shell ADR rebrand RDSA→SHEL; ARCA latency 220ms.', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
-      { id:'s2', label:'2. Check RDSA Ticker',    desc:'Confirm RDSA pending rename and count affected open orders.', cls:'btn-primary', fn: () => runStep('s2','check_ticker',{symbol:'RDSA'}) },
-      { id:'s3', label:'3. Apply RDSA→SHEL',      desc:'Rename ticker and bulk-update all open RDSA orders to SHEL.', cls:'btn-danger', fn: () => runStep('s3','update_ticker',{old_symbol:'RDSA',new_symbol:'SHEL',reason:'corporate_action'}) },
-      { id:'s4', label:'4. Check ARCA Session',   desc:'ARCA latency 220ms — route flap. Check degraded state.', cls:'btn-primary', fn: () => runStep('s4','check_fix_sessions',{venue:'ARCA'}) },
-      { id:'s5', label:'5. Query ARCA Orders',    desc:'Find orders routed to ARCA that are at risk from high latency.', cls:'btn-primary', fn: () => runStep('s5','query_orders',{venue:'ARCA'}) },
-      { id:'s6', label:'6. Validate ADR Orders',  desc:'Validate all SHEL orders post-rename before pre-market opens.', cls:'btn-primary', fn: () => runStep('s6','validate_orders',{symbol:'SHEL'}) },
+      { id:'s1', label:'1. Pre-Market Check',     desc:'Full triage: RDSA→SHEL rename detected, ARCA latency 220ms, affected order count.', ai:'Scans all venues and tickers. Surfaces RDSA pending rename, counts affected orders, and flags ARCA degraded. Gives you the complete picture before you act.', approval:false, cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
+      { id:'s2', label:'2. Check RDSA Ticker',    desc:'Confirm corporate action details: effective date, new symbol SHEL, and how many open orders are affected.', ai:'Reads ticker reference for RDSA, confirms rename is effective today, and counts all open orders with symbol=RDSA. Lists order IDs for review.', approval:false, cls:'btn-primary', fn: () => runStep('s2','check_ticker',{symbol:'RDSA'}) },
+      { id:'s3', label:'3. Apply RDSA→SHEL',      desc:'Rename ticker and bulk-update all open RDSA orders to SHEL before markets open.', ai:'Calls update_ticker to rename RDSA→SHEL, then bulk-patches all open orders. Corporate action on a live symbol — requires human sign-off even in Agent mode.', approval:true, cls:'btn-danger', fn: () => runStep('s3','update_ticker',{old_symbol:'RDSA',new_symbol:'SHEL',reason:'corporate_action'}) },
+      { id:'s4', label:'4. Check ARCA Session',   desc:'ARCA latency is 220ms — well above the 50ms warning threshold. Assess degradation level.', ai:'Reads ARCA FIX session stats. At 220ms this is DEGRADED (not down). AI notes that orders can still route but with higher rejection risk. Recommends but does not act.', approval:false, cls:'btn-primary', fn: () => runStep('s4','check_fix_sessions',{venue:'ARCA'}) },
+      { id:'s5', label:'5. Query ARCA Orders',    desc:'Find all orders routed to ARCA that are at risk from the latency issue.', ai:'Lists all open orders with venue=ARCA, annotates each with estimated latency risk. In Agent mode, flags the $10M+ orders for human review and leaves smaller ones alone.', approval:false, cls:'btn-primary', fn: () => runStep('s5','query_orders',{venue:'ARCA'}) },
+      { id:'s6', label:'6. Validate ADR Orders',  desc:'Post-rename pre-flight: ensure all SHEL orders have valid symbol, price, and venue after the bulk update.', ai:'Validates all orders with symbol=SHEL. Checks for price discrepancies from the rename, confirms venue assignments are still valid. Clean report before pre-market opens.', approval:false, cls:'btn-primary', fn: () => runStep('s6','validate_orders',{symbol:'SHEL'}) },
     ],
 
     preopen_auction_0900: [
-      { id:'s1', label:'1. Pre-Market Check',     desc:'09:02 ET: MOO imbalance on SPY; IEX feed stale 4 min.', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
-      { id:'s2', label:'2. Check IEX Session',    desc:'IEX feed is stale — last quote 4 minutes ago.', cls:'btn-primary', fn: () => runStep('s2','check_fix_sessions',{venue:'IEX'}) },
-      { id:'s3', label:'3. Query MOO Orders',     desc:'Find Market-on-Open orders exposed to SPY imbalance.', cls:'btn-primary', fn: () => runStep('s3','query_orders',{symbol:'SPY'}) },
-      { id:'s4', label:'4. Validate Open Orders', desc:'Pre-flight check all orders — catch stale IEX prices before 09:28 lock.', cls:'btn-primary', fn: () => runStep('s4','validate_orders',{}) },
-      { id:'s5', label:'5. Reconnect IEX',        desc:'If IEX feed remains stale, trigger reconnect.', cls:'btn-danger', fn: () => runStep('s5','fix_session_issue',{venue:'IEX',action:'reconnect'}) },
+      { id:'s1', label:'1. Pre-Market Check',     desc:'09:02 ET full triage: SPY MOO imbalance and IEX feed staleness detected.', ai:'Flags SPY imbalance (buy-heavy), surfaces stale IEX feed (4min), and counts all MOO orders. In Agent mode this triage runs automatically at 08:00 ET.', approval:false, cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
+      { id:'s2', label:'2. Check IEX Session',    desc:'IEX data feed has been silent for 4 minutes — could be a connectivity issue or feed suspension.', ai:'Reads IEX session state and last heartbeat timestamp. If feed is stale >3 min, AI recommends reconnect. Will not reconnect automatically — feed suspension could be intentional.', approval:false, cls:'btn-primary', fn: () => runStep('s2','check_fix_sessions',{venue:'IEX'}) },
+      { id:'s3', label:'3. Query MOO Orders',     desc:'Find all Market-on-Open SPY orders to assess your exposure to the imbalance.', ai:'Lists all open SPY orders with order_type=market or time_in_force=OPG. Calculates total notional and directional exposure. Flags any that would worsen the imbalance.', approval:false, cls:'btn-primary', fn: () => runStep('s3','query_orders',{symbol:'SPY'}) },
+      { id:'s4', label:'4. Validate Open Orders', desc:'Pre-flight all open orders — catch stale prices, IEX-dependent orders, before the 09:28 auction lock.', ai:'Validates every open order. Orders using IEX quotes get a stale_price flag. Orders with IEX as primary venue get a venue_risk warning. Output lists all that need attention before 09:28.', approval:false, cls:'btn-primary', fn: () => runStep('s4','validate_orders',{}) },
+      { id:'s5', label:'5. Reconnect IEX',        desc:'Trigger a FIX Logon (35=A) to IEX to re-establish the data feed.', ai:'Sends Logon to IEX. If session comes up clean with current seq, unblocks all IEX-dependent orders automatically. If seq gap detected, pauses and escalates to human before releasing orders.', approval:true, cls:'btn-danger', fn: () => runStep('s5','fix_session_issue',{venue:'IEX',action:'reconnect'}) },
     ],
 
     open_volatility_0930: [
-      { id:'s1', label:'1. Pre-Market Check',     desc:'09:35 ET: GME LULD halt; BATS packet loss 3.2%.', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
-      { id:'s2', label:'2. Find GME Orders',      desc:'Identify all GME orders blocked by LULD circuit breaker.', cls:'btn-danger', fn: () => runStep('s2','query_orders',{symbol:'GME'}) },
-      { id:'s3', label:'3. Check BATS Session',   desc:'BATS reporting elevated packet loss — assess degradation.', cls:'btn-primary', fn: () => runStep('s3','check_fix_sessions',{venue:'BATS'}) },
-      { id:'s4', label:'4. Query BATS Orders',    desc:'Find orders at BATS that may be delayed due to packet loss.', cls:'btn-primary', fn: () => runStep('s4','query_orders',{venue:'BATS',status:'stuck'}) },
-      { id:'s5', label:'5. Validate Orders',      desc:'Check for duplicate ClOrdIDs and LULD price band violations.', cls:'btn-primary', fn: () => runStep('s5','validate_orders',{}) },
+      { id:'s1', label:'1. Pre-Market Check',     desc:'Market just opened. GME LULD halt active. BATS packet loss 3.2% detected.', ai:'Scans all venues and orders. Flags GME halt (regulatory), BATS degradation, and lists all at-risk orders. In Agent mode this triggers an immediate alert to the desk.', approval:false, cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
+      { id:'s2', label:'2. Find GME Orders',      desc:'Identify every GME order that is now frozen by the LULD circuit breaker.', ai:'Queries all orders with symbol=GME. Lists order IDs, notionals, side, and how long halted. AI does NOT cancel — LULD halts are regulatory, cancels are not guaranteed to succeed during halt.', approval:false, cls:'btn-danger', fn: () => runStep('s2','query_orders',{symbol:'GME'}) },
+      { id:'s3', label:'3. Check BATS Session',   desc:'BATS packet loss at 3.2% is above the 1% warning threshold — assess the degradation.', ai:'Reads BATS FIX session metrics. 3.2% loss means ~1-in-31 messages may be delayed or require retransmit. AI calculates expected ACK delay and flags orders near SLA boundaries.', approval:false, cls:'btn-primary', fn: () => runStep('s3','check_fix_sessions',{venue:'BATS'}) },
+      { id:'s4', label:'4. Query BATS Orders',    desc:'Find stuck orders at BATS — these may have sent but not yet received an ACK due to packet loss.', ai:'Lists all BATS orders with status=stuck. Cross-references against known sent timestamps to identify potential phantom fills. Flags duplicates for human review.', approval:false, cls:'btn-primary', fn: () => runStep('s4','query_orders',{venue:'BATS',status:'stuck'}) },
+      { id:'s5', label:'5. Validate Orders',      desc:'Check all open orders for LULD price band violations and duplicate ClOrdIDs before sending any new orders.', ai:'Validates every open order. GME orders get luld_violation check. BATS orders get duplicate_clordid check. Result: a clear list of what is safe to leave vs. what needs immediate action.', approval:false, cls:'btn-primary', fn: () => runStep('s5','validate_orders',{}) },
     ],
 
     venue_degradation_1030: [
-      { id:'s1', label:'1. Check Sessions',       desc:'10:32 ET: NYSE 180ms latency (Mahwah route flap #44827).', cls:'btn-primary', fn: () => runStep('s1','check_fix_sessions',{}) },
-      { id:'s2', label:'2. Find Stuck Orders',    desc:'12 orders with venue_degraded+seq_backlog at NYSE ($4.1M).', cls:'btn-primary', fn: () => runStep('s2','query_orders',{venue:'NYSE',status:'stuck'}) },
-      { id:'s3', label:'3. Validate NYSE Orders', desc:'Check which NYSE orders are listing-venue-required (cannot reroute).', cls:'btn-primary', fn: () => runStep('s3','validate_orders',{venue:'NYSE'}) },
-      { id:'s4', label:'4. Repair NYSE',          desc:'Send ResendRequest to clear seq backlog caused by route flap.', cls:'btn-danger', fn: () => runStep('s4','fix_session_issue',{venue:'NYSE',action:'resend_request'}) },
-      { id:'s5', label:'5. Re-Check Status',      desc:'Confirm backlog cleared and latency normalising.', cls:'btn-primary', fn: () => runStep('s5','run_premarket_check',{}) },
+      { id:'s1', label:'1. Check Sessions',       desc:'NYSE latency at 180ms — Mahwah co-lo route flap incident #44827.', ai:'Reads all session states. Confirms NYSE at 180ms (DEGRADED threshold: 100ms). Identifies seq_backlog building. Shows how many messages are buffered at NYSE awaiting ACK.', approval:false, cls:'btn-primary', fn: () => runStep('s1','check_fix_sessions',{}) },
+      { id:'s2', label:'2. Find Stuck Orders',    desc:'12 orders at NYSE worth $4.1M have venue_degraded and seq_backlog flags.', ai:'Queries NYSE stuck orders, sorts by notional descending. Flags which ones have listing_venue_required=true (cannot reroute). Gives you a reroutable vs. stuck-here split.', approval:false, cls:'btn-primary', fn: () => runStep('s2','query_orders',{venue:'NYSE',status:'stuck'}) },
+      { id:'s3', label:'3. Validate NYSE Orders', desc:'Pre-validation: identify which NYSE orders are listing-venue-required before attempting any fix.', ai:'Validates all NYSE orders. Marks each as reroutable or listing_required. This prevents the AI from accidentally rerouting a NYSE-listed stock that can only fill on its listing venue.', approval:false, cls:'btn-primary', fn: () => runStep('s3','validate_orders',{venue:'NYSE'}) },
+      { id:'s4', label:'4. Repair NYSE',          desc:'Send ResendRequest (35=2) to clear the sequence backlog from the route flap.', ai:'Sends 35=2 to NYSE requesting retransmit of backed-up messages. Waits for SequenceReset(GapFill) confirmation. ⚠ $4.1M exposure — mixed mode requires human sign-off before sending.', approval:true, cls:'btn-danger', fn: () => runStep('s4','fix_session_issue',{venue:'NYSE',action:'resend_request'}) },
+      { id:'s5', label:'5. Re-Check Status',      desc:'Confirm NYSE latency is returning to normal and the seq backlog is clearing.', ai:'Re-reads NYSE session stats and compares to pre-flap baseline. Prints latency trend (improving/stable/worsening). Auto-releases any orders that unblocked after the repair.', approval:false, cls:'btn-primary', fn: () => runStep('s5','run_premarket_check',{}) },
     ],
 
     ssr_and_split_1130: [
-      { id:'s1', label:'1. Pre-Market Check',     desc:'11:34 ET: RIDE SSR active; AAPL 4:1 split in 26 min.', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
-      { id:'s2', label:'2. Check RIDE Ticker',    desc:'Confirm SSR restriction on RIDE — short-sell orders must be at/above NBBO.', cls:'btn-primary', fn: () => runStep('s2','check_ticker',{symbol:'RIDE'}) },
-      { id:'s3', label:'3. Find RIDE Short Orders', desc:'Identify SellShort orders on RIDE that violate SSR.', cls:'btn-danger', fn: () => runStep('s3','query_orders',{symbol:'RIDE'}) },
-      { id:'s4', label:'4. Check AAPL Ticker',    desc:'Confirm AAPL split ratio and see which orders need adjustment.', cls:'btn-primary', fn: () => runStep('s4','check_ticker',{symbol:'AAPL'}) },
-      { id:'s5', label:'5. Apply AAPL Split',     desc:'Update AAPL ticker (ratio adjustment) — bulk-updates open orders.', cls:'btn-danger', fn: () => runStep('s5','update_ticker',{old_symbol:'AAPL',new_symbol:'AAPL',reason:'corporate_action'}) },
-      { id:'s6', label:'6. Validate All',         desc:'Pre-flight check: catch stop orders with pre-split prices.', cls:'btn-primary', fn: () => runStep('s6','validate_orders',{symbol:'AAPL'}) },
+      { id:'s1', label:'1. Pre-Market Check',     desc:'11:34 ET: RIDE SSR triggered. AAPL 4:1 split executes in 26 minutes.', ai:'Surfaces SSR flag on RIDE and the upcoming AAPL split. Lists all RIDE short orders and all AAPL orders with pre-split prices. Gives you the complete exposure picture.', approval:false, cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
+      { id:'s2', label:'2. Check RIDE Ticker',    desc:'Confirm SSR is active on RIDE — short-sale orders must be at or above NBBO bid.', ai:'Reads RIDE ticker flags. Confirms ssr_active=true. Lists the NBBO at trigger time. Any SellShort orders below this price are in violation — AI lists them but will not cancel without approval.', approval:false, cls:'btn-primary', fn: () => runStep('s2','check_ticker',{symbol:'RIDE'}) },
+      { id:'s3', label:'3. Find RIDE Short Orders', desc:'Identify SellShort orders on RIDE that are priced below NBBO — regulatory violation.', ai:'Queries all RIDE SellShort orders. Compares each price against the SSR reference price. Flags violators with ssr_violation. In Agent mode, auto-cancels orders >$0 below NBBO — needs approval above $500K notional.', approval:true, cls:'btn-danger', fn: () => runStep('s3','query_orders',{symbol:'RIDE'}) },
+      { id:'s4', label:'4. Check AAPL Ticker',    desc:'Confirm AAPL 4:1 split ratio and the effective time so you know which orders to adjust.', ai:'Reads AAPL ticker. Confirms ratio 4:1, effective 12:00 ET. Counts open orders with pre-split prices (>$200). Lists them for adjustment. Will not modify — corporate action requires explicit human command.', approval:false, cls:'btn-primary', fn: () => runStep('s4','check_ticker',{symbol:'AAPL'}) },
+      { id:'s5', label:'5. Apply AAPL Split',     desc:'Trigger the 4:1 split adjustment — bulk-updates all open AAPL order prices and quantities.', ai:'Calls update_ticker for the split. Bulk-adjusts price ÷4, qty ×4 on all open AAPL orders. ⚠ High-impact bulk operation — requires human confirmation even in Agent mode.', approval:true, cls:'btn-danger', fn: () => runStep('s5','update_ticker',{old_symbol:'AAPL',new_symbol:'AAPL',reason:'corporate_action'}) },
+      { id:'s6', label:'6. Validate All',         desc:'Post-split pre-flight: catch any stop orders still using pre-split prices.', ai:'Validates every AAPL order against the new post-split price bands. Any order with price > $220 after the split adjustment is flagged as stale_price. Output shows a clean pass or a list of exceptions.', approval:false, cls:'btn-primary', fn: () => runStep('s6','validate_orders',{symbol:'AAPL'}) },
     ],
 
     iex_recovery_1400: [
-      { id:'s1', label:'1. Check Sessions',       desc:'14:03 ET: IEX recovered after 1-hour outage. Seq gap 8938–8940.', cls:'btn-primary', fn: () => runStep('s1','check_fix_sessions',{}) },
-      { id:'s2', label:'2. Repair IEX',           desc:'Send ResendRequest to resolve the 3-message seq gap on IEX.', cls:'btn-danger', fn: () => runStep('s2','fix_session_issue',{venue:'IEX',action:'resend_request'}) },
-      { id:'s3', label:'3. Find Rerouted Orders', desc:'Find orders diverted to BATS during IEX outage (iex_rerouted flag).', cls:'btn-primary', fn: () => runStep('s3','query_orders',{venue:'BATS'}) },
-      { id:'s4', label:'4. Find D-Limit Orders',  desc:'Identify D-Limit orders that must return to IEX now session is healthy.', cls:'btn-primary', fn: () => runStep('s4','query_orders',{status:'stuck'}) },
-      { id:'s5', label:'5. Validate IEX Orders',  desc:'Check partial fills on NYSE — do not move those orders.', cls:'btn-primary', fn: () => runStep('s5','validate_orders',{}) },
+      { id:'s1', label:'1. Check Sessions',       desc:'14:03 ET: IEX is back after 1-hour outage. Sequence gap: msgs 8938–8940 missing.', ai:'Reads IEX session state. Confirms gap of 3 messages (8938, 8939, 8940). Compares IEX vs BATS fill reports during outage window to surface potential missed fills.', approval:false, cls:'btn-primary', fn: () => runStep('s1','check_fix_sessions',{}) },
+      { id:'s2', label:'2. Repair IEX',           desc:'Send ResendRequest (35=2) to recover the 3-message gap before IEX processes new orders.', ai:'Sends 35=2 for seq 8938–8940. If IEX responds with GapFill (no fills missed), marks gap resolved. If ExecutionReport arrives in gap, checks for duplicate fills vs BATS and alerts human.', approval:true, cls:'btn-danger', fn: () => runStep('s2','fix_session_issue',{venue:'IEX',action:'resend_request'}) },
+      { id:'s3', label:'3. Find Rerouted Orders', desc:'Surface orders that were diverted to BATS during the IEX outage (iex_rerouted flag).', ai:'Queries all BATS orders with flag iex_rerouted=true. Lists each with original venue, fill status, and whether it is now safe to cancel the BATS routing since IEX is back.', approval:false, cls:'btn-primary', fn: () => runStep('s3','query_orders',{venue:'BATS'}) },
+      { id:'s4', label:'4. Find D-Limit Orders',  desc:'D-Limit orders lose their price-improvement guarantee on BATS — they must return to IEX.', ai:'Queries stuck orders with d_limit flag. These CANNOT stay at BATS — IEX D-Limit is an IEX-only order type. AI identifies them but will not cancel/reroute without approval due to live partial fills.', approval:true, cls:'btn-primary', fn: () => runStep('s4','query_orders',{status:'stuck'}) },
+      { id:'s5', label:'5. Validate IEX Orders',  desc:'Final pre-flight: do not move orders with partial fills on NYSE — they have a live leg.', ai:'Validates all post-recovery IEX orders. Orders with partial_fill and venue=NYSE are marked do_not_move. Clean orders get a ready_to_route flag. Report shows move vs. hold decision for each order.', approval:false, cls:'btn-primary', fn: () => runStep('s5','validate_orders',{}) },
     ],
 
     eod_moc_1530: [
-      { id:'s1', label:'1. Pre-Market Check',     desc:'15:31 ET: ARCA MOC cutoff missed; NYSE MOC closes in 14 min.', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
-      { id:'s2', label:'2. Find MOC Orders',      desc:'List all Market-on-Close orders — identify cutoff misses.', cls:'btn-danger', fn: () => runStep('s2','query_orders',{status:'stuck'}) },
-      { id:'s3', label:'3. Find GTC Orders',      desc:'Identify GTC orders that must be preserved before 16:00 DAY purge.', cls:'btn-primary', fn: () => runStep('s3','query_orders',{}) },
-      { id:'s4', label:'4. Validate MOC Orders',  desc:'Check Maple Capital 500K AAPL MOC — large_moc_regulatory_review flag.', cls:'btn-primary', fn: () => runStep('s4','validate_orders',{symbol:'AAPL'}) },
-      { id:'s5', label:'5. Check Sessions',       desc:'Confirm NYSE session is active before cutoff at 15:45.', cls:'btn-primary', fn: () => runStep('s5','check_fix_sessions',{venue:'NYSE'}) },
+      { id:'s1', label:'1. Pre-Market Check',     desc:'15:31 ET: ARCA MOC cutoff at 15:28 already missed. NYSE MOC cutoff at 15:45 — 14 min away.', ai:'Flags the missed ARCA deadline immediately. Counts all MOC orders, sorts by venue. In Agent mode this check triggers an alert at 15:20 to catch the deadline before it passes.', approval:false, cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
+      { id:'s2', label:'2. Find MOC Orders',      desc:'List all Market-on-Close orders — identify those that missed ARCA cutoff and are now stuck.', ai:'Queries all MOC orders. Flags ARCA MOC orders as cutoff_missed — they cannot participate in the close. Separates NYSE MOC orders (still live) from the failed ARCA batch.', approval:false, cls:'btn-danger', fn: () => runStep('s2','query_orders',{status:'stuck'}) },
+      { id:'s3', label:'3. Find GTC Orders',      desc:'Identify GTC orders that survive the 16:00 DAY purge and must not be accidentally canceled.', ai:'Queries all open orders and separates GTC from DAY. Builds a preserve list and a purge list. In Agent mode, pre-stages the purge list so the 16:00 cleanup job runs correctly.', approval:false, cls:'btn-primary', fn: () => runStep('s3','query_orders',{}) },
+      { id:'s4', label:'4. Validate MOC Orders',  desc:'Maple Capital 500K AAPL MOC has a large_moc_regulatory_review flag — must be reviewed.', ai:'Validates all AAPL MOC orders. The Maple Capital 500K order ($107M notional) has a regulatory flag — it cannot be submitted without compliance sign-off. AI holds it and presents the flag for human decision.', approval:true, cls:'btn-primary', fn: () => runStep('s4','validate_orders',{symbol:'AAPL'}) },
+      { id:'s5', label:'5. Check Sessions',       desc:'Confirm NYSE FIX session is active and healthy before the 15:45 MOC cutoff.', ai:'Reads NYSE session state. If healthy, confirms remaining MOC orders can be submitted. If degraded, escalates immediately — NYSE MOC cutoff waits for no one.', approval:false, cls:'btn-primary', fn: () => runStep('s5','check_fix_sessions',{venue:'NYSE'}) },
     ],
 
     afterhours_dark_1630: [
-      { id:'s1', label:'1. After-Hours Check',    desc:'16:32 ET: NYSE/ARCA logged out. Liquidnet offline (SessionStatus=8).', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
-      { id:'s2', label:'2. Check Sessions',       desc:'Confirm which venues are in extended-hours and which are fully offline.', cls:'btn-primary', fn: () => runStep('s2','check_fix_sessions',{}) },
-      { id:'s3', label:'3. Find Dark Pool Orders', desc:'Find orders blocked with dark_pool_unavailable — the orphaned NVDA block.', cls:'btn-danger', fn: () => runStep('s3','query_orders',{status:'stuck'}) },
-      { id:'s4', label:'4. Cancel Uncleaned DAY', desc:'Find DAY orders that were not canceled at 16:00 (OMS cleanup job failed).', cls:'btn-danger', fn: () => runStep('s4','query_orders',{}) },
-      { id:'s5', label:'5. Check BATS Extended',  desc:'Confirm BATS extended-hours session (16:00–20:00) is healthy.', cls:'btn-primary', fn: () => runStep('s5','check_fix_sessions',{venue:'BATS'}) },
-      { id:'s6', label:'6. Validate After-Hours', desc:'Check remaining open orders — confirm only extended-hours eligible orders are active.', cls:'btn-primary', fn: () => runStep('s6','validate_orders',{}) },
+      { id:'s1', label:'1. After-Hours Check',    desc:'16:32 ET: NYSE and ARCA logged out (normal). Liquidnet offline with SessionStatus=8 (abnormal).', ai:'Distinguishes normal post-close logouts (NYSE, ARCA) from the abnormal Liquidnet failure. SessionStatus=8 means Liquidnet sent an explicit halt — this is not a timeout, it is a deliberate disconnect.', approval:false, cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
+      { id:'s2', label:'2. Check Sessions',       desc:'Map which venues are in extended hours, which are fully offline, and which failed abnormally.', ai:'Reads all 6 sessions. Categorizes as: closed_normal (NYSE, ARCA), extended_hours (BATS, EDGX), failed_abnormal (Liquidnet). This map drives which orders can still be worked tonight.', approval:false, cls:'btn-primary', fn: () => runStep('s2','check_fix_sessions',{}) },
+      { id:'s3', label:'3. Find Dark Pool Orders', desc:'NVDA block order worth ~$18M is orphaned — Liquidnet offline means it has nowhere to fill.', ai:'Queries orders with flag dark_pool_unavailable. The NVDA block is the largest exposure. AI will NOT cancel or reroute — dark block strategy decisions have market impact and require PM approval.', approval:true, cls:'btn-danger', fn: () => runStep('s3','query_orders',{status:'stuck'}) },
+      { id:'s4', label:'4. Cancel Uncleaned DAY', desc:'OMS day-order cleanup failed — DAY orders that should have been canceled at 16:00 are still open.', ai:'Queries DAY orders that are still open past 16:00. In Agent mode, auto-cancels DAY orders under $500K notional after 16:05. Holds larger orders for human confirmation — phantom orders can cause overnight risk.', approval:true, cls:'btn-danger', fn: () => runStep('s4','query_orders',{}) },
+      { id:'s5', label:'5. Check BATS Extended',  desc:'Confirm BATS extended-hours session (16:00–20:00 ET) is healthy for overnight fills.', ai:'Reads BATS extended-hours session state. Confirms it is ACTIVE and has a clean seq. Any orders eligible for extended trading can be routed here safely.', approval:false, cls:'btn-primary', fn: () => runStep('s5','check_fix_sessions',{venue:'BATS'}) },
+      { id:'s6', label:'6. Validate After-Hours', desc:'Final check: confirm only extended-hours eligible orders remain open — no regular-session-only orders.', ai:'Validates all remaining open orders against extended-hours eligibility rules. Regular-session-only orders get extended_hours_ineligible flag. AI lists them for cancellation — human must confirm.', approval:true, cls:'btn-primary', fn: () => runStep('s6','validate_orders',{}) },
     ],
 
     twap_slippage_1000: [
-      { id:'s1', label:'1. Check Algo Status',    desc:'10:05 ET: NVDA TWAP 5.2ppts behind; GME TWAP halted mid-execution.', cls:'btn-primary', fn: () => runStep('s1','check_algo_status',{}) },
-      { id:'s2', label:'2. Inspect NVDA TWAP',    desc:'Drill into ALGO-20260328-001: schedule deviation and rejected slices.', cls:'btn-primary', fn: () => runStep('s2','check_algo_status',{algo_id:'ALGO-20260328-001'}) },
-      { id:'s3', label:'3. Pause NVDA TWAP',      desc:'Pause the behind-schedule NVDA TWAP to stop further slippage.', cls:'btn-danger', fn: () => runStep('s3','modify_algo',{algo_id:'ALGO-20260328-001',action:'pause'}) },
-      { id:'s4', label:'4. Check BATS Session',   desc:'BATS degraded 85ms — root cause of NVDA slice rejections.', cls:'btn-primary', fn: () => runStep('s4','check_fix_sessions',{venue:'BATS'}) },
-      { id:'s5', label:'5. Find GME Orders',      desc:'Inspect GME TWAP child slices blocked by LULD halt.', cls:'btn-primary', fn: () => runStep('s5','query_orders',{symbol:'GME'}) },
-      { id:'s6', label:'6. Check Algo Status',    desc:'After pausing NVDA, review full algo book state.', cls:'btn-primary', fn: () => runStep('s6','check_algo_status',{}) },
+      { id:'s1', label:'1. Check Algo Status',    desc:'10:05 ET: NVDA TWAP 5.2ppts behind schedule. GME TWAP halted by LULD.', ai:'Reads all active algos. Surfaces NVDA behind schedule and GME halted. In Agent mode an alert fires automatically when schedule deviation exceeds 3ppts. You are already behind that threshold.', approval:false, cls:'btn-primary', fn: () => runStep('s1','check_algo_status',{}) },
+      { id:'s2', label:'2. Inspect NVDA TWAP',    desc:'Drill into ALGO-20260328-001: which child slices were rejected and why.', ai:'Reads NVDA TWAP detail: 47% executed vs 52% scheduled. Rejected slices all went to BATS (85ms latency). AI calculates that if current pace continues, final shortfall will be ~8.7ppts. Surfaces this projection for human decision.', approval:false, cls:'btn-primary', fn: () => runStep('s2','check_algo_status',{algo_id:'ALGO-20260328-001'}) },
+      { id:'s3', label:'3. Pause NVDA TWAP',      desc:'Stop the behind-schedule NVDA TWAP to prevent further slippage while BATS is degraded.', ai:'Pauses the TWAP immediately. No new child slices will fire. ⚠ Client order — pausing a client TWAP requires desk notification. AI pauses and creates an escalation record but expects human to notify the PM.', approval:true, cls:'btn-danger', fn: () => runStep('s3','modify_algo',{algo_id:'ALGO-20260328-001',action:'pause'}) },
+      { id:'s4', label:'4. Check BATS Session',   desc:'BATS at 85ms is the root cause of the NVDA slice rejections — confirm degradation level.', ai:'Reads BATS session stats. 85ms is in the DEGRADED band (50ms warn, 100ms critical). AI confirms this is the root cause of NVDA rejections. Once BATS recovers below 50ms, NVDA TWAP can resume.', approval:false, cls:'btn-primary', fn: () => runStep('s4','check_fix_sessions',{venue:'BATS'}) },
+      { id:'s5', label:'5. Find GME Orders',      desc:'Inspect GME TWAP child slices blocked by the LULD circuit breaker.', ai:'Queries all GME orders (TWAP children and parent). Shows halt start time and estimated halt duration. AI notes GME halts typically last 5 minutes — it will automatically re-check and resume if LULD clears.', approval:false, cls:'btn-primary', fn: () => runStep('s5','query_orders',{symbol:'GME'}) },
+      { id:'s6', label:'6. Check Algo Status',    desc:'After pausing NVDA, see the full algo book state to plan the rest of the day.', ai:'Re-reads all algos. Shows NVDA as paused, GME as halted, all others healthy. Provides a catch-up schedule: if BATS recovers and NVDA resumes at 10:20, it can finish by 14:30 with a modified pace.', approval:false, cls:'btn-primary', fn: () => runStep('s6','check_algo_status',{}) },
     ],
 
     vwap_vol_spike_1130: [
-      { id:'s1', label:'1. Check Algo Status',    desc:'11:35 ET: MSFT VWAP over-participating at 15% vs 10% cap.', cls:'btn-primary', fn: () => runStep('s1','check_algo_status',{}) },
-      { id:'s2', label:'2. Inspect MSFT VWAP',    desc:'Check ALGO-20260328-003: over_participation and spread_widened flags.', cls:'btn-danger', fn: () => runStep('s2','check_algo_status',{algo_id:'ALGO-20260328-003'}) },
-      { id:'s3', label:'3. Reduce MSFT POV Rate', desc:'Lower MSFT VWAP participation from 15% to 10% to stop over-participation.', cls:'btn-danger', fn: () => runStep('s3','modify_algo',{algo_id:'ALGO-20260328-003',action:'update_pov_rate',new_pov_rate:0.10}) },
-      { id:'s4', label:'4. Inspect AMD POV',      desc:'Check ALGO-20260328-004: AMD POV also over-participating.', cls:'btn-primary', fn: () => runStep('s4','check_algo_status',{algo_id:'ALGO-20260328-004'}) },
-      { id:'s5', label:'5. Reduce AMD POV Rate',  desc:'Lower AMD POV rate from 15% to 8% to reduce market impact.', cls:'btn-danger', fn: () => runStep('s5','modify_algo',{algo_id:'ALGO-20260328-004',action:'update_pov_rate',new_pov_rate:0.08}) },
-      { id:'s6', label:'6. Check Algo Status',    desc:'Confirm both algos are now within participation limits.', cls:'btn-primary', fn: () => runStep('s6','check_algo_status',{}) },
+      { id:'s1', label:'1. Check Algo Status',    desc:'11:35 ET: MSFT VWAP at 15% participation vs 10% cap. AMD POV also over-limit.', ai:'Reads all algos. Surfaces two over-participation violations. In Agent mode, this detection happens automatically every 30 seconds. An alert was already sent — you are confirming before acting.', approval:false, cls:'btn-primary', fn: () => runStep('s1','check_algo_status',{}) },
+      { id:'s2', label:'2. Inspect MSFT VWAP',    desc:'ALGO-20260328-003 has flags: over_participation and spread_widened. Check how bad it is.', ai:'Reads MSFT VWAP detail. 15% vs 10% cap — 5ppt breach. Spread widened from 2c to 6c since algo started. AI calculates that current pace has already added ~3bps of market impact cost to the client.', approval:false, cls:'btn-danger', fn: () => runStep('s2','check_algo_status',{algo_id:'ALGO-20260328-003'}) },
+      { id:'s3', label:'3. Reduce MSFT POV Rate', desc:'Lower MSFT VWAP participation rate from 15% to 10% to stop the over-participation.', ai:'Updates MSFT VWAP pov_rate to 0.10. Child slice sizing immediately adjusts. ⚠ Modifying a live client algo requires desk notification. AI applies the change and logs the modification with rationale to the audit trail.', approval:true, cls:'btn-danger', fn: () => runStep('s3','modify_algo',{algo_id:'ALGO-20260328-003',action:'update_pov_rate',new_pov_rate:0.10}) },
+      { id:'s4', label:'4. Inspect AMD POV',      desc:'ALGO-20260328-004: AMD is also over-participating at 15% vs 8% limit.', ai:'Reads AMD POV detail. Similar pattern to MSFT — vol spike caused the algo to size up. AMD is less liquid than MSFT so the 7ppt breach has more market impact per dollar. Larger urgency.', approval:false, cls:'btn-primary', fn: () => runStep('s4','check_algo_status',{algo_id:'ALGO-20260328-004'}) },
+      { id:'s5', label:'5. Reduce AMD POV Rate',  desc:'Lower AMD POV rate from 15% to 8% to reduce market impact.', ai:'Updates AMD POV pov_rate to 0.08. ⚠ Same approval requirement as MSFT change. AI logs both modifications together as a single event for compliance audit trail purposes.', approval:true, cls:'btn-danger', fn: () => runStep('s5','modify_algo',{algo_id:'ALGO-20260328-004',action:'update_pov_rate',new_pov_rate:0.08}) },
+      { id:'s6', label:'6. Check Algo Status',    desc:'Confirm both algos are back within their participation limits after the rate reductions.', ai:'Re-reads both algos. Confirms MSFT at ≤10% and AMD at ≤8%. Provides updated projected completion times at the new rates. If either is still breaching, alerts immediately.', approval:false, cls:'btn-primary', fn: () => runStep('s6','check_algo_status',{}) },
     ],
 
     is_dark_failure_1415: [
-      { id:'s1', label:'1. Check Algo Status',    desc:'14:15 ET: TSLA IS 108bps shortfall; AMZN dark aggregator zero fills.', cls:'btn-primary', fn: () => runStep('s1','check_algo_status',{}) },
-      { id:'s2', label:'2. Inspect TSLA IS',      desc:'ALGO-20260328-005: high_is_shortfall — avg 251.20 vs arrival 248.50.', cls:'btn-danger', fn: () => runStep('s2','check_algo_status',{algo_id:'ALGO-20260328-005'}) },
-      { id:'s3', label:'3. Pause TSLA IS',        desc:'IS shortfall >50bps requires client approval — pause algo first.', cls:'btn-danger', fn: () => runStep('s3','modify_algo',{algo_id:'ALGO-20260328-005',action:'pause'}) },
-      { id:'s4', label:'4. Inspect AMZN Dark',    desc:'ALGO-20260328-006: no_dark_fill — Liquidnet + IEX dark both rejecting.', cls:'btn-primary', fn: () => runStep('s4','check_algo_status',{algo_id:'ALGO-20260328-006'}) },
-      { id:'s5', label:'5. Cancel AMZN Dark',     desc:'Dark venues illiquid — cancel dark algo and route to lit TWAP instead.', cls:'btn-danger', fn: () => runStep('s5','cancel_algo',{algo_id:'ALGO-20260328-006',reason:'dark venues illiquid, switching to lit TWAP'}) },
-      { id:'s6', label:'6. Check Sessions',       desc:'Verify IEX dark sub-component status for the session engineer.', cls:'btn-primary', fn: () => runStep('s6','check_fix_sessions',{venue:'IEX'}) },
+      { id:'s1', label:'1. Check Algo Status',    desc:'14:15 ET: TSLA IS shortfall 108bps. AMZN dark aggregator has zero fills.', ai:'Reads all algos. TSLA IS at 108bps over arrival (SLA breach threshold: 50bps). AMZN dark at 0% fill rate since 13:45. Both are in urgent state — AI fired alerts 30 min ago at the 50bps breach.', approval:false, cls:'btn-primary', fn: () => runStep('s1','check_algo_status',{}) },
+      { id:'s2', label:'2. Inspect TSLA IS',      desc:'ALGO-20260328-005: avg fill 251.20 vs arrival 248.50 — 108bps shortfall, well above the 50bps SLA limit.', ai:'Reads TSLA IS detail. 108bps shortfall = ~$2.7M in unexpected cost on a $100M order. Identifies root cause: TSLA spread widened post-earnings whisper, causing IS to pay up to fill. This is a client call — pause first, explain second.', approval:false, cls:'btn-danger', fn: () => runStep('s2','check_algo_status',{algo_id:'ALGO-20260328-005'}) },
+      { id:'s3', label:'3. Pause TSLA IS',        desc:'IS shortfall >50bps is a client SLA breach — pause the algo before it worsens.', ai:'Pauses TSLA IS immediately. ⚠ SLA breach with a client — this is a billable event. AI pauses, records the shortfall in the audit trail, and creates a compliance escalation. Human must notify the client PM before resuming.', approval:true, cls:'btn-danger', fn: () => runStep('s3','modify_algo',{algo_id:'ALGO-20260328-005',action:'pause'}) },
+      { id:'s4', label:'4. Inspect AMZN Dark',    desc:'ALGO-20260328-006: no_dark_fill — both Liquidnet and IEX dark are rejecting AMZN blocks.', ai:'Reads AMZN dark aggregator detail. Zero fills since 13:45 — 30 minutes. Both Liquidnet and IEX dark are rejecting with liquidity_unavailable. Dark venues have dried up for AMZN block size ($50M). Cannot fix with reconnect — market structural issue.', approval:false, cls:'btn-primary', fn: () => runStep('s4','check_algo_status',{algo_id:'ALGO-20260328-006'}) },
+      { id:'s5', label:'5. Cancel AMZN Dark',     desc:'Dark venues are structurally illiquid for this size — cancel dark algo and switch to lit TWAP.', ai:'Cancels AMZN dark aggregator. ⚠ Switching strategies mid-order is a significant decision — the lit TWAP will create visible market footprint. AI cancels after human confirmation and pre-stages a TWAP replacement order for immediate launch.', approval:true, cls:'btn-danger', fn: () => runStep('s5','cancel_algo',{algo_id:'ALGO-20260328-006',reason:'dark venues illiquid, switching to lit TWAP'}) },
+      { id:'s6', label:'6. Check Sessions',       desc:'Verify IEX dark sub-component — is it a venue issue or just an AMZN liquidity issue?', ai:'Reads IEX FIX session and dark venue sub-component. If IEX dark session is healthy but rejecting, the issue is AMZN-specific liquidity. If IEX dark session is down, it may affect other symbols too — broader impact assessment.', approval:false, cls:'btn-primary', fn: () => runStep('s6','check_fix_sessions',{venue:'IEX'}) },
     ],
   };
 
@@ -472,16 +507,29 @@ HTML = r"""<!doctype html>
       </div>
     `).join('');
 
+    // scenario brief banner
+    const ctx = SCENARIO_CONTEXT[data.scenario];
+    document.getElementById('scenarioBrief').innerHTML = ctx ? `
+      <div class="brief">
+        <div class="brief-time">⏱ ${ctx.time} &nbsp;·&nbsp; ${ctx.headline}</div>
+        <div class="brief-body">${ctx.body}</div>
+      </div>` : '';
+
     // workflow steps (per-scenario) — store globally, reference by index to avoid quoting issues
     window._steps = SCENARIO_STEPS[data.scenario] || DEFAULT_STEPS;
-    document.getElementById('workflowSteps').innerHTML = window._steps.map((s, i) => `
-      <div class="step" id="step-${s.id}">
-        <h5>${s.label}</h5>
-        <p>${s.desc}</p>
-        ${s.ai ? `<p style="font-family:Arial;font-size:11px;color:#1d4e89;background:#eef4ff;border-radius:6px;padding:6px 8px;margin:4px 0 6px;line-height:1.5"><strong>AI:</strong> ${s.ai}</p>` : ''}
-        <button class="${s.cls}" onclick="runCurrentStep(${i})">Go</button>
-      </div>
-    `).join('');
+    document.getElementById('workflowSteps').innerHTML = window._steps.map((s, i) => {
+      const aiBlock = s.ai
+        ? `<div class="${s.approval ? 'ai-approval' : 'ai-auto'}">${s.ai}</div>`
+        : '';
+      return `
+      <div class="pb-step" id="step-${s.id}">
+        <div class="pb-num">Step ${i+1}</div>
+        <h5>${s.label.replace(/^\d+\.\s*/,'')}</h5>
+        <div class="pb-desc">${s.desc}</div>
+        ${aiBlock}
+        <button class="${s.cls}" onclick="runCurrentStep(${i})" style="margin-top:4px">Run →</button>
+      </div>`;
+    }).join('');
 
     // sessions table
     document.querySelector('#sessionsTable tbody').innerHTML = data.sessions.map(s => `
@@ -550,14 +598,20 @@ HTML = r"""<!doctype html>
   }
 
   async function runTool(tool, args) {
-    document.getElementById('output').textContent = `Running ${tool}…`;
-    switchTab('output');
+    const out = document.getElementById('output');
+    out.textContent = `⏳ Running ${tool}…`;
+    out.className = 'pb-output';
+    switchTab('playbook');
+    out.scrollIntoView({behavior:'smooth', block:'nearest'});
     const data = await fetchJson('/api/tool', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({tool, arguments: args}),
     });
-    if (data) document.getElementById('output').textContent = data.output;
+    if (data) {
+      out.textContent = data.output;
+      out.className = data.ok ? 'pb-output' : 'pb-output error';
+    }
     await refresh();
   }
 
@@ -622,7 +676,7 @@ HTML = r"""<!doctype html>
 
   function switchTab(name) {
     document.querySelectorAll('.tab').forEach((t, i) => {
-      const names = ['output','sessions','orders','algos','activity'];
+      const names = ['playbook','sessions','orders','algos','activity'];
       t.classList.toggle('active', names[i] === name);
     });
     document.querySelectorAll('.tab-body').forEach(b => {
