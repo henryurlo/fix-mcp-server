@@ -78,6 +78,9 @@ services:
     environment:
       - SCENARIO=${SCENARIO:-morning_triage}
       - FIX_MCP_CONFIG_DIR=/app/config
+      - API_URL=http://api-server:8000
+    depends_on:
+      - api-server
     volumes:
       - fix_logs:/var/log/fix
       - ./config:/app/config:ro

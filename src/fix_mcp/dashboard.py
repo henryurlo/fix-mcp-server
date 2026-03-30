@@ -111,6 +111,9 @@ HTML = r"""<!doctype html>
     .stat .label { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 
     .divider { height: 1px; background: var(--line); }
+    .btn-vcr  { background: #1e3a5f; color: #fff; }
+    .btn-vcr.active { background: var(--blue); outline: 2px solid #7eb3ff; }
+    .vcr-bar  { display:flex; gap:4px; align-items:center; padding:0 4px; border-left:1px solid #555; margin-left:4px; }
   </style>
 </head>
 <body>
@@ -125,6 +128,14 @@ HTML = r"""<!doctype html>
       <button id="modeHuman" class="btn-ok"     onclick="switchMode('human')" style="padding:6px 10px;font-size:12px">Human</button>
       <button id="modeMixed" class="btn-neutral" onclick="switchMode('mixed')" style="padding:6px 10px;font-size:12px">Mixed</button>
       <button id="modeAgent" class="btn-neutral" onclick="switchMode('agent')" style="padding:6px 10px;font-size:12px">Agent</button>
+    </div>
+    <div class="vcr-bar">
+      <span style="font-family:Arial;font-size:11px;color:#aaa;letter-spacing:1px;text-transform:uppercase">Sim</span>
+      <button id="vcrPause" class="btn-vcr" onclick="togglePause()" style="padding:6px 10px;font-size:12px">⏸ Pause</button>
+      <button id="vcr1x"  class="btn-vcr" onclick="setSimSpeed(1)"  style="padding:6px 10px;font-size:12px">1x</button>
+      <button id="vcr10x" class="btn-vcr active" onclick="setSimSpeed(10)" style="padding:6px 10px;font-size:12px">10x</button>
+      <button id="vcr20x" class="btn-vcr" onclick="setSimSpeed(20)" style="padding:6px 10px;font-size:12px">20x</button>
+      <button id="vcr60x" class="btn-vcr" onclick="setSimSpeed(60)" style="padding:6px 10px;font-size:12px">60x</button>
     </div>
     <select id="scenarioSelect" onchange="loadScenario(this.value)"></select>
     <button class="btn-neutral" onclick="refresh()">Refresh</button>
@@ -250,18 +261,19 @@ HTML = r"""<!doctype html>
 <script>
   // ── state ──────────────────────────────────────────────────────────────────
   let currentStatus = null;
+  let simState = {speed: 10, paused: false};
 
   // ── workflow definitions — one step set per scenario ──────────────────────
   const SCENARIO_STEPS = {
 
     morning_triage: [
-      { id:'s1', label:'1. Pre-Market Check',   desc:'Full triage: sessions, corp actions, stuck orders, SLA timers.', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
-      { id:'s2', label:'2. Check Sessions',      desc:'Inspect sequence numbers. ARCA is down with a seq gap.', cls:'btn-primary', fn: () => runStep('s2','check_fix_sessions',{}) },
-      { id:'s3', label:'3. Repair ARCA',         desc:'Send ResendRequest (35=2) to recover ARCA sequence gap and release stuck orders.', cls:'btn-danger', fn: () => runStep('s3','fix_session_issue',{venue:'ARCA',action:'resend_request'}) },
-      { id:'s4', label:'4. Query Stuck Orders',  desc:'Find orders blocked at ARCA and by unknown symbols.', cls:'btn-primary', fn: () => runStep('s4','query_orders',{status:'stuck'}) },
-      { id:'s5', label:'5. Check ACME Ticker',   desc:'Confirm ACME→ACMX corporate action affects 23 open orders.', cls:'btn-primary', fn: () => runStep('s5','check_ticker',{symbol:'ACME'}) },
-      { id:'s6', label:'6. Load ZEPH (IPO)',      desc:'Add ZEPH to reference store and release 2 pending IPO orders.', cls:'btn-ok', fn: () => runStep('s6','load_ticker',{symbol:'ZEPH',cusip:'98765X101',name:'Zephyr Technologies Inc',listing_exchange:'NYSE'}) },
-      { id:'s7', label:'7. Validate All Orders', desc:'Pre-flight check all open orders before the 09:30 open.', cls:'btn-primary', fn: () => runStep('s7','validate_orders',{status:'new'}) },
+      { id:'s1', label:'1. Pre-Market Check',   desc:'Full triage: sessions, corp actions, stuck orders, SLA timers.', ai:'AI scans all 6 venues, flags ARCA seq gap, ACME corp action, ZEPH IPO miss, and 3 stuck orders. In Agent mode this runs automatically at 07:00 ET.', cls:'btn-primary', fn: () => runStep('s1','run_premarket_check',{}) },
+      { id:'s2', label:'2. Check Sessions',      desc:'Inspect sequence numbers. ARCA is down with a seq gap.', ai:'AI identifies ARCA LastSentSeq=1042 vs expected 1043. Recommends ResendRequest (35=2). Human approval required before sending.', cls:'btn-primary', fn: () => runStep('s2','check_fix_sessions',{}) },
+      { id:'s3', label:'3. Repair ARCA',         desc:'Send ResendRequest (35=2) to recover ARCA sequence gap and release stuck orders.', ai:'AI sends 35=2 to ARCA, waits for SequenceReset(GapFill) confirmation, then auto-releases 7 stuck orders. ⚠ Notional >$1M — requires human sign-off in Mixed mode.', cls:'btn-danger', fn: () => runStep('s3','fix_session_issue',{venue:'ARCA',action:'resend_request'}) },
+      { id:'s4', label:'4. Query Stuck Orders',  desc:'Find orders blocked at ARCA and by unknown symbols.', ai:'AI surfaces 7 ARCA-blocked orders + 2 ZEPH IPO orders. Flags unknown_symbol and venue_gap reasons. No action taken — presents findings for human review.', cls:'btn-primary', fn: () => runStep('s4','query_orders',{status:'stuck'}) },
+      { id:'s5', label:'5. Check ACME Ticker',   desc:'Confirm ACME→ACMX corporate action affects 23 open orders.', ai:'AI confirms rebrand effective today, counts 23 open ACME orders. Recommends update_ticker but will NOT auto-apply — corporate actions require explicit human approval.', cls:'btn-primary', fn: () => runStep('s5','check_ticker',{symbol:'ACME'}) },
+      { id:'s6', label:'6. Load ZEPH (IPO)',      desc:'Add ZEPH to reference store and release 2 pending IPO orders.', ai:'AI loads ZEPH (CUSIP 98765X101, NYSE listing) and immediately unblocks 2 IPO-day orders. Safe to auto-execute in Agent mode — no notional threshold breach.', cls:'btn-ok', fn: () => runStep('s6','load_ticker',{symbol:'ZEPH',cusip:'98765X101',name:'Zephyr Technologies Inc',listing_exchange:'NYSE'}) },
+      { id:'s7', label:'7. Validate All Orders', desc:'Pre-flight check all open orders before the 09:30 open.', ai:'AI runs pre-flight across all open orders: checks price bands, duplicate ClOrdIDs, venue health, and SLA timers. Produces a pass/fail report. Blocked orders surface in Output tab.', cls:'btn-primary', fn: () => runStep('s7','validate_orders',{status:'new'}) },
     ],
 
     bats_startup_0200: [
@@ -405,9 +417,13 @@ HTML = r"""<!doctype html>
   // ── refresh ────────────────────────────────────────────────────────────────
 
   async function refresh() {
-    const data = await fetchJson('/api/detail');
+    const [data, sim] = await Promise.all([
+      fetchJson('/api/detail'),
+      fetchJson('/api/simulation'),
+    ]);
     if (!data) return;
     currentStatus = data;
+    if (sim) { simState = sim; _updateVCR(); }
 
     // scenario select
     const sel = document.getElementById('scenarioSelect');
@@ -431,11 +447,13 @@ HTML = r"""<!doctype html>
     const ordChip  = data.orders_stuck > 0 ? chip(`${data.orders_stuck} STUCK`, 'warn') : chip(`${data.orders_open} open`, 'ok');
     const algoChip = data.algos_active > 0 ? chip(`${data.algos_active} active`, 'ok') : chip('no algos', 'neutral');
     const modeChip = data.mode === 'agent' ? chip('AGENT AUTO', 'ok') : data.mode === 'mixed' ? chip('MIXED', 'warn') : chip('HUMAN', 'neutral');
+    const simChip  = simState.paused ? chip('⏸ PAUSED', 'warn') : chip(`▶ ${simState.speed}x`, 'neutral');
     document.getElementById('statusbar').innerHTML = `
       <div class="stat">${sessChip}<span class="label">Sessions (${data.sessions.filter(s=>s.status==='active').length}/${data.sessions.length})</span></div>
       <div class="stat">${ordChip}<span class="label">Orders (${data.orders_open} open)</span></div>
       <div class="stat">${algoChip}<span class="label">Algos</span></div>
       <div class="stat">${modeChip}<span class="label">Mode</span></div>
+      <div class="stat">${simChip}<span class="label">Sim Speed</span></div>
       <div class="stat" style="margin-left:auto;color:#aaa;font-size:12px;font-family:Arial">Scenario: <strong style="color:var(--ink)">${data.scenario}</strong></div>
     `;
 
@@ -460,6 +478,7 @@ HTML = r"""<!doctype html>
       <div class="step" id="step-${s.id}">
         <h5>${s.label}</h5>
         <p>${s.desc}</p>
+        ${s.ai ? `<p style="font-family:Arial;font-size:11px;color:#1d4e89;background:#eef4ff;border-radius:6px;padding:6px 8px;margin:4px 0 6px;line-height:1.5"><strong>AI:</strong> ${s.ai}</p>` : ''}
         <button class="${s.cls}" onclick="runCurrentStep(${i})">Go</button>
       </div>
     `).join('');
@@ -619,6 +638,37 @@ HTML = r"""<!doctype html>
       body: JSON.stringify({mode: m}),
     });
     await refresh();
+  }
+
+  async function setSimSpeed(s) {
+    const data = await fetchJson('/api/simulation', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({speed: s, paused: false}),
+    });
+    if (data) { simState = data; _updateVCR(); }
+  }
+
+  async function togglePause() {
+    const data = await fetchJson('/api/simulation', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({paused: !simState.paused}),
+    });
+    if (data) { simState = data; _updateVCR(); }
+  }
+
+  function _updateVCR() {
+    const speeds = [1, 10, 20, 60];
+    speeds.forEach(s => {
+      const btn = document.getElementById('vcr' + s + 'x');
+      if (btn) btn.classList.toggle('active', !simState.paused && simState.speed === s);
+    });
+    const pauseBtn = document.getElementById('vcrPause');
+    if (pauseBtn) {
+      pauseBtn.textContent = simState.paused ? '▶ Resume' : '⏸ Pause';
+      pauseBtn.classList.toggle('active', simState.paused);
+    }
   }
 
   async function renderEvents() {

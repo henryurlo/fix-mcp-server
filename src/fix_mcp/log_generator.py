@@ -269,9 +269,12 @@ class FIXLogGenerator:
         speed_multiplier: float = 10.0,   # 10x = 1 hour in 6 minutes
         output_dir: Optional[str] = None,
         seed: Optional[int] = None,
+        control_url: Optional[str] = None,  # e.g. http://api-server:8000/api/simulation
     ):
         self.scenario = scenario
         self.speed = speed_multiplier
+        self.paused = False
+        self._control_url = control_url or os.environ.get("API_URL", "").rstrip("/") + "/api/simulation" if os.environ.get("API_URL") else None
         self.output_dir = Path(output_dir) if output_dir else None
         self.rng = random.Random(seed)
         self.builder = FIXMessageBuilder()
@@ -590,6 +593,23 @@ class FIXLogGenerator:
 
         return msgs
 
+    # --- Control Polling ---
+
+    async def _poll_control(self) -> None:
+        """Background task: poll /api/simulation every 5s to update speed/paused."""
+        if not self._control_url:
+            return
+        import urllib.request as _ur
+        while True:
+            await asyncio.sleep(5)
+            try:
+                with _ur.urlopen(self._control_url, timeout=2) as r:
+                    state = json.loads(r.read())
+                    self.speed = max(0.1, float(state.get("speed", self.speed)))
+                    self.paused = bool(state.get("paused", self.paused))
+            except Exception:
+                pass  # API not reachable yet — keep current state
+
     # --- Main Stream ---
 
     async def stream(self) -> AsyncIterator[str]:
@@ -599,6 +619,9 @@ class FIXLogGenerator:
         Faults injected at their scheduled offsets.
         Background order flow mixed in.
         """
+        # Start background control polling if API URL is configured
+        poll_task = asyncio.create_task(self._poll_control())
+
         # Initial logons for all venues
         for venue in VENUES:
             yield self._gen_logon(venue)
@@ -607,33 +630,40 @@ class FIXLogGenerator:
         fault_idx = 0
         tick = 0
 
-        while True:
-            sim_elapsed = self._sim_elapsed()
+        try:
+            while True:
+                # Honour pause — spin-wait in 0.5s increments
+                while self.paused:
+                    await asyncio.sleep(0.5)
 
-            # Inject any faults that are due
-            while fault_idx < len(self.faults) and self.faults[fault_idx].offset_seconds <= sim_elapsed:
-                fault = self.faults[fault_idx]
-                logger.info(f"Injecting fault: {fault.description} at +{sim_elapsed:.1f}s sim")
-                for msg in self._inject_fault(fault):
+                sim_elapsed = self._sim_elapsed()
+
+                # Inject any faults that are due
+                while fault_idx < len(self.faults) and self.faults[fault_idx].offset_seconds <= sim_elapsed:
+                    fault = self.faults[fault_idx]
+                    logger.info(f"Injecting fault: {fault.description} at +{sim_elapsed:.1f}s sim")
+                    for msg in self._inject_fault(fault):
+                        yield msg
+                    fault_idx += 1
+
+                # Heartbeats for connected sessions
+                for venue, sess in self.sessions.items():
+                    if sess.connected and (tick % 10 == 0):  # Every 10 ticks ≈ 30s sim
+                        yield self._gen_heartbeat(venue)
+
+                # Background order flow
+                for msg in self._generate_background_flow():
                     yield msg
-                fault_idx += 1
 
-            # Heartbeats for connected sessions
-            for venue, sess in self.sessions.items():
-                if sess.connected and (tick % 10 == 0):  # Every 10 ticks ≈ 30s sim
-                    yield self._gen_heartbeat(venue)
+                tick += 1
+                await asyncio.sleep(3.0 / self.speed)  # Tick interval — respects live speed changes
 
-            # Background order flow
-            for msg in self._generate_background_flow():
-                yield msg
-
-            tick += 1
-            await asyncio.sleep(3.0 / self.speed)  # Tick interval
-
-            # Stop after ~2 hours sim time
-            if sim_elapsed > 7200:
-                logger.info("Scenario stream complete (2h sim time)")
-                break
+                # Stop after ~2 hours sim time
+                if sim_elapsed > 7200:
+                    logger.info("Scenario stream complete (2h sim time)")
+                    break
+        finally:
+            poll_task.cancel()
 
     async def stream_to_file(self, output_dir: Optional[Path] = None):
         """Write log stream to per-venue log files."""
