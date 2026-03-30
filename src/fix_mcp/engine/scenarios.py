@@ -2,6 +2,8 @@
 and ReferenceDataStore with pre-seeded demo state."""
 
 import json
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +17,18 @@ from fix_mcp.engine.reference import (
     Client,
 )
 from fix_mcp.engine.algos import AlgoEngine, AlgoOrder
+
+
+def _rebase_today(ts: str) -> str:
+    """Replace the date portion of an ISO-8601 timestamp with today's date.
+
+    Scenario JSON files use hardcoded dates (e.g. 2026-03-28). When a scenario
+    is loaded we rebase all order timestamps to today so SLA timers start fresh
+    and the pre-market check doesn't immediately show 2,000-minute breaches.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Replace the leading date (YYYY-MM-DD) portion, keep the time part
+    return re.sub(r"^\d{4}-\d{2}-\d{2}", today, ts)
 
 
 class ScenarioEngine:
@@ -264,8 +278,8 @@ class ScenarioEngine:
                 order_type=o["order_type"],
                 venue=o["venue"],
                 client_name=o["client_name"],
-                created_at=o["created_at"],
-                updated_at=o.get("updated_at", o["created_at"]),
+                created_at=_rebase_today(o["created_at"]),
+                updated_at=_rebase_today(o.get("updated_at", o["created_at"])),
                 filled_quantity=int(o.get("filled_quantity", 0)),
                 price=float(o["price"]) if o.get("price") is not None else None,
                 status=o.get("status", "new"),
