@@ -1,0 +1,78 @@
+# =============================================================================
+# FIX MCP — Alert Pattern Configuration
+# =============================================================================
+# Defines detection rules, thresholds, and remediation mappings.
+# The LogMonitor uses these to decide what to detect and how to respond.
+# =============================================================================
+
+# Session health thresholds
+sessions:
+  heartbeat_timeout_seconds: 90
+  max_latency_warning_ms: 50
+  max_latency_critical_ms: 100
+  max_latency_emergency_ms: 200
+  reconnect_max_retries: 3
+  reconnect_backoff_seconds: [5, 15, 30]
+
+# Reject burst detection
+rejects:
+  window_seconds: 60
+  warning_threshold: 2
+  critical_threshold: 3
+  # Reject reasons that trigger regulatory escalation
+  regulatory_keywords:
+    - "SSR"
+    - "short sale restriction"
+    - "LULD"
+    - "regulatory halt"
+    - "compliance"
+
+# Halt detection
+halts:
+  # Halt reasons that require human escalation
+  escalation_reasons:
+    - "LULD"
+    - "REGULATORY"
+    - "NEWS_PENDING"
+    - "VOLATILITY"
+  # Halt reasons that are informational only
+  info_reasons:
+    - "SPLIT_PENDING"
+    - "DIVIDEND"
+
+# Algo monitoring
+algos:
+  # POV participation thresholds
+  pov_warning_pct: 12.0     # Warn if POV > 12%
+  pov_critical_pct: 15.0    # Critical if POV > 15%
+  # TWAP schedule deviation
+  twap_behind_warning_pct: 5.0
+  twap_behind_critical_pct: 10.0
+  # IS shortfall
+  is_shortfall_warning_bps: 20
+  is_shortfall_critical_bps: 50
+  # Always escalate algo modifications
+  always_escalate_modification: true
+  always_escalate_cancel: false
+
+# Escalation policy
+escalation:
+  notional_threshold_usd: 10000000    # $10M
+  max_auto_actions_per_minute: 10
+  escalation_expiry_minutes: 30
+  channels:
+    slack: true
+    email: false
+    pagerduty: false
+
+# Stale feed detection
+feeds:
+  stale_warning_seconds: 10
+  stale_critical_seconds: 30
+
+# Sequence gap handling
+sequence:
+  # Auto-resend for gaps smaller than this
+  auto_resend_max_gap: 100
+  # Escalate for gaps larger than this
+  escalation_gap_threshold: 500

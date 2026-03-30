@@ -69,6 +69,40 @@ services:
     volumes:
       - ./config:/app/config:ro
 
+  # ── FIX log generator (VCR-style simulation, writes to fix-logs volume) ────────
+  log-generator:
+    build: .
+    container_name: fix-mcp-loggen
+    command: ["python", "-m", "fix_mcp.log_generator", "--scenario", "${SCENARIO:-morning_triage}", "--output", "/var/log/fix", "--speed", "${LOG_SPEED:-10}"]
+    restart: "no"
+    environment:
+      - SCENARIO=${SCENARIO:-morning_triage}
+      - FIX_MCP_CONFIG_DIR=/app/config
+    volumes:
+      - fix_logs:/var/log/fix
+      - ./config:/app/config:ro
+    profiles:
+      - simulation
+
+  # ── FIX log monitor (pattern detection + autonomous API calls) ───────────────
+  log-monitor:
+    build: .
+    container_name: fix-mcp-monitor
+    command: ["python", "-m", "fix_mcp.log_monitor", "--watch", "/var/log/fix", "--api", "http://api-server:8000"]
+    restart: on-failure
+    environment:
+      - FIX_MCP_CONFIG_DIR=/app/config
+      - REDIS_URL=redis://redis:6379/0
+      - API_URL=http://api-server:8000
+    depends_on:
+      - api-server
+      - redis
+    volumes:
+      - fix_logs:/var/log/fix:ro
+      - ./config:/app/config:ro
+    profiles:
+      - simulation
+
   # ── FIX gateway process (real venue connectivity) ────────────────────────────
   # Configure via FIX_HOST_NYSE, FIX_PORT_NYSE, etc. environment variables.
   # Uncomment when connecting to real exchange gateways or QuickFIX UAT acceptors.
@@ -127,3 +161,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  fix_logs:

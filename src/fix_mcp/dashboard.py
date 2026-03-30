@@ -15,94 +15,15 @@ For Docker (dashboard container talks to api-server via shared compose network):
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
+import os
+import urllib.error
+import urllib.request
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
-from fix_mcp import server
-from fix_mcp.prompts.trading_ops import SCENARIO_PROMPTS
-
-# ---------------------------------------------------------------------------
-# API helpers (mirrors api.py — dashboard is self-contained)
-# ---------------------------------------------------------------------------
-
-_ALGO_KEYWORDS = ("twap", "vwap", "is_dark", "algo", "pov")
-
-
-def _is_algo(name: str) -> bool:
-    return any(k in name.lower() for k in _ALGO_KEYWORDS)
-
-
-def _available_scenarios() -> list[str]:
-    config_dir = Path(server.engine.config_dir) / "scenarios"
-    if not config_dir.exists():
-        return []
-    return sorted(p.stem for p in config_dir.glob("*.json"))
-
-
-def _status_payload() -> dict:
-    sessions = server.session_manager.get_all_sessions()
-    algos = server.algo_engine.get_all()
-    active_algos = [a for a in algos if a.status in {"running", "paused", "stuck", "halted"}]
-    open_orders = [
-        o for o in server.oms.orders.values()
-        if o.status not in {"filled", "canceled", "rejected"}
-    ]
-    return {
-        "scenario": server.SCENARIO,
-        "is_algo_scenario": _is_algo(server.SCENARIO),
-        "available_scenarios": _available_scenarios(),
-        "sessions": [
-            {
-                "venue": s.venue,
-                "status": s.status,
-                "latency_ms": s.latency_ms,
-                "last_sent_seq": s.last_sent_seq,
-                "last_recv_seq": s.last_recv_seq,
-                "expected_recv_seq": s.expected_recv_seq,
-                "seq_gap": s.expected_recv_seq > s.last_recv_seq + 1,
-                "error": s.error,
-            }
-            for s in sessions
-        ],
-        "orders": [
-            {
-                "order_id": o.order_id,
-                "symbol": o.symbol,
-                "side": o.side,
-                "quantity": o.quantity,
-                "order_type": o.order_type,
-                "price": float(o.price) if o.price else None,
-                "venue": o.venue,
-                "status": o.status,
-                "client_name": o.client_name,
-                "flags": o.flags,
-                "notional": o.notional_value,
-                "is_institutional": o.is_institutional,
-            }
-            for o in open_orders
-        ],
-        "algos": [
-            {
-                "algo_id": a.algo_id,
-                "symbol": a.symbol,
-                "algo_type": a.algo_type,
-                "side": a.side,
-                "total_qty": a.total_qty,
-                "executed_qty": a.executed_qty,
-                "execution_pct": round(a.execution_pct, 1),
-                "schedule_pct": round(a.schedule_pct, 1),
-                "schedule_deviation_pct": round(a.schedule_deviation_pct, 1),
-                "status": a.status,
-                "flags": a.flags,
-                "client_name": a.client_name,
-                "child_count": len(a.child_order_ids),
-            }
-            for a in active_algos
-        ],
-    }
+# API server base URL — override via env var for non-Docker deployments
+API_URL = os.environ.get("API_URL", "http://api-server:8000")
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +120,12 @@ HTML = r"""<!doctype html>
   <div class="topbar">
     <h1>FIX MCP Dashboard</h1>
     <span class="spacer"></span>
+    <div style="display:flex;gap:4px;align-items:center">
+      <span style="font-family:Arial;font-size:11px;color:#aaa;letter-spacing:1px;text-transform:uppercase">Mode</span>
+      <button id="modeHuman" class="btn-ok"     onclick="switchMode('human')" style="padding:6px 10px;font-size:12px">Human</button>
+      <button id="modeMixed" class="btn-neutral" onclick="switchMode('mixed')" style="padding:6px 10px;font-size:12px">Mixed</button>
+      <button id="modeAgent" class="btn-neutral" onclick="switchMode('agent')" style="padding:6px 10px;font-size:12px">Agent</button>
+    </div>
     <select id="scenarioSelect" onchange="loadScenario(this.value)"></select>
     <button class="btn-neutral" onclick="refresh()">Refresh</button>
     <button class="btn-danger"  onclick="resetScenario()">Reset</button>
@@ -268,6 +195,7 @@ HTML = r"""<!doctype html>
         <div class="tab" onclick="switchTab('sessions')">Sessions</div>
         <div class="tab" onclick="switchTab('orders')">Orders</div>
         <div class="tab" onclick="switchTab('algos')">Algos</div>
+        <div class="tab" onclick="switchTab('activity')">Activity</div>
       </div>
 
       <div class="tab-body active" id="tab-output">
@@ -302,6 +230,16 @@ HTML = r"""<!doctype html>
           <table id="algosTable">
             <thead><tr><th>Algo ID</th><th>Symbol</th><th>Type</th><th>Total Qty</th><th>Executed</th><th>Schedule%</th><th>Exec%</th><th>Deviation</th><th>Status</th><th>Client</th><th>Flags</th><th>Actions</th></tr></thead>
           <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-body" id="tab-activity">
+        <div class="card">
+          <h4>Agent Activity Log</h4>
+          <table id="activityTable">
+            <thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Summary</th></tr></thead>
+            <tbody></tbody>
           </table>
         </div>
       </div>
@@ -467,7 +405,7 @@ HTML = r"""<!doctype html>
   // ── refresh ────────────────────────────────────────────────────────────────
 
   async function refresh() {
-    const data = await fetchJson('/api/status');
+    const data = await fetchJson('/api/detail');
     if (!data) return;
     currentStatus = data;
 
@@ -477,17 +415,27 @@ HTML = r"""<!doctype html>
       `<option value="${n}" ${n === data.scenario ? 'selected' : ''}>${n}</option>`
     ).join('');
 
+    // mode buttons
+    const modes = ['human','mixed','agent'];
+    modes.forEach(m => {
+      const btn = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+      if (btn) btn.className = m === data.mode ? 'btn-ok' : 'btn-neutral';
+      if (btn) btn.style.cssText = 'padding:6px 10px;font-size:12px';
+    });
+
     // status bar
     const downs = data.sessions.filter(s => s.status === 'down').length;
     const warns = data.sessions.filter(s => s.status === 'degraded').length;
     const actv  = data.sessions.filter(s => s.status === 'active').length;
     const sessChip = downs > 0 ? chip(`${downs} DOWN`, 'down') : warns > 0 ? chip(`${warns} WARN`, 'warn') : chip(`${actv} OK`, 'ok');
-    const ordChip  = data.orders.stuck > 0 ? chip(`${data.orders.stuck} STUCK`, 'warn') : chip(`${data.orders.open} open`, 'ok');
-    const algoChip = data.algos.active > 0 ? chip(`${data.algos.active} active`, 'ok') : chip('no algos', 'neutral');
+    const ordChip  = data.orders_stuck > 0 ? chip(`${data.orders_stuck} STUCK`, 'warn') : chip(`${data.orders_open} open`, 'ok');
+    const algoChip = data.algos_active > 0 ? chip(`${data.algos_active} active`, 'ok') : chip('no algos', 'neutral');
+    const modeChip = data.mode === 'agent' ? chip('AGENT AUTO', 'ok') : data.mode === 'mixed' ? chip('MIXED', 'warn') : chip('HUMAN', 'neutral');
     document.getElementById('statusbar').innerHTML = `
       <div class="stat">${sessChip}<span class="label">Sessions (${data.sessions.filter(s=>s.status==='active').length}/${data.sessions.length})</span></div>
-      <div class="stat">${ordChip}<span class="label">Orders (${data.orders.open} open)</span></div>
+      <div class="stat">${ordChip}<span class="label">Orders (${data.orders_open} open)</span></div>
       <div class="stat">${algoChip}<span class="label">Algos</span></div>
+      <div class="stat">${modeChip}<span class="label">Mode</span></div>
       <div class="stat" style="margin-left:auto;color:#aaa;font-size:12px;font-family:Arial">Scenario: <strong style="color:var(--ink)">${data.scenario}</strong></div>
     `;
 
@@ -655,16 +603,42 @@ HTML = r"""<!doctype html>
 
   function switchTab(name) {
     document.querySelectorAll('.tab').forEach((t, i) => {
-      const names = ['output','sessions','orders','algos'];
+      const names = ['output','sessions','orders','algos','activity'];
       t.classList.toggle('active', names[i] === name);
     });
     document.querySelectorAll('.tab-body').forEach(b => {
       b.classList.toggle('active', b.id === 'tab-' + name);
     });
+    if (name === 'activity') renderEvents();
+  }
+
+  async function switchMode(m) {
+    await fetchJson('/api/mode', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({mode: m}),
+    });
+    await refresh();
+  }
+
+  async function renderEvents() {
+    const events = await fetchJson('/api/events');
+    if (!events) return;
+    document.querySelector('#activityTable tbody').innerHTML = events.map(e => {
+      const t = new Date(e.ts).toLocaleTimeString();
+      const ok = e.ok ? '<span style="color:var(--ok);font-weight:700">OK</span>' : '<span style="color:var(--down);font-weight:700">ERR</span>';
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${t}</td>
+        <td><strong>${e.tool}</strong></td>
+        <td>${ok}</td>
+        <td style="font-size:12px;color:#555">${e.summary}</td>
+      </tr>`;
+    }).join('');
   }
 
   // ── init ───────────────────────────────────────────────────────────────────
   refresh();
+  setInterval(refresh, 5000);
 </script>
 </body>
 </html>
@@ -672,71 +646,68 @@ HTML = r"""<!doctype html>
 
 
 # ---------------------------------------------------------------------------
-# Inline API (mirrors api.py — dashboard is self-contained)
+# Proxy handler — forwards all /api/* requests to the API server
 # ---------------------------------------------------------------------------
-
-def _json_bytes(payload: object) -> bytes:
-    return json.dumps(payload).encode("utf-8")
-
 
 class DashboardHandler(BaseHTTPRequestHandler):
 
-    def _send_json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
-        body = _json_bytes(payload)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+    def _send_html(self, body: bytes) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length", "0"))
-        raw = self.rfile.read(length)
-        return json.loads(raw.decode("utf-8") or "{}")
+    def _proxy(self, path: str, method: str = "GET", body: bytes | None = None) -> None:
+        url = f"{API_URL}{path}"
+        headers = {"Content-Type": "application/json"} if body else {}
+        try:
+            req = urllib.request.Request(url, data=body, headers=headers, method=method)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = resp.read()
+                self.send_response(resp.status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(data)
+        except urllib.error.HTTPError as exc:
+            data = exc.read()
+            self.send_response(exc.code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as exc:
+            error = json.dumps({"error": str(exc), "ok": False}).encode()
+            self.send_response(HTTPStatus.BAD_GATEWAY)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(error)))
+            self.end_headers()
+            self.wfile.write(error)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/":
-            body = HTML.encode("utf-8")
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_html(HTML.encode("utf-8"))
             return
-
-        if self.path == "/api/status":
-            self._send_json(_status_payload())
+        if self.path.startswith("/api/"):
+            self._proxy(self.path)
             return
-
-        if self.path == "/api/scenarios":
-            names = _available_scenarios()
-            self._send_json([
-                {"name": n, "context": SCENARIO_PROMPTS.get(n, ""), "is_algo": _is_algo(n)}
-                for n in names
-            ])
-            return
-
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path == "/api/tool":
-            payload = self._read_json()
-            tool = payload.get("tool", "")
-            arguments = payload.get("arguments", {})
-            try:
-                result = asyncio.run(server.call_tool(tool, arguments))
-                self._send_json({"output": result[0].text, "ok": True})
-            except Exception as exc:
-                self._send_json({"output": str(exc), "ok": False}, HTTPStatus.BAD_REQUEST)
+        if self.path.startswith("/api/"):
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            self._proxy(self.path, "POST", body)
             return
-
-        if self.path == "/api/reset":
-            payload = self._read_json()
-            scenario = payload.get("scenario") or None
-            active = server.reset_runtime(scenario)
-            self._send_json({"output": f"Scenario loaded: {active}", "scenario": active, "ok": True})
-            return
-
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def log_message(self, fmt: str, *args: object) -> None:

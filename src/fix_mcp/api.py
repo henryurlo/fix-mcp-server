@@ -16,12 +16,44 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import threading
+from collections import deque
+from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from fix_mcp import server
 from fix_mcp.prompts.trading_ops import SCENARIO_PROMPTS
+
+# ---------------------------------------------------------------------------
+# Shared state: agent mode + event log
+# ---------------------------------------------------------------------------
+
+_mode: str = "human"          # "human" | "agent" | "mixed"
+_events: deque = deque(maxlen=100)
+_events_lock = threading.Lock()
+
+
+def _publish_event(tool: str, args: dict, result: str, ok: bool) -> None:
+    """Append event to in-memory log and optionally publish to Redis."""
+    event = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "tool": tool,
+        "ok": ok,
+        "summary": (result or "")[:200],
+    }
+    with _events_lock:
+        _events.appendleft(event)
+    redis_url = os.environ.get("REDIS_URL")
+    if redis_url:
+        try:
+            import redis as _redis  # optional dependency
+            r = _redis.from_url(redis_url, socket_timeout=1)
+            r.publish("fix:events", json.dumps(event))
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +137,73 @@ def _order_summary() -> list[dict]:
     return orders
 
 
+def _detail_payload() -> dict:
+    """Full expanded status for the dashboard — sessions/orders/algos as flat arrays."""
+    sessions = server.session_manager.get_all_sessions()
+    algos = server.algo_engine.get_all()
+    active_algos = [a for a in algos if a.status in {"running", "paused", "stuck", "halted"}]
+    open_orders = [o for o in server.oms.orders.values() if o.status not in {"filled", "canceled", "rejected"}]
+    stuck_orders = [o for o in open_orders if o.status == "stuck"]
+    return {
+        "scenario": server.SCENARIO,
+        "is_algo_scenario": _is_algo_scenario(server.SCENARIO),
+        "available_scenarios": _available_scenarios(),
+        "mode": _mode,
+        "sessions": [
+            {
+                "venue": s.venue,
+                "status": s.status,
+                "latency_ms": s.latency_ms,
+                "last_sent_seq": s.last_sent_seq,
+                "last_recv_seq": s.last_recv_seq,
+                "expected_recv_seq": s.expected_recv_seq,
+                "seq_gap": s.expected_recv_seq > s.last_recv_seq + 1,
+                "error": s.error,
+            }
+            for s in sessions
+        ],
+        "orders": [
+            {
+                "order_id": o.order_id,
+                "symbol": o.symbol,
+                "side": o.side,
+                "quantity": o.quantity,
+                "order_type": o.order_type,
+                "price": float(o.price) if o.price else None,
+                "venue": o.venue,
+                "status": o.status,
+                "client_name": o.client_name,
+                "flags": o.flags,
+                "is_institutional": o.is_institutional,
+                "notional": o.notional_value,
+            }
+            for o in open_orders
+        ],
+        "algos": [
+            {
+                "algo_id": a.algo_id,
+                "symbol": a.symbol,
+                "algo_type": a.algo_type,
+                "side": a.side,
+                "total_qty": a.total_qty,
+                "executed_qty": a.executed_qty,
+                "execution_pct": round(a.execution_pct, 1),
+                "schedule_pct": round(a.schedule_pct, 1),
+                "schedule_deviation_pct": round(a.schedule_deviation_pct, 1),
+                "status": a.status,
+                "flags": a.flags,
+                "client_name": a.client_name,
+                "child_count": len(a.child_order_ids),
+            }
+            for a in active_algos
+        ],
+        "orders_open": len(open_orders),
+        "orders_stuck": len(stuck_orders),
+        "algos_active": len(active_algos),
+        "algos_total": len(algos),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Request handler
 # ---------------------------------------------------------------------------
@@ -134,7 +233,7 @@ class APIHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/" or self.path == "":
-            self._send_json({"api": "fix-mcp", "version": "0.1.0", "endpoints": ["/health", "/api/status", "/api/sessions", "/api/orders", "/api/algos", "/api/scenarios", "/api/tool (POST)", "/api/reset (POST)"]})
+            self._send_json({"api": "fix-mcp", "version": "0.1.0", "endpoints": ["/health", "/api/status", "/api/detail", "/api/sessions", "/api/orders", "/api/algos", "/api/scenarios", "/api/events", "/api/mode", "/api/tool (POST)", "/api/reset (POST)", "/api/mode (POST)"]})
             return
 
         if self.path == "/health":
@@ -196,6 +295,19 @@ class APIHandler(BaseHTTPRequestHandler):
             ])
             return
 
+        if self.path == "/api/detail":
+            self._send_json(_detail_payload())
+            return
+
+        if self.path == "/api/mode":
+            self._send_json({"mode": _mode})
+            return
+
+        if self.path.startswith("/api/events"):
+            with _events_lock:
+                self._send_json(list(_events))
+            return
+
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
@@ -205,9 +317,21 @@ class APIHandler(BaseHTTPRequestHandler):
             arguments = payload.get("arguments", {})
             try:
                 result = asyncio.run(server.call_tool(tool, arguments))
-                self._send_json({"output": result[0].text, "ok": True})
+                result_text = result[0].text
+                _publish_event(tool, arguments, result_text, True)
+                self._send_json({"output": result_text, "ok": True})
             except Exception as exc:
+                _publish_event(tool, arguments, str(exc), False)
                 self._send_json({"output": str(exc), "ok": False}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if self.path == "/api/mode":
+            global _mode
+            payload = self._read_json()
+            new_mode = payload.get("mode", "human")
+            if new_mode in ("human", "agent", "mixed"):
+                _mode = new_mode
+            self._send_json({"mode": _mode, "ok": True})
             return
 
         if self.path == "/api/reset":
