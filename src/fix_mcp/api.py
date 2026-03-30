@@ -141,6 +141,23 @@ def _order_summary() -> list[dict]:
     return orders
 
 
+def _order_sla_breached(o) -> bool:
+    """Return True if this order's SLA deadline has passed."""
+    if not o.is_institutional or o.sla_minutes is None:
+        return False
+    if o.status not in {"new", "stuck", "partially_filled"}:
+        return False
+    try:
+        baseline_str = max(o.created_at, o.updated_at)
+        created = datetime.fromisoformat(baseline_str)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        deadline = created.timestamp() + o.sla_minutes * 60
+        return datetime.now(timezone.utc).timestamp() > deadline
+    except Exception:
+        return False
+
+
 def _detail_payload() -> dict:
     """Full expanded status for the dashboard — sessions/orders/algos as flat arrays."""
     sessions = server.session_manager.get_all_sessions()
@@ -180,6 +197,10 @@ def _detail_payload() -> dict:
                 "flags": o.flags,
                 "is_institutional": o.is_institutional,
                 "notional": o.notional_value,
+                "sla_minutes": o.sla_minutes,
+                "created_at": o.created_at,
+                "updated_at": o.updated_at,
+                "sla_breached": _order_sla_breached(o),
             }
             for o in open_orders
         ],

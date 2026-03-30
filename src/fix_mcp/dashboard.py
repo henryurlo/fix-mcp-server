@@ -127,6 +127,21 @@ HTML = r"""<!doctype html>
     .ai-auto::before     { content:"🤖 Auto: "; font-weight:700; }
     .ai-approval::before { content:"✋ Needs OK: "; font-weight:700; color:var(--warn); }
 
+    /* ── client notification panel ── */
+    .notify-panel { background:#fff8e1; border:1px solid var(--warn); border-radius:12px; padding:12px; }
+    .notify-panel .notify-title { font-family:Arial,sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);font-weight:700;margin-bottom:8px; }
+    .notify-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #ffe082; font-family:Arial,sans-serif;font-size:12px; }
+    .notify-row:last-child { border-bottom:none; }
+    .notify-row .client { font-weight:700;color:var(--ink); }
+    .notify-row .detail { color:#666;font-size:11px; }
+
+    /* ── output cards from pre-market check ── */
+    .issue-card { border-radius:10px; padding:10px 12px; margin-bottom:8px; font-family:Arial,sans-serif;font-size:12px;line-height:1.5; }
+    .issue-critical { background:#fff0f0; border-left:4px solid var(--down); }
+    .issue-warning  { background:#fffbf0; border-left:4px solid var(--warn); }
+    .issue-ok       { background:#f0fff8; border-left:4px solid var(--ok); }
+    .issue-card strong { display:block; font-size:13px; margin-bottom:3px; }
+
     /* ── playbook steps in main area ── */
     .playbook { display:flex; flex-direction:column; gap:10px; }
     .pb-step  { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
@@ -182,6 +197,14 @@ HTML = r"""<!doctype html>
         <button class="btn-primary" onclick="runTool('check_fix_sessions',{})">Sessions</button>
         <button class="btn-primary" onclick="runTool('check_algo_status',{})">Algos</button>
         <button class="btn-neutral" onclick="switchTab('activity')">Activity Log</button>
+      </div>
+
+      <div id="notifyPanel" style="display:none;margin-top:10px">
+        <div class="divider" style="margin-bottom:10px"></div>
+        <div class="notify-panel">
+          <div class="notify-title">📞 Client Notifications Required</div>
+          <div id="notifyRows"></div>
+        </div>
       </div>
 
       <div class="divider"></div>
@@ -306,9 +329,10 @@ HTML = r"""<!doctype html>
       { id:'s2', label:'2. Check Sessions',      desc:'Inspect sequence numbers. ARCA is down with a seq gap.', ai:'AI identifies ARCA LastSentSeq=1042 vs expected 1043. Recommends ResendRequest (35=2). Human approval required before sending.', cls:'btn-primary', fn: () => runStep('s2','check_fix_sessions',{}) },
       { id:'s3', label:'3. Repair ARCA',         desc:'Send ResendRequest (35=2) to recover ARCA sequence gap and release stuck orders.', ai:'AI sends 35=2 to ARCA, waits for SequenceReset(GapFill) confirmation, then auto-releases 7 stuck orders. ⚠ Notional >$1M — requires human sign-off in Mixed mode.', cls:'btn-danger', fn: () => runStep('s3','fix_session_issue',{venue:'ARCA',action:'resend_request'}) },
       { id:'s4', label:'4. Query Stuck Orders',  desc:'Find orders blocked at ARCA and by unknown symbols.', ai:'AI surfaces 7 ARCA-blocked orders + 2 ZEPH IPO orders. Flags unknown_symbol and venue_gap reasons. No action taken — presents findings for human review.', cls:'btn-primary', fn: () => runStep('s4','query_orders',{status:'stuck'}) },
-      { id:'s5', label:'5. Check ACME Ticker',   desc:'Confirm ACME→ACMX corporate action affects 23 open orders.', ai:'AI confirms rebrand effective today, counts 23 open ACME orders. Recommends update_ticker but will NOT auto-apply — corporate actions require explicit human approval.', cls:'btn-primary', fn: () => runStep('s5','check_ticker',{symbol:'ACME'}) },
-      { id:'s6', label:'6. Load ZEPH (IPO)',      desc:'Add ZEPH to reference store and release 2 pending IPO orders.', ai:'AI loads ZEPH (CUSIP 98765X101, NYSE listing) and immediately unblocks 2 IPO-day orders. Safe to auto-execute in Agent mode — no notional threshold breach.', cls:'btn-ok', fn: () => runStep('s6','load_ticker',{symbol:'ZEPH',cusip:'98765X101',name:'Zephyr Technologies Inc',listing_exchange:'NYSE'}) },
-      { id:'s7', label:'7. Validate All Orders', desc:'Pre-flight check all open orders before the 09:30 open.', ai:'AI runs pre-flight across all open orders: checks price bands, duplicate ClOrdIDs, venue health, and SLA timers. Produces a pass/fail report. Blocked orders surface in Output tab.', cls:'btn-primary', fn: () => runStep('s7','validate_orders',{status:'new'}) },
+      { id:'s5', label:'5. Check ACME Ticker',   desc:'Confirm ACME→ACMX corporate action affects 23 open orders.', ai:'AI confirms rebrand effective today, counts 23 open ACME orders. Confirms corp action is pending and prepares update_ticker for the next step.', approval:false, cls:'btn-primary', fn: () => runStep('s5','check_ticker',{symbol:'ACME'}) },
+      { id:'s5b', label:'5b. Apply ACME→ACMX',   desc:'Rename ACME to ACMX and bulk-update all 23 open orders — this releases the SLA clock on every affected order.', ai:'Calls update_ticker(ACME→ACMX). Renames symbol in reference store and patches all 23 open orders. SLA timers restart from now on each order. ⚠ Stop orders (025, 026) flagged for manual price review after rename — two clients to notify.', approval:true, cls:'btn-danger', fn: () => runStep('s5b','update_ticker',{old_symbol:'ACME',new_symbol:'ACMX',reason:'corporate_action'}) },
+      { id:'s6', label:'6. Load ZEPH (IPO)',      desc:'Add ZEPH to reference store and release 2 pending IPO orders.', ai:'AI loads ZEPH (CUSIP 98765X101, NYSE listing) and immediately unblocks 2 IPO-day orders. Safe to auto-execute in Agent mode — no notional threshold breach.', approval:false, cls:'btn-ok', fn: () => runStep('s6','load_ticker',{symbol:'ZEPH',cusip:'98765X101',name:'Zephyr Technologies Inc',listing_exchange:'NYSE'}) },
+      { id:'s7', label:'7. Validate All Orders', desc:'Pre-flight check all open orders before the 09:30 open.', ai:'AI runs pre-flight across all open orders: checks price bands, duplicate ClOrdIDs, venue health, and SLA timers. Produces a pass/fail report. Any remaining SLA-breached orders surface as "client notification required" in the sidebar.', approval:false, cls:'btn-primary', fn: () => runStep('s7','validate_orders',{status:'new'}) },
     ],
 
     bats_startup_0200: [
@@ -583,6 +607,25 @@ HTML = r"""<!doctype html>
         </td>
       </tr>
     `).join('');
+
+    // notification panel — naturally-expired SLA breaches (not stuck, so tools can't fix them)
+    const breachedOrders = (data.orders || []).filter(o => o.sla_breached && o.status !== 'stuck');
+    const notifyPanel = document.getElementById('notifyPanel');
+    const notifyRows  = document.getElementById('notifyRows');
+    if (breachedOrders.length > 0) {
+      notifyRows.innerHTML = breachedOrders.map(o => `
+        <div class="notify-row">
+          <div>
+            <div class="client">${o.client_name}</div>
+            <div class="detail">${o.symbol} ${o.side.toUpperCase()} ${o.quantity.toLocaleString()} @ ${o.venue}</div>
+          </div>
+          <div class="detail" style="text-align:right">SLA ${o.sla_minutes}min<br><span style="color:var(--down);font-weight:700">EXPIRED</span></div>
+        </div>
+      `).join('');
+      notifyPanel.style.display = 'block';
+    } else {
+      notifyPanel.style.display = 'none';
+    }
   }
 
   // ── actions ────────────────────────────────────────────────────────────────
@@ -597,6 +640,52 @@ HTML = r"""<!doctype html>
     }
   }
 
+  function _parsePremarketOutput(text) {
+    // Parse structured pre-market check output into issue cards.
+    // Sections: CRITICAL / WARNING / INFO / SUMMARY
+    const lines = text.split('\n');
+    let html = '';
+    let section = null; // 'critical' | 'warning' | 'info' | 'summary' | null
+    const headerRe = /^(CRITICAL|WARNING|INFO)\s*\((\d+)\s*issues?\)/i;
+    const summaryRe = /^===\s*SUMMARY\s*===/i;
+    const dividerRe = /^[━─=]{10,}/;
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+
+      const hm = line.match(headerRe);
+      if (hm) {
+        section = hm[1].toLowerCase();
+        const count = parseInt(hm[2], 10);
+        const cls   = section === 'critical' ? 'down' : section === 'warning' ? 'warn' : 'ok';
+        const icon  = section === 'critical' ? '🔴' : section === 'warning' ? '🟡' : 'ℹ️';
+        html += `<div style="font-family:Arial;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--${cls});font-weight:700;margin:14px 0 4px">${icon} ${hm[1]} — ${count} issue${count !== 1 ? 's' : ''}</div>`;
+        continue;
+      }
+      if (summaryRe.test(line)) { section = 'summary'; continue; }
+      if (dividerRe.test(line)) continue;
+      // title line (=== PRE-MARKET CHECK … ===)
+      if (/^===.*===$/.test(line)) {
+        html += `<div style="font-family:var(--mono);font-size:11px;color:#90b8e8;margin-bottom:8px">${line}</div>`;
+        continue;
+      }
+
+      if (section === 'critical') {
+        html += `<div class="issue-card issue-critical"><strong>${line}</strong></div>`;
+      } else if (section === 'warning') {
+        html += `<div class="issue-card issue-warning"><strong>${line}</strong></div>`;
+      } else if (section === 'info') {
+        html += `<div class="issue-card issue-ok">${line.replace(/^-\s*/,'')}</div>`;
+      } else if (section === 'summary') {
+        html += `<div style="font-family:Arial;font-size:12px;margin-top:4px;color:#555">${line}</div>`;
+      } else {
+        html += `<div style="font-family:Arial;font-size:12px;color:#555">${line}</div>`;
+      }
+    }
+    return html || `<pre>${text}</pre>`;
+  }
+
   async function runTool(tool, args) {
     const out = document.getElementById('output');
     out.textContent = `⏳ Running ${tool}…`;
@@ -609,8 +698,17 @@ HTML = r"""<!doctype html>
       body: JSON.stringify({tool, arguments: args}),
     });
     if (data) {
-      out.textContent = data.output;
-      out.className = data.ok ? 'pb-output' : 'pb-output error';
+      if (tool === 'run_premarket_check' && data.ok) {
+        out.className = 'pb-output';
+        out.style.background = 'var(--panel)';
+        out.style.color = 'var(--ink)';
+        out.innerHTML = _parsePremarketOutput(data.output);
+      } else {
+        out.textContent = data.output;
+        out.className = data.ok ? 'pb-output' : 'pb-output error';
+        out.style.background = '';
+        out.style.color = '';
+      }
     }
     await refresh();
   }

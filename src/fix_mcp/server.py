@@ -95,7 +95,12 @@ def _sla_countdown(order: Order) -> str | None:
     if order.sla_minutes is None:
         return None
     try:
-        created = datetime.fromisoformat(order.created_at)
+        # Use whichever is later: original creation time or last update time.
+        # When an order is released from a stuck/venue-down state its updated_at
+        # is reset to now, so the SLA clock restarts from the moment it became
+        # workable rather than from the original submission time.
+        baseline_str = max(order.created_at, order.updated_at)
+        created = datetime.fromisoformat(baseline_str)
         if created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
         deadline = created.timestamp() + order.sla_minutes * 60
