@@ -2,7 +2,7 @@
 # Run:  docker compose up -d
 # MCP stdio:  docker compose run --rm mcp-server
 # API:        http://localhost:8000
-# Dashboard:  http://localhost:8080
+# Dashboard:  http://localhost:8787
 
 services:
 
