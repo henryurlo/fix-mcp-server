@@ -10,17 +10,24 @@ A production-grade MCP server for FIX protocol trading operations. Exposes 15 to
 - **Algorithmic order engine** — TWAP, VWAP, POV, IS, DARK_AGG, ICEBERG with schedule tracking and execution quality metrics
 - **Production stack** — PostgreSQL 16 + Redis 7 via Docker Compose, async FIX TCP connector
 
-## Quick Start (local)
+## Quick Start
+
+**One command — no Docker required:**
 
 ```bash
-# Install into local venv
-XDG_CACHE_HOME=/tmp ./.venv/bin/python -m pip install -e . --no-build-isolation
-
-# Start the MCP server (stdio)
-SCENARIO=morning_triage ./.venv/bin/fix-mcp-server
+./scripts/start.sh
+# Open: http://localhost:8080
 ```
 
-## Quick Start (Docker)
+The script creates a virtualenv on first run, installs the package, then starts the dashboard. The REST API is embedded in the same process — one port, one URL.
+
+**Load a specific scenario:**
+
+```bash
+SCENARIO=twap_slippage_1000 ./scripts/start.sh
+```
+
+**Docker (full production stack):**
 
 ```bash
 docker compose up -d
@@ -35,9 +42,9 @@ docker compose up -d
 {
   "mcpServers": {
     "fix-mcp": {
-      "command": "/home/urbano-claw/FIX-MCP/fix-mcp-server/.venv/bin/fix-mcp-server",
+      "command": "/path/to/fix-mcp-server/.venv/bin/fix-mcp-server",
       "args": [],
-      "cwd": "/home/urbano-claw/FIX-MCP/fix-mcp-server"
+      "cwd": "/path/to/fix-mcp-server"
     }
   }
 }
@@ -119,28 +126,35 @@ PYTHONPATH=src ./.venv/bin/python -m pytest
 ## CLI Smoke Test
 
 ```bash
-cd /home/urbano-claw/FIX-MCP/fix-mcp-server && PYTHONPATH=src ./.venv/bin/python -c "import asyncio; from fix_mcp import server; print(asyncio.run(server.call_tool('run_premarket_check', {}))[0].text)"
+PYTHONPATH=src ./.venv/bin/python -c "import asyncio; from fix_mcp import server; print(asyncio.run(server.call_tool('run_premarket_check', {}))[0].text)"
 ```
 
 ## Dashboard
 
 ```bash
-PYTHONPATH=src ./.venv/bin/fix-mcp-dashboard
-# Open: http://127.0.0.1:8787
+./scripts/start.sh
+# Open: http://localhost:8080
 ```
 
-The dashboard is self-contained — serves both the HTML and the API from one process. Features:
-- Per-scenario guided workflow steps (all 13 scenarios have specific steps)
-- Session health cards with latency and sequence gap indicators
-- Tabbed view: Output / Sessions / Orders / Algos
-- Inline algo Pause and Cancel buttons
-- Send Order and Session Repair forms in sidebar
-- Scenario dropdown reloads runtime and refreshes workflow steps
+Self-contained — one command starts both the REST API (embedded) and the web UI. Features:
+
+| Tab | What it shows |
+|---|---|
+| **Playbook** | Step-by-step guided workflow for the active scenario — run each tool with one click |
+| **FIX Messages** | Annotated FIX 4.2 protocol message table: tag number, field name, value — populated on every order or session repair |
+| **Tools** | Visual catalog of all 15 MCP tools with descriptions, organized by category |
+| **Sessions** | FIX session health cards: status, latency, sequence numbers, gap alerts |
+| **Orders** | Live order table with Cancel button per row and SLA breach indicators |
+| **Algos** | Execution progress bars, schedule deviation coloring, inline Pause/Cancel |
+| **Activity** | Timestamped log of every tool call and result |
+| **Architecture** | Mermaid system diagram + 6-milestone evolution roadmap |
+
+Sidebar controls: Send Order form, Session Repair form, Quick Tools, simulation VCR speed (1×–60×), Human/Mixed/Agent mode toggle.
 
 ## REST API
 
 ```bash
-PYTHONPATH=src ./.venv/bin/fix-mcp-api
+./.venv/bin/fix-mcp-api
 # Endpoints: http://localhost:8000
 ```
 

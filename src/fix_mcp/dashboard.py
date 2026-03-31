@@ -17,13 +17,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import threading
 import urllib.error
 import urllib.request
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-# API server base URL — override via env var for non-Docker deployments
-API_URL = os.environ.get("API_URL", "http://api-server:8000")
+# API server base URL — override via env var for non-Docker deployments.
+# When left as the default Docker address (or unset), the dashboard embeds
+# the API server in a background thread so a single command starts everything.
+_API_URL_DEFAULT = "http://api-server:8000"
+API_URL = os.environ.get("API_URL", _API_URL_DEFAULT)
 
 
 # ---------------------------------------------------------------------------
@@ -36,69 +40,88 @@ HTML = r"""<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>FIX MCP Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
-      --bg: #f0ece3; --ink: #12202e; --panel: #fffdf8; --line: #d0c4b4;
-      --accent: #8f2d1f; --blue: #1d4e89; --ok: #1a6b46; --warn: #a05c00; --down: #8f2d1f;
-      --mono: "SFMono-Regular", "Consolas", monospace;
+      --bg: #0d1117;
+      --bg-el: #161b22;
+      --bg-in: #1c2230;
+      --border: #30363d;
+      --border-sub: #21262d;
+      --text: #e6edf3;
+      --dim: #8b949e;
+      --xdim: #484f58;
+      --accent: #388bfd;
+      --ok: #3fb950;
+      --ok-bg: rgba(63,185,80,.1);
+      --warn: #d29922;
+      --warn-bg: rgba(210,153,34,.1);
+      --down: #f85149;
+      --down-bg: rgba(248,81,73,.1);
+      --mono: ui-monospace,"SFMono-Regular","SF Mono",Menlo,Consolas,monospace;
+      --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Georgia, serif; background: var(--bg); color: var(--ink); }
-    a { color: var(--blue); }
+    body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 13px; }
+    a { color: var(--accent); }
 
     /* ── layout ── */
     .shell { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; }
-    .topbar { padding: 12px 20px; background: var(--ink); color: #fff; display: flex; align-items: center; gap: 16px; }
-    .topbar h1 { margin: 0; font-size: 20px; letter-spacing: 0.5px; }
+    .topbar { padding: 10px 20px; background: var(--bg-el); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    .topbar h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; color: var(--text); }
     .topbar .spacer { flex: 1; }
-    .statusbar { display: flex; gap: 10px; padding: 8px 20px; background: #e6e0d6; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-    .main { display: grid; grid-template-columns: 300px 1fr; overflow: hidden; }
-    .sidebar { border-right: 1px solid var(--line); overflow-y: auto; padding: 14px; background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
-    .content { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .statusbar { display: flex; gap: 12px; padding: 7px 20px; background: var(--bg-el); border-bottom: 1px solid var(--border-sub); flex-wrap: wrap; align-items: center; }
+    .main { display: grid; grid-template-columns: 280px 1fr; overflow: hidden; }
+    .sidebar { border-right: 1px solid var(--border); overflow-y: auto; padding: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 10px; }
+    .content { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: var(--bg); }
 
     /* ── components ── */
-    button { font: inherit; border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; font-family: Arial, sans-serif; font-size: 13px; }
-    .btn-primary { background: var(--blue); color: #fff; }
-    .btn-danger  { background: var(--accent); color: #fff; }
-    .btn-ok      { background: var(--ok); color: #fff; }
-    .btn-neutral { background: #ccc; color: var(--ink); }
-    select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-family: Arial, sans-serif; font-size: 13px; }
-    input  { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; width: 100%; font-family: Arial, sans-serif; font-size: 13px; }
-    pre { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin: 0; }
+    button { font-family: var(--sans); border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 500; transition: filter .15s; }
+    button:hover { filter: brightness(1.18); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-danger  { background: var(--down); color: #fff; }
+    .btn-ok      { background: var(--ok); color: #0d1117; font-weight: 600; }
+    .btn-neutral { background: #21262d; color: var(--dim); border: 1px solid var(--border); }
+    .btn-neutral:hover { color: var(--text); background: var(--bg-in); }
+    select { font-family: var(--sans); font-size: 12px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-in); color: var(--text); }
+    input  { font-family: var(--sans); font-size: 12px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-in); color: var(--text); width: 100%; }
+    input::placeholder { color: var(--xdim); }
+    pre { font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0; }
 
-    .chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-family: Arial, sans-serif; font-size: 12px; font-weight: 600; }
-    .chip-ok   { background: #d4edda; color: var(--ok); }
-    .chip-warn { background: #fff3cd; color: var(--warn); }
-    .chip-down { background: #f8d7da; color: var(--down); }
-    .chip-neutral { background: #e2e8f0; color: #4a5568; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-family: var(--sans); font-size: 11px; font-weight: 600; }
+    .chip-ok   { background: var(--ok-bg); color: var(--ok); border: 1px solid rgba(63,185,80,.25); }
+    .chip-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid rgba(210,153,34,.25); }
+    .chip-down { background: var(--down-bg); color: var(--down); border: 1px solid rgba(248,81,73,.25); }
+    .chip-neutral { background: #21262d; color: var(--dim); border: 1px solid var(--border); }
 
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
-    .card h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-family: Arial, sans-serif; color: #666; }
-    .card.critical { border-color: var(--down); background: #fff5f5; }
-    .card.warn { border-color: var(--warn); background: #fffbf0; }
-    .card.ok { border-color: var(--ok); background: #f0fff8; }
+    .card { background: var(--bg-el); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .card h4 { margin: 0 0 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; font-family: var(--sans); color: var(--dim); font-weight: 600; }
+    .card.critical { border-color: rgba(248,81,73,.5); background: var(--down-bg); }
+    .card.warn     { border-color: rgba(210,153,34,.5); background: var(--warn-bg); }
+    .card.ok       { border-color: rgba(63,185,80,.35); background: var(--ok-bg); }
 
-    .step { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-    .step.done { border-color: var(--ok); }
-    .step h5 { margin: 0 0 5px; font-size: 14px; }
-    .step p { margin: 0 0 8px; font-family: Arial, sans-serif; font-size: 12px; color: #555; line-height: 1.4; }
+    .step { background: var(--bg-el); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .step.done { border-color: rgba(63,185,80,.4); background: var(--ok-bg); }
+    .step h5 { margin: 0 0 5px; font-size: 13px; }
+    .step p { margin: 0 0 8px; font-size: 12px; color: var(--dim); line-height: 1.5; }
 
-    .section-label { font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #888; padding: 4px 0; }
+    .section-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--xdim); padding: 4px 0; font-weight: 600; }
 
     /* ── tabs ── */
-    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding-bottom: 0; }
-    .tab { padding: 8px 16px; font-family: Arial, sans-serif; font-size: 13px; cursor: pointer; border-radius: 8px 8px 0 0; border: 1px solid transparent; border-bottom: none; color: #666; }
-    .tab.active { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600; }
+    .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 8px 16px; font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 6px 6px 0 0; border: 1px solid transparent; border-bottom: none; color: var(--dim); }
+    .tab:hover { color: var(--text); background: var(--bg-in); }
+    .tab.active { background: var(--bg-el); border-color: var(--border); color: var(--text); font-weight: 600; }
     .tab-body { display: none; }
     .tab-body.active { display: block; }
 
     /* ── tables ── */
-    table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12.5px; }
-    th { text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--line); color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; }
-    td { padding: 6px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
-    tr:hover td { background: #f8f6f1; }
-    .flag { display: inline-block; padding: 2px 6px; border-radius: 6px; background: #fee2e2; color: var(--down); font-size: 10px; margin: 1px; }
-    .flag-warn { background: #fef3c7; color: var(--warn); }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--dim); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; }
+    td { padding: 7px 10px; border-bottom: 1px solid var(--border-sub); vertical-align: middle; }
+    tr:hover td { background: var(--bg-in); }
+    .flag { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--down-bg); color: var(--down); font-size: 10px; margin: 1px; border: 1px solid rgba(248,81,73,.2); font-weight: 500; }
+    .flag-warn { background: var(--warn-bg); color: var(--warn); border-color: rgba(210,153,34,.2); }
 
     /* ── session badges ── */
     .sess-ok   { color: var(--ok);   font-weight: 700; }
@@ -106,51 +129,97 @@ HTML = r"""<!doctype html>
     .sess-down { color: var(--down); font-weight: 700; }
 
     /* ── status bar numbers ── */
-    .stat { display: flex; align-items: center; gap: 6px; font-family: Arial, sans-serif; font-size: 13px; }
-    .stat strong { font-size: 18px; font-family: Georgia, serif; }
-    .stat .label { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+    .stat { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+    .stat strong { font-size: 15px; font-weight: 700; }
+    .stat .label { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
 
-    .divider { height: 1px; background: var(--line); }
-    .btn-vcr  { background: #1e3a5f; color: #fff; }
-    .btn-vcr.active { background: var(--blue); outline: 2px solid #7eb3ff; }
-    .vcr-bar  { display:flex; gap:4px; align-items:center; padding:0 4px; border-left:1px solid #555; margin-left:4px; }
+    .divider { height: 1px; background: var(--border); margin: 2px 0; }
+    .btn-vcr  { background: #21262d; color: var(--dim); border: 1px solid var(--border); padding: 4px 10px; font-size: 11px; }
+    .btn-vcr.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .vcr-bar  { display:flex; gap:3px; align-items:center; padding:0 4px; border-left:1px solid var(--border); margin-left:4px; }
 
     /* ── scenario brief banner ── */
-    .brief { background: #1d4e89; color: #fff; border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
-    .brief .brief-time { font-family: var(--mono); font-size: 11px; color: #90b8e8; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
-    .brief .brief-body { font-family: Arial, sans-serif; font-size: 13px; line-height: 1.6; }
-    .brief .brief-body strong { color: #ffd580; }
+    .brief { background: var(--bg-in); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 12px; }
+    .brief .brief-time { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 6px; }
+    .brief .brief-body { font-size: 13px; line-height: 1.7; color: var(--text); }
+    .brief .brief-body strong { color: #ffd680; }
 
-    /* ── improved AI callouts ── */
-    .ai-auto     { font-family:Arial,sans-serif;font-size:11px;background:#e8f5e9;border-left:3px solid var(--ok);border-radius:0 6px 6px 0;padding:6px 8px;margin:4px 0 6px;line-height:1.5;color:#1a4a2e; }
-    .ai-approval { font-family:Arial,sans-serif;font-size:11px;background:#fff8e1;border-left:3px solid var(--warn);border-radius:0 6px 6px 0;padding:6px 8px;margin:4px 0 6px;line-height:1.5;color:#5c3800; }
-    .ai-auto::before     { content:"🤖 Auto: "; font-weight:700; }
+    /* ── AI callouts ── */
+    .ai-auto     { font-size:11px;background:var(--ok-bg);border-left:3px solid var(--ok);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 6px;line-height:1.5;color:var(--dim); }
+    .ai-approval { font-size:11px;background:var(--warn-bg);border-left:3px solid var(--warn);border-radius:0 6px 6px 0;padding:6px 10px;margin:4px 0 6px;line-height:1.5;color:var(--dim); }
+    .ai-auto::before     { content:"🤖 Auto: "; font-weight:700; color:var(--ok); }
     .ai-approval::before { content:"✋ Needs OK: "; font-weight:700; color:var(--warn); }
 
     /* ── client notification panel ── */
-    .notify-panel { background:#fff8e1; border:1px solid var(--warn); border-radius:12px; padding:12px; }
-    .notify-panel .notify-title { font-family:Arial,sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);font-weight:700;margin-bottom:8px; }
-    .notify-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #ffe082; font-family:Arial,sans-serif;font-size:12px; }
+    .notify-panel { background:var(--warn-bg); border:1px solid rgba(210,153,34,.3); border-radius:8px; padding:12px; }
+    .notify-panel .notify-title { font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);font-weight:700;margin-bottom:8px; }
+    .notify-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid rgba(210,153,34,.15); font-size:12px; }
     .notify-row:last-child { border-bottom:none; }
-    .notify-row .client { font-weight:700;color:var(--ink); }
-    .notify-row .detail { color:#666;font-size:11px; }
+    .notify-row .client { font-weight:700;color:var(--text); }
+    .notify-row .detail { color:var(--dim);font-size:11px; }
 
     /* ── output cards from pre-market check ── */
-    .issue-card { border-radius:10px; padding:10px 12px; margin-bottom:8px; font-family:Arial,sans-serif;font-size:12px;line-height:1.5; }
-    .issue-critical { background:#fff0f0; border-left:4px solid var(--down); }
-    .issue-warning  { background:#fffbf0; border-left:4px solid var(--warn); }
-    .issue-ok       { background:#f0fff8; border-left:4px solid var(--ok); }
-    .issue-card strong { display:block; font-size:13px; margin-bottom:3px; }
+    .issue-card { border-radius:6px; padding:8px 12px; margin-bottom:6px; font-size:12px;line-height:1.5; }
+    .issue-critical { background:var(--down-bg); border-left:3px solid var(--down); }
+    .issue-warning  { background:var(--warn-bg); border-left:3px solid var(--warn); }
+    .issue-ok       { background:var(--ok-bg); border-left:3px solid var(--ok); }
+    .issue-card strong { display:block; font-size:12px; margin-bottom:2px; color:var(--text); }
 
-    /* ── playbook steps in main area ── */
-    .playbook { display:flex; flex-direction:column; gap:10px; }
-    .pb-step  { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
-    .pb-step.done  { border-color:var(--ok); background:#f0fff8; }
-    .pb-step .pb-num  { font-family:Arial,sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:4px; }
-    .pb-step h5 { margin:0 0 4px;font-size:14px;font-family:Georgia,serif; }
-    .pb-step .pb-desc { margin:0 0 8px;font-family:Arial,sans-serif;font-size:12px;color:#555;line-height:1.5; }
-    .pb-output { background:#1a1a2e;color:#90ee90;font-family:var(--mono);font-size:12px;line-height:1.5;padding:14px 16px;border-radius:12px;white-space:pre-wrap;word-break:break-word;min-height:80px; }
-    .pb-output.error { color:#ff8080; }
+    /* ── playbook steps ── */
+    .playbook { display:flex; flex-direction:column; gap:8px; }
+    .pb-step  { background:var(--bg-el); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+    .pb-step.done  { border-color:rgba(63,185,80,.4); background:var(--ok-bg); }
+    .pb-step .pb-num  { font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--xdim);margin-bottom:4px;font-weight:600; }
+    .pb-step h5 { margin:0 0 4px;font-size:13px;font-weight:600;color:var(--text); }
+    .pb-step .pb-desc { margin:0 0 8px;font-size:12px;color:var(--dim);line-height:1.5; }
+    .pb-output { background:#0d1117;color:var(--ok);font-family:var(--mono);font-size:12px;line-height:1.6;padding:16px;border-radius:8px;white-space:pre-wrap;word-break:break-word;min-height:80px;border:1px solid var(--border); }
+    .pb-output.error { color:var(--down); }
+
+    /* ── FIX message viewer ── */
+    .fix-msg-table { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px; margin-top:8px; }
+    .fix-msg-table th { text-align:left; padding:5px 10px; border-bottom:1px solid var(--border); color:var(--dim); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; }
+    .fix-msg-table td { padding:5px 10px; border-bottom:1px solid var(--border-sub); vertical-align:top; }
+    .fix-msg-table .tag { color:var(--accent); font-weight:700; min-width:36px; display:inline-block; }
+    .fix-msg-table .fname { color:var(--dim); font-size:11px; }
+    .fix-msg-table .fval { color:var(--text); }
+    .fix-msg-table .fval.hi { color:#ffd680; font-weight:700; }
+    .fix-msg-table tr.hi td { background:rgba(56,139,253,.06); }
+    .raw-fix { font-family:var(--mono); font-size:11px; color:var(--dim); word-break:break-all; padding:8px 12px; background:var(--bg); border-radius:4px; border:1px solid var(--border); margin-top:6px; line-height:1.6; }
+    .raw-fix .pipe { color:var(--accent); opacity:.7; }
+
+    /* ── progress bars ── */
+    .prog-bar { height:5px; border-radius:3px; background:var(--border); overflow:hidden; width:72px; display:inline-block; vertical-align:middle; margin-left:4px; }
+    .prog-bar .fill { height:100%; border-radius:3px; transition:width .4s; }
+    .prog-bar .fill.ok { background:var(--ok); }
+    .prog-bar .fill.warn { background:var(--warn); }
+    .prog-bar .fill.crit { background:var(--down); }
+
+    /* ── tool catalog ── */
+    .tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; margin-top:4px; }
+    .tool-card { background:var(--bg-el); border:1px solid var(--border); border-radius:8px; padding:12px 14px; cursor:pointer; transition:border-color .15s; }
+    .tool-card:hover { border-color:var(--accent); }
+    .tool-name { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--accent); margin-bottom:4px; }
+    .tool-desc { font-size:11px; color:var(--dim); line-height:1.5; }
+    .tool-badge { display:inline-block; padding:1px 7px; border-radius:4px; font-size:10px; font-weight:600; margin-top:6px; }
+    .tb-order   { background:rgba(56,139,253,.15);  color:var(--accent); }
+    .tb-session { background:rgba(168,85,247,.15);  color:#a855f7; }
+    .tb-ref     { background:rgba(210,153,34,.15);  color:var(--warn); }
+    .tb-algo    { background:rgba(63,185,80,.15);   color:var(--ok); }
+    .tb-triage  { background:rgba(248,81,73,.15);   color:var(--down); }
+
+    /* ── rich output sections ── */
+    .out-section { font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); font-weight:700; margin:14px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--border-sub); }
+    .kv-grid { display:grid; grid-template-columns:140px 1fr; gap:4px 8px; font-size:12px; }
+    .kv-key  { color:var(--dim); }
+    .kv-val  { color:var(--text); font-family:var(--mono); }
+    .sess-out-card { background:var(--bg-el); border:1px solid var(--border); border-left:4px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:8px; }
+    .sess-out-card.ok   { border-left-color:var(--ok); }
+    .sess-out-card.warn { border-left-color:var(--warn); }
+    .sess-out-card.down { border-left-color:var(--down); background:var(--down-bg); }
+    .order-conf-card { background:var(--bg-el); border:1px solid var(--border); border-left:4px solid var(--border); border-radius:8px; padding:14px 16px; }
+    .order-conf-card.ok   { border-left-color:var(--ok); }
+    .order-conf-card.warn { border-left-color:var(--warn); }
+    .warn-item { padding:6px 10px; background:var(--warn-bg); border-left:3px solid var(--warn); border-radius:0 4px 4px 0; font-size:12px; color:var(--warn); margin-top:4px; }
   </style>
 </head>
 <body>
@@ -161,18 +230,18 @@ HTML = r"""<!doctype html>
     <h1>FIX MCP Dashboard</h1>
     <span class="spacer"></span>
     <div style="display:flex;gap:4px;align-items:center">
-      <span style="font-family:Arial;font-size:11px;color:#aaa;letter-spacing:1px;text-transform:uppercase">Mode</span>
-      <button id="modeHuman" class="btn-ok"     onclick="switchMode('human')" style="padding:6px 10px;font-size:12px">Human</button>
-      <button id="modeMixed" class="btn-neutral" onclick="switchMode('mixed')" style="padding:6px 10px;font-size:12px">Mixed</button>
-      <button id="modeAgent" class="btn-neutral" onclick="switchMode('agent')" style="padding:6px 10px;font-size:12px">Agent</button>
+      <span style="font-size:10px;color:var(--xdim);letter-spacing:1px;text-transform:uppercase;font-weight:600">Mode</span>
+      <button id="modeHuman" class="btn-ok"     onclick="switchMode('human')" style="padding:5px 12px;font-size:12px">Human</button>
+      <button id="modeMixed" class="btn-neutral" onclick="switchMode('mixed')" style="padding:5px 12px;font-size:12px">Mixed</button>
+      <button id="modeAgent" class="btn-neutral" onclick="switchMode('agent')" style="padding:5px 12px;font-size:12px">Agent</button>
     </div>
     <div class="vcr-bar">
-      <span style="font-family:Arial;font-size:11px;color:#aaa;letter-spacing:1px;text-transform:uppercase">Sim</span>
-      <button id="vcrPause" class="btn-vcr" onclick="togglePause()" style="padding:6px 10px;font-size:12px">⏸ Pause</button>
-      <button id="vcr1x"  class="btn-vcr" onclick="setSimSpeed(1)"  style="padding:6px 10px;font-size:12px">1x</button>
-      <button id="vcr10x" class="btn-vcr active" onclick="setSimSpeed(10)" style="padding:6px 10px;font-size:12px">10x</button>
-      <button id="vcr20x" class="btn-vcr" onclick="setSimSpeed(20)" style="padding:6px 10px;font-size:12px">20x</button>
-      <button id="vcr60x" class="btn-vcr" onclick="setSimSpeed(60)" style="padding:6px 10px;font-size:12px">60x</button>
+      <span style="font-size:10px;color:var(--xdim);letter-spacing:1px;text-transform:uppercase;font-weight:600">Sim</span>
+      <button id="vcrPause" class="btn-vcr" onclick="togglePause()">⏸ Pause</button>
+      <button id="vcr1x"  class="btn-vcr" onclick="setSimSpeed(1)">1×</button>
+      <button id="vcr10x" class="btn-vcr active" onclick="setSimSpeed(10)">10×</button>
+      <button id="vcr20x" class="btn-vcr" onclick="setSimSpeed(20)">20×</button>
+      <button id="vcr60x" class="btn-vcr" onclick="setSimSpeed(60)">60×</button>
     </div>
     <select id="scenarioSelect" onchange="loadScenario(this.value)"></select>
     <button class="btn-neutral" onclick="refresh()">Refresh</button>
@@ -248,6 +317,9 @@ HTML = r"""<!doctype html>
         <div class="tab" onclick="switchTab('orders')">Orders</div>
         <div class="tab" onclick="switchTab('algos')">Algos</div>
         <div class="tab" onclick="switchTab('activity')">Activity</div>
+        <div class="tab" onclick="switchTab('fixmsgs')">FIX Messages</div>
+        <div class="tab" onclick="switchTab('tools')">Tools</div>
+        <div class="tab" onclick="switchTab('architecture')">Architecture</div>
       </div>
 
       <div class="tab-body active" id="tab-playbook">
@@ -270,7 +342,7 @@ HTML = r"""<!doctype html>
         <div class="card">
           <h4>Open Orders</h4>
           <table id="ordersTable">
-            <thead><tr><th>Order ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Price</th><th>Venue</th><th>Status</th><th>Client</th><th>Notional</th><th>Flags</th></tr></thead>
+            <thead><tr><th>Order ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Price</th><th>Venue</th><th>Status</th><th>Client</th><th>Notional</th><th>Flags</th><th>Actions</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -286,6 +358,22 @@ HTML = r"""<!doctype html>
         </div>
       </div>
 
+      <div class="tab-body" id="tab-fixmsgs">
+        <div class="card">
+          <h4>FIX Message Inspector</h4>
+          <p style="font-size:12px;color:var(--dim);margin:0 0 10px">Send an order or repair a session — the FIX 4.2 protocol message appears here with field-by-field annotations.</p>
+          <div id="fixMsgContent" style="font-size:12px;color:var(--xdim)">No messages yet. Run <strong style="color:var(--dim)">send_order</strong> or <strong style="color:var(--dim)">fix_session_issue</strong> from the Playbook tab to populate this view.</div>
+        </div>
+      </div>
+
+      <div class="tab-body" id="tab-tools">
+        <div class="card">
+          <h4>MCP Tool Catalog — 15 Tools</h4>
+          <p style="font-size:12px;color:var(--dim);margin:0 0 12px">Click any tool to inspect it. All 15 tools are accessible to Claude AI via natural language — the dashboard calls them over HTTP.</p>
+          <div class="tool-grid" id="toolGrid"></div>
+        </div>
+      </div>
+
       <div class="tab-body" id="tab-activity">
         <div class="card">
           <h4>Agent Activity Log</h4>
@@ -293,6 +381,130 @@ HTML = r"""<!doctype html>
             <thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Summary</th></tr></thead>
             <tbody></tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="tab-body" id="tab-architecture">
+        <div class="card" style="margin-bottom:14px">
+          <h4>System Architecture — FIX MCP Server</h4>
+          <div class="mermaid" id="archDiagram" style="background:transparent;padding:8px 0">
+flowchart TB
+    subgraph AI["AI Agent Layer"]
+        CL["🤖 Claude AI\nMCP Client\n(Claude Code / claude.ai)"]
+    end
+
+    subgraph Docker["Docker Compose Stack"]
+        direction TB
+
+        subgraph MCPSvc["fix-mcp-server  (stdio)"]
+            MCP["fix_mcp.server\n15 MCP tools · 4 resources\n6 role prompts"]
+            subgraph Engine["FIX Engine"]
+                OMS["OMS\norder lifecycle"]
+                SESS["FIX Sessions\nsequence tracking"]
+                ALGOS["Algo Engine\nTWAP · VWAP · IS · POV"]
+                REF["Reference Data\nticker · corp actions"]
+                SCEN["Scenarios\n13 trading scenarios"]
+            end
+            MCP --> OMS & SESS & ALGOS & REF & SCEN
+        end
+
+        subgraph APISvc["fix-mcp-api  :8000"]
+            API["fix_mcp.api\nREST API\n/orders /sessions /algos\n/scenarios /simulation"]
+        end
+
+        subgraph DashSvc["fix-mcp-dashboard  :8787"]
+            DASH["fix_mcp.dashboard\nWeb UI\nPlaybook · Sessions · Orders\nAlgos · Activity · Architecture"]
+        end
+
+        subgraph SimSvc["Simulation  (--profile simulation)"]
+            LOGGEN["fix_mcp.log_generator\nVCR-style FIX log writer\n1x–60x speed"]
+            LOGMON["fix_mcp.log_monitor\nPattern detector\nautonomous API calls"]
+        end
+    end
+
+    subgraph Infra["Infrastructure"]
+        PG[("PostgreSQL :5432\norder store\nFIX message log")]
+        REDIS[("Redis :6379\npub/sub fills\nsession events")]
+        LOGS[/"fix_logs volume\n/var/log/fix/\n*.log"\]
+    end
+
+    CL -- "MCP tools via stdio" --> MCP
+    MCP -- "read/write orders &amp; sessions" --> PG
+    MCP -- "pub/sub events" --> REDIS
+    API -- "CRUD" --> PG
+    API -- "publish fills &amp; alerts" --> REDIS
+    DASH -- "proxy /api/*" --> API
+    LOGGEN -- "write FIX messages" --> LOGS
+    LOGGEN -- "POST scenario state" --> API
+    LOGMON -- "tail &amp; parse" --> LOGS
+    LOGMON -- "POST pattern alerts" --> API
+    REDIS -- "subscribe" --> LOGMON
+
+    classDef aiNode fill:#1c2230,stroke:#388bfd,stroke-width:2px,color:#e6edf3
+    classDef mcpNode fill:#1c2230,stroke:#388bfd,stroke-width:1px,color:#e6edf3
+    classDef apiNode fill:#1c2230,stroke:#3fb950,stroke-width:1px,color:#e6edf3
+    classDef dashNode fill:#1c2230,stroke:#3fb950,stroke-width:1px,color:#e6edf3
+    classDef simNode fill:#1c2230,stroke:#d29922,stroke-width:1px,color:#e6edf3
+    classDef infraNode fill:#161b22,stroke:#30363d,stroke-width:1px,color:#8b949e
+    classDef engineNode fill:#0d1117,stroke:#30363d,stroke-width:1px,color:#8b949e
+
+    class CL aiNode
+    class MCP,MCPSvc mcpNode
+    class API,APISvc apiNode
+    class DASH,DashSvc dashNode
+    class LOGGEN,LOGMON,SimSvc simNode
+    class PG,REDIS,LOGS,Infra infraNode
+    class OMS,SESS,ALGOS,REF,SCEN,Engine engineNode
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Next Steps — Evolution Roadmap</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+
+            <div class="pb-step">
+              <div class="pb-num">Milestone 1 · Real Connectivity</div>
+              <h5>Live FIX Gateway</h5>
+              <div class="pb-desc">Replace the simulated sessions with a real QuickFIX/N or QuickFIX/J acceptor. The <code style="font-family:var(--mono);font-size:11px;color:var(--accent)">fix_mcp/fix/connector.py</code> stub is already in place — wire it to a UAT venue (e.g. BATS UAT, IEX Pillar sandbox) and let the engine track live sequence numbers.</div>
+              <div class="ai-auto">Engine and MCP tools are venue-agnostic — only the connector needs to be swapped.</div>
+            </div>
+
+            <div class="pb-step">
+              <div class="pb-num">Milestone 2 · Real-Time UI</div>
+              <h5>WebSocket Push</h5>
+              <div class="pb-desc">The dashboard currently polls every 5 s. Add a WebSocket endpoint to <code style="font-family:var(--mono);font-size:11px;color:var(--accent)">fix_mcp.api</code> that pushes Redis pub/sub events directly to the browser — fills and session flips appear in &lt;100 ms with no polling lag.</div>
+              <div class="ai-auto">The live_dashboard.py already has a WebSocket skeleton to reference.</div>
+            </div>
+
+            <div class="pb-step">
+              <div class="pb-num">Milestone 3 · Security</div>
+              <h5>Auth + API Keys</h5>
+              <div class="pb-desc">Add JWT or API-key authentication to the REST API and dashboard. Right now any local network request can call <code style="font-family:var(--mono);font-size:11px;color:var(--accent)">POST /reset</code> or send orders. Before exposing beyond localhost, gate every write endpoint behind a bearer token.</div>
+              <div class="ai-approval">Requires human sign-off — changes the security boundary of all 15 MCP tools.</div>
+            </div>
+
+            <div class="pb-step">
+              <div class="pb-num">Milestone 4 · Observability</div>
+              <h5>Audit Trail + Metrics</h5>
+              <div class="pb-desc">Emit every MCP tool call, order state change, and session event to a tamper-proof audit log (append-only PostgreSQL partition or S3). Add Prometheus metrics endpoint (<code style="font-family:var(--mono);font-size:11px;color:var(--accent)">/metrics</code>) so Grafana can plot fill latency, session uptime, and algo deviation over time.</div>
+              <div class="ai-auto">Compliance-ready audit trail enables regulatory reporting without changing the MCP tool interface.</div>
+            </div>
+
+            <div class="pb-step">
+              <div class="pb-num">Milestone 5 · Market Data</div>
+              <h5>Live Quote Feed</h5>
+              <div class="pb-desc">Replace static scenario prices with a real NBBO feed (Polygon.io, IEX Cloud, or a QuickFIX Market Data Request). Price validation, LULD checks, and SSR calculations then use real tick data — making every tool call reflect actual market state.</div>
+              <div class="ai-approval">Live quotes change the risk profile of autonomous agent actions — mixed-mode approval gates should stay enabled initially.</div>
+            </div>
+
+            <div class="pb-step">
+              <div class="pb-num">Milestone 6 · Multi-Seat</div>
+              <h5>Multi-User + Role Prompts</h5>
+              <div class="pb-desc">The server already ships 6 role prompts (head trader, risk, compliance, sales, ops, quant). Add per-role API scopes so a compliance user can only call read tools, while an ops user can repair sessions but not send orders. Integrate with an SSO provider via OIDC.</div>
+              <div class="ai-auto">Role prompts map directly to tool permission groups — the prompt layer already enforces the boundary conceptually.</div>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>
@@ -513,17 +725,17 @@ HTML = r"""<!doctype html>
       <div class="stat">${algoChip}<span class="label">Algos</span></div>
       <div class="stat">${modeChip}<span class="label">Mode</span></div>
       <div class="stat">${simChip}<span class="label">Sim Speed</span></div>
-      <div class="stat" style="margin-left:auto;color:#aaa;font-size:12px;font-family:Arial">Scenario: <strong style="color:var(--ink)">${data.scenario}</strong></div>
+      <div class="stat" style="margin-left:auto;color:var(--dim);font-size:11px">Scenario: <strong style="color:var(--text)">${data.scenario}</strong></div>
     `;
 
     // session cards
     document.getElementById('sessionCards').innerHTML = data.sessions.map(s => `
       <div class="card${s.status === 'down' ? ' critical' : s.status === 'degraded' ? ' warn' : ' ok'}" style="padding:10px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <strong style="font-family:Arial;font-size:13px">${s.venue}</strong>
+          <strong style="font-size:13px">${s.venue}</strong>
           ${statusIcon(s.status)}
         </div>
-        <div style="font-family:Arial;font-size:11px;color:#666">
+        <div style="font-size:11px;color:var(--dim)">
           ${s.latency_ms}ms · seq ${s.last_recv_seq}/${s.expected_recv_seq}
           ${s.seq_gap ? ' <span style="color:var(--down);font-weight:700">GAP</span>' : ''}
           ${s.error ? `<br><span style="color:var(--down)">${s.error.substring(0,40)}</span>` : ''}
@@ -564,7 +776,7 @@ HTML = r"""<!doctype html>
         <td>${s.last_sent_seq.toLocaleString()}</td>
         <td>${s.last_recv_seq.toLocaleString()}</td>
         <td>${s.expected_recv_seq.toLocaleString()}${s.seq_gap ? ' ⚠' : ''}</td>
-        <td style="color:var(--down);font-size:11px">${s.error || ''}</td>
+        <td style="color:var(--down);font-size:11px;font-family:var(--mono)">${s.error || ''}</td>
       </tr>
     `).join('');
 
@@ -582,6 +794,7 @@ HTML = r"""<!doctype html>
         <td>${o.client_name}</td>
         <td>$${Math.round(o.notional || 0).toLocaleString()}</td>
         <td>${renderFlags(o.flags)}</td>
+        <td><button class="btn-danger" style="padding:2px 8px;font-size:11px" onclick="runTool('cancel_replace',{order_id:'${o.order_id}',action:'cancel'})">Cancel</button></td>
       </tr>
     `).join('');
 
@@ -594,15 +807,15 @@ HTML = r"""<!doctype html>
         <td>${a.total_qty.toLocaleString()}</td>
         <td>${a.executed_qty.toLocaleString()}</td>
         <td>${a.schedule_pct}%</td>
-        <td>${a.execution_pct}%</td>
+        <td>${a.execution_pct}%<br><div class="prog-bar" style="margin-top:2px"><div class="fill ${Math.abs(a.schedule_deviation_pct||0)>10?'crit':Math.abs(a.schedule_deviation_pct||0)>3?'warn':'ok'}" style="width:${Math.min(100,a.execution_pct)}%"></div></div></td>
         <td>${deviationCell(a.schedule_deviation_pct)}</td>
         <td>${a.status}</td>
         <td>${a.client_name}</td>
         <td>${renderFlags(a.flags)}</td>
         <td>
-          <button style="padding:3px 8px;font-size:11px;border-radius:6px;background:var(--warn);color:#fff;border:0;cursor:pointer"
+          <button class="btn-neutral" style="padding:3px 8px;font-size:11px"
             onclick="runTool('modify_algo',{algo_id:'${a.algo_id}',action:'pause'})">Pause</button>
-          <button style="padding:3px 8px;font-size:11px;border-radius:6px;background:var(--down);color:#fff;border:0;cursor:pointer;margin-left:4px"
+          <button class="btn-danger" style="padding:3px 8px;font-size:11px;margin-left:4px"
             onclick="runTool('cancel_algo',{algo_id:'${a.algo_id}',reason:'dashboard cancel'})">Cancel</button>
         </td>
       </tr>
@@ -619,7 +832,7 @@ HTML = r"""<!doctype html>
             <div class="client">${o.client_name}</div>
             <div class="detail">${o.symbol} ${o.side.toUpperCase()} ${o.quantity.toLocaleString()} @ ${o.venue}</div>
           </div>
-          <div class="detail" style="text-align:right">SLA ${o.sla_minutes}min<br><span style="color:var(--down);font-weight:700">EXPIRED</span></div>
+          <div class="detail" style="text-align:right;color:var(--dim)">SLA ${o.sla_minutes}min<br><span class="chip chip-down" style="font-size:10px;padding:1px 7px">EXPIRED</span></div>
         </div>
       `).join('');
       notifyPanel.style.display = 'block';
@@ -660,14 +873,14 @@ HTML = r"""<!doctype html>
         const count = parseInt(hm[2], 10);
         const cls   = section === 'critical' ? 'down' : section === 'warning' ? 'warn' : 'ok';
         const icon  = section === 'critical' ? '🔴' : section === 'warning' ? '🟡' : 'ℹ️';
-        html += `<div style="font-family:Arial;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--${cls});font-weight:700;margin:14px 0 4px">${icon} ${hm[1]} — ${count} issue${count !== 1 ? 's' : ''}</div>`;
+        html += `<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--${cls});font-weight:700;margin:14px 0 4px">${icon} ${hm[1]} — ${count} issue${count !== 1 ? 's' : ''}</div>`;
         continue;
       }
       if (summaryRe.test(line)) { section = 'summary'; continue; }
       if (dividerRe.test(line)) continue;
       // title line (=== PRE-MARKET CHECK … ===)
       if (/^===.*===$/.test(line)) {
-        html += `<div style="font-family:var(--mono);font-size:11px;color:#90b8e8;margin-bottom:8px">${line}</div>`;
+        html += `<div style="font-family:var(--mono);font-size:11px;color:var(--accent);margin-bottom:8px">${line}</div>`;
         continue;
       }
 
@@ -678,12 +891,342 @@ HTML = r"""<!doctype html>
       } else if (section === 'info') {
         html += `<div class="issue-card issue-ok">${line.replace(/^-\s*/,'')}</div>`;
       } else if (section === 'summary') {
-        html += `<div style="font-family:Arial;font-size:12px;margin-top:4px;color:#555">${line}</div>`;
+        html += `<div style="font-size:12px;margin-top:4px;color:var(--dim)">${line}</div>`;
       } else {
-        html += `<div style="font-family:Arial;font-size:12px;color:#555">${line}</div>`;
+        html += `<div style="font-size:12px;color:var(--dim)">${line}</div>`;
       }
     }
     return html || `<pre>${text}</pre>`;
+  }
+
+  // ── FIX tag metadata ──────────────────────────────────────────────────────
+  const _FIX_TAG_NAMES = {
+    8:'BeginString', 9:'BodyLength', 35:'MsgType', 49:'SenderCompID',
+    56:'TargetCompID', 34:'MsgSeqNum', 52:'SendingTime', 10:'CheckSum',
+    11:'ClOrdID', 41:'OrigClOrdID', 55:'Symbol', 54:'Side', 38:'OrderQty',
+    40:'OrdType', 44:'Price', 99:'StopPx', 100:'ExDestination', 21:'HandlInst',
+    60:'TransactTime', 59:'TimeInForce', 37:'OrderID', 17:'ExecID',
+    150:'ExecType', 39:'OrdStatus', 151:'LeavesQty', 14:'CumQty', 6:'AvgPx',
+    7:'BeginSeqNo', 16:'EndSeqNo', 36:'NewSeqNo', 123:'GapFillFlag',
+  };
+  const _FIX_TAG_VALUES = {
+    35: {'D':'NewOrderSingle','F':'OrderCancelRequest','G':'OrderCancelReplaceRequest',
+         '8':'ExecutionReport','2':'ResendRequest','4':'SequenceReset','0':'Heartbeat','A':'Logon','5':'Logout'},
+    54: {'1':'Buy','2':'Sell'},
+    40: {'1':'Market','2':'Limit','3':'Stop','4':'StopLimit'},
+  };
+  const _FIX_IMPORTANT = new Set([35,55,54,38,44,11,37,100,34]);
+
+  function _parseFIXMessageRaw(raw) {
+    const pairs = raw.split('|').filter(p => p.includes('='));
+    if (!pairs.length) return '';
+    let rows = '';
+    for (const pair of pairs) {
+      const eq = pair.indexOf('=');
+      const tag = parseInt(pair.substring(0, eq));
+      const val = pair.substring(eq + 1);
+      if (!val) continue;
+      const name = _FIX_TAG_NAMES[tag] || ('Tag' + tag);
+      const friendly = (_FIX_TAG_VALUES[tag] || {})[val];
+      const disp = friendly ? val + ' (' + friendly + ')' : val;
+      const important = _FIX_IMPORTANT.has(tag);
+      rows += '<tr' + (important ? ' class="hi"' : '') + '>'
+            + '<td><span class="tag">' + tag + '</span></td>'
+            + '<td class="fname">' + name + '</td>'
+            + '<td class="fval' + (important ? ' hi' : '') + '">' + disp + '</td>'
+            + '</tr>';
+    }
+    return '<table class="fix-msg-table"><thead><tr><th>Tag</th><th>Field</th><th>Value</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  function _storeFIXMsg(raw, label) {
+    const el = document.getElementById('fixMsgContent');
+    if (!el || !raw) return;
+    const ts = new Date().toLocaleTimeString();
+    const rawHtml = raw.replace(/\|/g, '<span class="pipe">|</span>');
+    el.innerHTML = '<div style="font-size:11px;color:var(--dim);margin-bottom:8px">Last message <strong style="color:var(--text)">' + (label||'') + '</strong> at ' + ts + '</div>'
+      + _parseFIXMessageRaw(raw)
+      + '<div class="raw-fix" style="margin-top:8px">' + rawHtml + '</div>';
+  }
+
+  // ── tool output parsers ───────────────────────────────────────────────────
+
+  function _parseSendOrderOutput(text) {
+    const lines = text.split('\n');
+    let confFields = {};
+    let section = null;
+    let warnHtml = '';
+    let fixHtml = '';
+    let rawLine = '';
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (line === 'ORDER CONFIRMATION') { section = 'conf'; continue; }
+      if (line === 'WARNINGS:') { section = 'warn'; continue; }
+      if (line.startsWith('FIX MESSAGE (')) { section = 'fix'; continue; }
+      if (line.startsWith('RAW: ')) {
+        rawLine = line.replace('RAW: ', '');
+        fixHtml = _parseFIXMessageRaw(rawLine);
+        _storeFIXMsg(rawLine, 'NewOrderSingle (35=D)');
+        continue;
+      }
+      if (section === 'conf') {
+        const m = line.match(/^(.+?):\s+(.+)$/);
+        if (m) confFields[m[1].trim()] = m[2].trim();
+      } else if (section === 'warn') {
+        warnHtml += '<div class="warn-item">' + line.replace(/^\[!\]\s*/,'') + '</div>';
+      }
+    }
+    const status = (confFields['Status']||'').toLowerCase();
+    const cls = status==='filled' ? 'ok' : status==='rejected' ? 'warn' : '';
+    const order = ['Order ID','ClOrdID','Symbol','Side','Quantity','Type','Price','Venue','Status','Client','Notional','Fill'];
+    let kvHtml = '';
+    for (const k of order) {
+      if (confFields[k]) kvHtml += '<div class="kv-key">' + k + '</div><div class="kv-val">' + confFields[k] + '</div>';
+    }
+    let html = '<div class="order-conf-card ' + cls + '">'
+             + '<div class="out-section">Order Confirmation</div>'
+             + '<div class="kv-grid">' + kvHtml + '</div></div>';
+    if (warnHtml) html += '<div class="out-section" style="color:var(--warn)">Warnings</div>' + warnHtml;
+    if (fixHtml)  html += '<div class="out-section">FIX Message — NewOrderSingle (35=D)</div>' + fixHtml;
+    if (rawLine)  html += '<div class="raw-fix">' + rawLine.replace(/\|/g, '<span class="pipe">|</span>') + '</div>';
+    return html || '<pre>' + text + '</pre>';
+  }
+
+  function _parseSessionFixOutput(text) {
+    const lines = text.split('\n');
+    let html = '';
+    let section = null;
+    let rawLine = '';
+    let kvOpen = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (line.startsWith('FIX SESSION FIX —') || line.startsWith('FIX SESSION REPAIR')) {
+        html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">' + line + '</div>'
+              + '<div class="kv-grid">';
+        kvOpen = true; section = 'info'; continue;
+      }
+      if (line.startsWith('Releasing stuck orders:')) {
+        if (kvOpen) { html += '</div>'; kvOpen = false; }
+        html += '<div class="out-section" style="color:var(--ok)">Orders Released</div>';
+        section = 'orders'; continue;
+      }
+      if (line.startsWith('FIX MESSAGE (')) {
+        if (kvOpen) { html += '</div>'; kvOpen = false; }
+        const label = line.replace('FIX MESSAGE (','').replace('):','').replace(')','').trim();
+        html += '<div class="out-section">FIX Message — ' + label + '</div>';
+        section = 'fix'; continue;
+      }
+      if (line.startsWith('RAW: ') && section !== null) {
+        rawLine = line.replace('RAW: ','');
+        html += _parseFIXMessageRaw(rawLine);
+        html += '<div class="raw-fix">' + rawLine.replace(/\|/g, '<span class="pipe">|</span>') + '</div>';
+        _storeFIXMsg(rawLine, line.includes('35=2') ? 'ResendRequest' : line.includes('35=4') ? 'SequenceReset' : 'Logon');
+        continue;
+      }
+      if (section === 'info' && kvOpen) {
+        const m = line.match(/^(.+?):\s+(.+)$/);
+        if (m) html += '<div class="kv-key">' + m[1].trim() + '</div><div class="kv-val">' + m[2].trim() + '</div>';
+      }
+      if (section === 'orders' && line.match(/^ORD-/)) {
+        html += '<div style="font-family:var(--mono);font-size:12px;padding:4px 12px;border-left:3px solid var(--ok);background:var(--ok-bg);margin-bottom:3px;border-radius:0 4px 4px 0">' + line + '</div>';
+      }
+    }
+    if (kvOpen) html += '</div>';
+    return html || '<pre>' + text + '</pre>';
+  }
+
+  function _parseSessionsOutput(text) {
+    const lines = text.split('\n');
+    let html = '';
+    let cur = null;
+    const venueRe = /^([✅⚠️❌🔴🟡🟢\[\]!]+\s+|\[OK\]\s+|\[WARN\]\s+|\[DOWN\]\s+)?([A-Z]{2,8})\s*(?:\(([^)]*)\))?$/;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('═') || line === 'FIX SESSION STATUS') continue;
+      const vm = line.match(venueRe);
+      if (vm && (line.startsWith('[') || line.match(/^[✅⚠️❌]/))) {
+        if (cur) html += _buildSessCard(cur);
+        cur = { icon: vm[1]||'', venue: vm[2], fields: [], flags: [] };
+        continue;
+      }
+      if (cur) {
+        if (line.startsWith('[!]') || line.startsWith('[DOWN]') || line.startsWith('[WARN]')) {
+          cur.flags.push(line);
+        } else {
+          const m = line.match(/^(.+?):\s+(.+)$/);
+          if (m) cur.fields.push([m[1].trim(), m[2].trim()]);
+        }
+      }
+    }
+    if (cur) html += _buildSessCard(cur);
+    return html || '<pre style="font-family:var(--mono);font-size:12px;white-space:pre-wrap">' + text + '</pre>';
+  }
+
+  function _buildSessCard(s) {
+    const statusField = s.fields.find(f => f[0]==='Status');
+    const status = statusField ? statusField[1].toLowerCase() : '';
+    const cls = status==='active' ? 'ok' : status==='degraded' ? 'warn' : 'down';
+    let rows = '';
+    for (const [k,v] of s.fields) rows += '<div class="kv-key">' + k + '</div><div class="kv-val">' + v + '</div>';
+    const flags = s.flags.map(f =>
+      '<div style="padding:5px 10px;margin-top:6px;background:var(--down-bg);border-left:3px solid var(--down);border-radius:0 4px 4px 0;font-size:12px;color:var(--down)">' + f + '</div>'
+    ).join('');
+    return '<div class="sess-out-card ' + cls + '">'
+         + '<div style="font-size:14px;font-weight:700;margin-bottom:8px">' + s.icon + ' ' + s.venue + '</div>'
+         + '<div class="kv-grid">' + rows + '</div>' + flags + '</div>';
+  }
+
+  function _parseOrderQueryOutput(text) {
+    const lines = text.split('\n');
+    let html = '';
+    let section = null;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('─')) continue;
+      if (line.startsWith('ORDER QUERY —')) { html += '<div style="font-size:13px;font-weight:700;margin-bottom:10px">' + line + '</div>'; continue; }
+      if (line.startsWith('ID ') && line.includes('SYM')) continue;
+      if (line.startsWith('[!] SLA CRITICAL'))      { section='sla';   html += '<div class="out-section" style="color:var(--down)">SLA Critical</div>'; continue; }
+      if (line.startsWith('[!] STUCK / VENUE DOWN')) { section='stuck'; html += '<div class="out-section" style="color:var(--warn)">Stuck / Venue Down</div>'; continue; }
+      if (line.startsWith('OPEN / OTHER'))           { section='open';  html += '<div class="out-section">Open / Other</div>'; continue; }
+      if (line.startsWith('Total notional')) { html += '<div style="font-size:11px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">' + line + '</div>'; continue; }
+      if (line.startsWith('***')) { html += '<div style="font-size:11px;color:var(--down);padding-left:12px">' + line + '</div>'; continue; }
+      if (line.match(/^ORD-/)) {
+        const bg = section==='sla' ? 'background:var(--down-bg);border-color:rgba(248,81,73,.4);' : section==='stuck' ? 'background:var(--warn-bg);border-color:rgba(210,153,34,.4);' : '';
+        html += '<div style="font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:4px;margin-bottom:3px;border:1px solid var(--border);' + bg + 'white-space:pre">' + line + '</div>';
+      }
+    }
+    return html || '<pre style="font-family:var(--mono);font-size:12px;white-space:pre-wrap">' + text + '</pre>';
+  }
+
+  function _parseAlgoOutput(text) {
+    const lines = text.split('\n');
+    let html = '';
+    let section = null;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('─')) continue;
+      if (line.startsWith('ALGO STATUS —')) { html += '<div style="font-size:13px;font-weight:700;margin-bottom:10px">' + line + '</div>'; continue; }
+      if (line.startsWith('ID ') && line.includes('SYM')) continue;
+      if (line.startsWith('[!] NEEDS ATTENTION')) { section='urgent'; html += '<div class="out-section" style="color:var(--down)">Needs Attention</div>'; continue; }
+      if (line.startsWith('RUNNING / PAUSED'))     { section='run';    html += '<div class="out-section">Running / Paused</div>'; continue; }
+      if (line.startsWith('COMPLETED / CANCELED')) { section='done';   html += '<div class="out-section" style="color:var(--xdim)">Completed / Canceled</div>'; continue; }
+      if (line.startsWith('Total algo') || line.startsWith('Problematic:')) { html += '<div style="font-size:11px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">' + line + '</div>'; continue; }
+      if (line.startsWith('flag:') || line.startsWith('note:')) { html += '<div style="font-size:11px;color:var(--warn);padding:1px 0 4px 16px">' + line + '</div>'; continue; }
+      if (line.length > 20 && section) html += _buildAlgoRow(line, section);
+    }
+    return html || '<pre style="font-family:var(--mono);font-size:12px;white-space:pre-wrap">' + text + '</pre>';
+  }
+
+  function _buildAlgoRow(line, section) {
+    const parts = line.split(/\s{2,}/);
+    if (parts.length < 6) return '<div style="font-family:var(--mono);font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border-sub)">' + line + '</div>';
+    const [id, sym, side, qty, type, status, exec, sched, dev] = parts;
+    const execNum = parseFloat(exec)||0;
+    const devNum  = parseFloat(dev)||0;
+    const devCls  = Math.abs(devNum)>10 ? 'crit' : Math.abs(devNum)>3 ? 'warn' : 'ok';
+    const devColor = devCls==='crit' ? 'var(--down)' : devCls==='warn' ? 'var(--warn)' : 'var(--ok)';
+    const isUrgent = section==='urgent';
+    const bg = isUrgent ? 'background:var(--down-bg);border-color:rgba(248,81,73,.3);' : 'background:var(--bg-el);';
+    const statusBg = isUrgent ? 'rgba(248,81,73,.2)' : status==='paused'||status==='halted' ? 'rgba(210,153,34,.2)' : 'rgba(63,185,80,.2)';
+    const statusColor = isUrgent ? 'var(--down)' : status==='paused'||status==='halted' ? 'var(--warn)' : 'var(--ok)';
+    return '<div style="padding:8px 12px;border-radius:6px;margin-bottom:6px;border:1px solid var(--border);' + bg + 'display:grid;grid-template-columns:190px 50px 40px 70px 70px 1fr;gap:8px;align-items:center;font-size:12px">'
+         + '<div style="font-family:var(--mono);font-size:11px;color:var(--accent)">' + (id||'') + '</div>'
+         + '<div><strong>' + (sym||'') + '</strong></div>'
+         + '<div style="color:var(--dim)">' + (side||'') + '</div>'
+         + '<div style="color:var(--dim)">' + (qty||'') + '</div>'
+         + '<div><span style="padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:' + statusBg + ';color:' + statusColor + '">' + (status||'—') + '</span></div>'
+         + '<div style="display:flex;align-items:center;gap:8px">'
+         + '<span style="font-size:11px;color:var(--dim)">' + execNum + '%</span>'
+         + '<div class="prog-bar" style="width:90px"><div class="fill ' + devCls + '" style="width:' + Math.min(100,execNum) + '%"></div></div>'
+         + '<span style="font-weight:600;color:' + devColor + '">' + (dev||'') + '% dev</span></div></div>';
+  }
+
+  function _parseAlgoModOutput(text) {
+    const lines = text.split('\n');
+    let html = '<div class="kv-grid">';
+    let opened = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (line.startsWith('ALGO MODIFIED —') || line.startsWith('ALGO CANCELED —')) {
+        html = '<div style="font-size:13px;font-weight:700;margin-bottom:10px">' + line + '</div><div class="kv-grid">';
+        opened = true; continue;
+      }
+      const m = line.match(/^(.+?):\s+(.+)$/);
+      if (m) html += '<div class="kv-key">' + m[1].trim() + '</div><div class="kv-val">' + m[2].trim() + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function _parseCancelReplaceOutput(text) {
+    return _parseAlgoModOutput(text.replace('cancel_replace','Cancel/Replace').replace('CANCEL','Cancel'));
+  }
+
+  function _parseValidationOutput(text) {
+    const lines = text.split('\n');
+    let html = '';
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('─')) continue;
+      if (line.startsWith('ORDER VALIDATION —')) { html += '<div style="font-size:13px;font-weight:700;margin-bottom:10px">' + line + '</div>'; continue; }
+      if (line.startsWith('ID ') && line.includes('STATUS')) continue;
+      if (line.startsWith('SUMMARY:')) { html += '<div style="font-size:12px;font-weight:600;margin-top:10px;padding:8px 12px;background:var(--bg-in);border-radius:6px">' + line + '</div>'; continue; }
+      const passM = line.match(/^(\S+)\s+PASS$/);
+      const failM = line.match(/^(\S+)\s+FAIL$/);
+      const bulletM = line.match(/^-\s+(.+)$/);
+      if (passM) html += '<div style="display:flex;gap:8px;align-items:center;padding:4px 8px;margin-bottom:2px;border-radius:4px;background:var(--ok-bg)"><span style="font-family:var(--mono);font-size:12px;flex:1">' + passM[1] + '</span><span style="font-size:10px;font-weight:700;color:var(--ok);padding:1px 7px;border-radius:3px;background:rgba(63,185,80,.2)">PASS</span></div>';
+      else if (failM) html += '<div style="display:flex;gap:8px;align-items:center;padding:4px 8px;margin-bottom:2px;border-radius:4px;background:var(--down-bg)"><span style="font-family:var(--mono);font-size:12px;flex:1">' + failM[1] + '</span><span style="font-size:10px;font-weight:700;color:var(--down);padding:1px 7px;border-radius:3px;background:rgba(248,81,73,.2)">FAIL</span></div>';
+      else if (bulletM) html += '<div style="font-size:12px;color:var(--down);padding:2px 8px 2px 24px">— ' + bulletM[1] + '</div>';
+    }
+    return html || '<pre style="font-family:var(--mono);font-size:12px;white-space:pre-wrap">' + text + '</pre>';
+  }
+
+  // ── tool catalog ──────────────────────────────────────────────────────────
+  const TOOL_CATALOG = [
+    { name:'query_orders',       badge:'tb-order',   label:'Orders',   desc:'Query OMS orders with filters: client, symbol, status, venue. Returns SLA countdowns for institutional orders.' },
+    { name:'check_fix_sessions', badge:'tb-session',  label:'Session',  desc:'Check FIX session health: status, sequence numbers, heartbeat age, latency. Detects sequence gaps.' },
+    { name:'send_order',         badge:'tb-order',   label:'Orders',   desc:'Send a NewOrderSingle (35=D). Validates symbol, checks corp actions, auto-routes to best venue.' },
+    { name:'cancel_replace',     badge:'tb-order',   label:'Orders',   desc:'Cancel (35=F) or replace (35=G) an existing order. Supports venue rerouts and quantity changes.' },
+    { name:'check_ticker',       badge:'tb-ref',     label:'Reference',desc:'Look up a symbol or CUSIP. Returns full record, pending corporate actions, and affected open order count.' },
+    { name:'update_ticker',      badge:'tb-ref',     label:'Reference',desc:'Rename a symbol and bulk-update all open orders. Flags stop orders for manual review on splits/mergers.' },
+    { name:'load_ticker',        badge:'tb-ref',     label:'Reference',desc:'Load a new symbol into the reference store and release orders blocked on missing symbology.' },
+    { name:'fix_session_issue',  badge:'tb-session',  label:'Session',  desc:'Resolve FIX session gaps: ResendRequest (35=2), SequenceReset (35=4), or full Logon reconnect (35=A).' },
+    { name:'validate_orders',    badge:'tb-triage',  label:'Triage',   desc:'Pre-flight validation: symbol validity, venue status, duplicate ClOrdIDs, and client account status.' },
+    { name:'run_premarket_check',badge:'tb-triage',  label:'Triage',   desc:'Flagship triage: sessions, corp actions, stuck orders, SLA deadlines, full morning checklist.' },
+    { name:'send_algo_order',    badge:'tb-algo',    label:'Algo',     desc:'Submit TWAP, VWAP, POV, IS, DARK_AGG, or ICEBERG algo. Creates parent order with execution schedule.' },
+    { name:'check_algo_status',  badge:'tb-algo',    label:'Algo',     desc:'Algo execution quality: schedule deviation, IS shortfall, over-participation alerts, child order health.' },
+    { name:'modify_algo',        badge:'tb-algo',    label:'Algo',     desc:'Pause, resume, or update POV participation rate on a live algo. Logged to audit trail.' },
+    { name:'cancel_algo',        badge:'tb-algo',    label:'Algo',     desc:'Cancel an active algo and send OrderCancelRequest (35=F) for all open child slices.' },
+    { name:'list_scenarios',     badge:'tb-triage',  label:'Triage',   desc:'List all 13 available trading scenarios or load one into the runtime to change the session state.' },
+  ];
+
+  function renderToolCatalog() {
+    const grid = document.getElementById('toolGrid');
+    if (!grid) return;
+    grid.innerHTML = TOOL_CATALOG.map(t =>
+      '<div class="tool-card" onclick="showToolDetail(\'' + t.name + '\')">'
+      + '<div class="tool-name">' + t.name + '</div>'
+      + '<div class="tool-desc">' + t.desc + '</div>'
+      + '<span class="tool-badge ' + t.badge + '">' + t.label + '</span></div>'
+    ).join('');
+  }
+
+  function showToolDetail(toolName) {
+    const t = TOOL_CATALOG.find(x => x.name === toolName);
+    if (!t) return;
+    const out = document.getElementById('output');
+    out.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;font-family:var(--mono)">' + t.name + '</div>'
+      + '<div style="font-size:12px;color:var(--dim);margin-bottom:12px">' + t.desc + '</div>'
+      + '<div class="out-section">Quick Run</div>'
+      + '<button class="btn-primary" onclick="runTool(\'' + t.name + '\',{})" style="margin-right:6px">Run (defaults)</button>'
+      + '<span style="font-size:11px;color:var(--dim)">Use the sidebar forms for parameterized calls</span>';
+    out.style.background = 'var(--bg-el)';
+    out.style.color = 'var(--text)';
+    out.className = 'pb-output';
+    switchTab('playbook');
   }
 
   async function runTool(tool, args) {
@@ -698,11 +1241,24 @@ HTML = r"""<!doctype html>
       body: JSON.stringify({tool, arguments: args}),
     });
     if (data) {
-      if (tool === 'run_premarket_check' && data.ok) {
+      const _richParsers = {
+        'run_premarket_check': _parsePremarketOutput,
+        'check_fix_sessions':  _parseSessionsOutput,
+        'send_order':          _parseSendOrderOutput,
+        'fix_session_issue':   _parseSessionFixOutput,
+        'query_orders':        _parseOrderQueryOutput,
+        'check_algo_status':   _parseAlgoOutput,
+        'modify_algo':         _parseAlgoModOutput,
+        'cancel_algo':         _parseAlgoModOutput,
+        'validate_orders':     _parseValidationOutput,
+        'cancel_replace':      _parseCancelReplaceOutput,
+      };
+      const parser = _richParsers[tool];
+      if (parser && data.ok) {
         out.className = 'pb-output';
-        out.style.background = 'var(--panel)';
-        out.style.color = 'var(--ink)';
-        out.innerHTML = _parsePremarketOutput(data.output);
+        out.style.background = 'var(--bg-el)';
+        out.style.color = 'var(--text)';
+        out.innerHTML = parser(data.output);
       } else {
         out.textContent = data.output;
         out.className = data.ok ? 'pb-output' : 'pb-output error';
@@ -774,7 +1330,7 @@ HTML = r"""<!doctype html>
 
   function switchTab(name) {
     document.querySelectorAll('.tab').forEach((t, i) => {
-      const names = ['playbook','sessions','orders','algos','activity'];
+      const names = ['playbook','sessions','orders','algos','activity','fixmsgs','tools','architecture'];
       t.classList.toggle('active', names[i] === name);
     });
     document.querySelectorAll('.tab-body').forEach(b => {
@@ -828,18 +1384,39 @@ HTML = r"""<!doctype html>
     if (!events) return;
     document.querySelector('#activityTable tbody').innerHTML = events.map(e => {
       const t = new Date(e.ts).toLocaleTimeString();
-      const ok = e.ok ? '<span style="color:var(--ok);font-weight:700">OK</span>' : '<span style="color:var(--down);font-weight:700">ERR</span>';
+      const ok = e.ok ? '<span class="chip chip-ok" style="font-size:10px;padding:1px 7px">OK</span>' : '<span class="chip chip-down" style="font-size:10px;padding:1px 7px">ERR</span>';
       return `<tr>
-        <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${t}</td>
+        <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;color:var(--dim)">${t}</td>
         <td><strong>${e.tool}</strong></td>
         <td>${ok}</td>
-        <td style="font-size:12px;color:#555">${e.summary}</td>
+        <td style="font-size:12px;color:var(--dim)">${e.summary}</td>
       </tr>`;
     }).join('');
   }
 
   // ── init ───────────────────────────────────────────────────────────────────
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#0d1117',
+      mainBkg: '#1c2230',
+      nodeBorder: '#30363d',
+      clusterBkg: '#161b22',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#0d1117',
+      lineColor: '#484f58',
+      primaryColor: '#1c2230',
+      primaryBorderColor: '#388bfd',
+      primaryTextColor: '#e6edf3',
+      secondaryColor: '#161b22',
+      tertiaryColor: '#0d1117',
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+  });
   refresh();
+  renderToolCatalog();
   setInterval(refresh, 5000);
 </script>
 </body>
@@ -917,16 +1494,48 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
 
 # ---------------------------------------------------------------------------
+# Embedded API server
+# ---------------------------------------------------------------------------
+
+def _start_embedded_api(api_port: int) -> None:
+    """Start fix_mcp.api in a daemon thread so the dashboard is self-contained.
+
+    Called automatically when API_URL is the default Docker address, meaning
+    no external API server has been configured. The embedded server runs on
+    127.0.0.1 only (not exposed externally) and shares process memory with
+    the dashboard.
+    """
+    global API_URL
+    from fix_mcp.api import APIHandler  # imported lazily to avoid circular import
+    server = ThreadingHTTPServer(("127.0.0.1", api_port), APIHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True, name="fix-mcp-api")
+    t.start()
+    API_URL = f"http://127.0.0.1:{api_port}"
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="FIX MCP Dashboard")
+    parser = argparse.ArgumentParser(
+        description="FIX MCP Dashboard — self-contained: starts API + UI in one process",
+    )
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--api-port", type=int, default=8000,
+                        help="Port for the embedded API server (default: 8000)")
+    parser.add_argument("--no-embed", action="store_true",
+                        help="Skip embedded API — use API_URL env var to point at an external server")
     args = parser.parse_args()
+
+    # Embed the API unless an external one is explicitly configured
+    if API_URL == _API_URL_DEFAULT and not args.no_embed:
+        _start_embedded_api(args.api_port)
+        print(f"FIX MCP API    → http://127.0.0.1:{args.api_port}")
+
     httpd = ThreadingHTTPServer((args.host, args.port), DashboardHandler)
-    print(f"FIX MCP Dashboard running at http://127.0.0.1:{args.port}")
+    print(f"FIX MCP Dashboard → http://127.0.0.1:{args.port}")
     httpd.serve_forever()
 
 
