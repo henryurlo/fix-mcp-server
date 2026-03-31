@@ -220,6 +220,30 @@ HTML = r"""<!doctype html>
     .order-conf-card.ok   { border-left-color:var(--ok); }
     .order-conf-card.warn { border-left-color:var(--warn); }
     .warn-item { padding:6px 10px; background:var(--warn-bg); border-left:3px solid var(--warn); border-radius:0 4px 4px 0; font-size:12px; color:var(--warn); margin-top:4px; }
+
+    /* ── MCP Server tab ── */
+    .mcp-cap-block { background:var(--bg-el); border:1px solid var(--accent); border-radius:8px; padding:14px 18px; margin-bottom:14px; }
+    .mcp-cap-block h3 { margin:0 0 8px; font-size:14px; color:var(--accent); font-family:var(--mono); font-weight:700; }
+    .mcp-cap-kv { display:flex; gap:24px; flex-wrap:wrap; }
+    .mcp-cap-kv span { font-size:12px; color:var(--dim); }
+    .mcp-cap-kv strong { color:var(--text); font-family:var(--mono); }
+    .mcp-section-hdr { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:var(--dim); margin:16px 0 8px; border-bottom:1px solid var(--border-sub); padding-bottom:5px; }
+    .mcp-tool-row { background:var(--bg-el); border:1px solid var(--border); border-radius:6px; padding:10px 14px; margin-bottom:6px; cursor:pointer; transition:border-color .15s; }
+    .mcp-tool-row:hover { border-color:var(--accent); }
+    .mcp-tool-name { font-family:var(--mono); font-size:12px; color:var(--accent); font-weight:600; }
+    .mcp-tool-desc { font-size:12px; color:var(--dim); margin-top:3px; line-height:1.5; }
+    .mcp-tool-schema { display:none; margin-top:8px; background:var(--bg); border:1px solid var(--border-sub); border-radius:4px; padding:10px; font-family:var(--mono); font-size:11px; color:#8b949e; white-space:pre; overflow-x:auto; }
+    .mcp-resource-row { display:flex; gap:12px; align-items:baseline; padding:7px 10px; border-bottom:1px solid var(--border-sub); }
+    .mcp-resource-uri { font-family:var(--mono); font-size:11px; color:var(--accent); min-width:200px; }
+    .mcp-resource-desc { font-size:12px; color:var(--dim); flex:1; }
+    .mcp-resource-mime { font-size:10px; color:var(--xdim); }
+    .mcp-prompt-row { padding:7px 10px; border-bottom:1px solid var(--border-sub); }
+    .mcp-prompt-name { font-family:var(--mono); font-size:12px; color:var(--ok); }
+    .mcp-prompt-desc { font-size:12px; color:var(--dim); margin-top:2px; }
+    .mcp-config-pre { background:var(--bg); border:1px solid var(--border-sub); border-radius:6px; padding:12px; font-family:var(--mono); font-size:11px; color:var(--dim); white-space:pre; overflow-x:auto; margin-top:8px; }
+    .mcp-jsonrpc-wrap { margin-top:14px; border-top:1px solid var(--border-sub); padding-top:10px; }
+    .mcp-jsonrpc-label { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--xdim); margin-bottom:5px; font-weight:700; }
+    .mcp-jsonrpc-pre { background:var(--bg-in); border:1px solid var(--border-sub); border-radius:4px; padding:10px 12px; font-family:var(--mono); font-size:11px; color:var(--dim); white-space:pre; overflow-x:auto; }
   </style>
 </head>
 <body>
@@ -318,7 +342,7 @@ HTML = r"""<!doctype html>
         <div class="tab" onclick="switchTab('algos')">Algos</div>
         <div class="tab" onclick="switchTab('activity')">Activity</div>
         <div class="tab" onclick="switchTab('fixmsgs')">FIX Messages</div>
-        <div class="tab" onclick="switchTab('tools')">Tools</div>
+        <div class="tab" onclick="switchTab('tools')">MCP Server</div>
         <div class="tab" onclick="switchTab('architecture')">Architecture</div>
       </div>
 
@@ -367,18 +391,16 @@ HTML = r"""<!doctype html>
       </div>
 
       <div class="tab-body" id="tab-tools">
-        <div class="card">
-          <h4>MCP Tool Catalog — 15 Tools</h4>
-          <p style="font-size:12px;color:var(--dim);margin:0 0 12px">Click any tool to inspect it. All 15 tools are accessible to Claude AI via natural language — the dashboard calls them over HTTP.</p>
-          <div class="tool-grid" id="toolGrid"></div>
+        <div id="mcpSchemaContent" style="padding:4px 0">
+          <div style="text-align:center;padding:40px;color:var(--dim);font-size:13px">Loading MCP schema&hellip;</div>
         </div>
       </div>
 
       <div class="tab-body" id="tab-activity">
         <div class="card">
-          <h4>Agent Activity Log</h4>
+          <h4>MCP Activity — <span style="font-family:var(--mono);font-size:12px;color:var(--dim)">jsonrpc: "2.0" · method: "tools/call"</span></h4>
           <table id="activityTable">
-            <thead><tr><th>Time</th><th>Tool</th><th>Status</th><th>Summary</th></tr></thead>
+            <thead><tr><th>Time</th><th>MCP Tool</th><th>Status</th><th>Result</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -1184,49 +1206,96 @@ flowchart TB
     return html || '<pre style="font-family:var(--mono);font-size:12px;white-space:pre-wrap">' + text + '</pre>';
   }
 
-  // ── tool catalog ──────────────────────────────────────────────────────────
-  const TOOL_CATALOG = [
-    { name:'query_orders',       badge:'tb-order',   label:'Orders',   desc:'Query OMS orders with filters: client, symbol, status, venue. Returns SLA countdowns for institutional orders.' },
-    { name:'check_fix_sessions', badge:'tb-session',  label:'Session',  desc:'Check FIX session health: status, sequence numbers, heartbeat age, latency. Detects sequence gaps.' },
-    { name:'send_order',         badge:'tb-order',   label:'Orders',   desc:'Send a NewOrderSingle (35=D). Validates symbol, checks corp actions, auto-routes to best venue.' },
-    { name:'cancel_replace',     badge:'tb-order',   label:'Orders',   desc:'Cancel (35=F) or replace (35=G) an existing order. Supports venue rerouts and quantity changes.' },
-    { name:'check_ticker',       badge:'tb-ref',     label:'Reference',desc:'Look up a symbol or CUSIP. Returns full record, pending corporate actions, and affected open order count.' },
-    { name:'update_ticker',      badge:'tb-ref',     label:'Reference',desc:'Rename a symbol and bulk-update all open orders. Flags stop orders for manual review on splits/mergers.' },
-    { name:'load_ticker',        badge:'tb-ref',     label:'Reference',desc:'Load a new symbol into the reference store and release orders blocked on missing symbology.' },
-    { name:'fix_session_issue',  badge:'tb-session',  label:'Session',  desc:'Resolve FIX session gaps: ResendRequest (35=2), SequenceReset (35=4), or full Logon reconnect (35=A).' },
-    { name:'validate_orders',    badge:'tb-triage',  label:'Triage',   desc:'Pre-flight validation: symbol validity, venue status, duplicate ClOrdIDs, and client account status.' },
-    { name:'run_premarket_check',badge:'tb-triage',  label:'Triage',   desc:'Flagship triage: sessions, corp actions, stuck orders, SLA deadlines, full morning checklist.' },
-    { name:'send_algo_order',    badge:'tb-algo',    label:'Algo',     desc:'Submit TWAP, VWAP, POV, IS, DARK_AGG, or ICEBERG algo. Creates parent order with execution schedule.' },
-    { name:'check_algo_status',  badge:'tb-algo',    label:'Algo',     desc:'Algo execution quality: schedule deviation, IS shortfall, over-participation alerts, child order health.' },
-    { name:'modify_algo',        badge:'tb-algo',    label:'Algo',     desc:'Pause, resume, or update POV participation rate on a live algo. Logged to audit trail.' },
-    { name:'cancel_algo',        badge:'tb-algo',    label:'Algo',     desc:'Cancel an active algo and send OrderCancelRequest (35=F) for all open child slices.' },
-    { name:'list_scenarios',     badge:'tb-triage',  label:'Triage',   desc:'List all 13 available trading scenarios or load one into the runtime to change the session state.' },
-  ];
+  // ── MCP Server tab ────────────────────────────────────────────────────────
+  async function renderMCPSchema() {
+    const el = document.getElementById('mcpSchemaContent');
+    if (!el) return;
+    const schema = await fetchJson('/api/mcp/schema');
+    if (!schema) {
+      el.innerHTML = '<div style="padding:20px;color:var(--down)">Failed to load MCP schema from /api/mcp/schema.</div>';
+      return;
+    }
+    const badgeColor = { orders:'tb-order', session:'tb-session', reference:'tb-ref', algo:'tb-algo', triage:'tb-triage' };
+    const toolCategory = {
+      query_orders:'tb-order', check_fix_sessions:'tb-session', send_order:'tb-order', cancel_replace:'tb-order',
+      check_ticker:'tb-ref', update_ticker:'tb-ref', load_ticker:'tb-ref', fix_session_issue:'tb-session',
+      validate_orders:'tb-triage', run_premarket_check:'tb-triage', send_algo_order:'tb-algo',
+      check_algo_status:'tb-algo', modify_algo:'tb-algo', cancel_algo:'tb-algo', list_scenarios:'tb-triage',
+    };
 
-  function renderToolCatalog() {
-    const grid = document.getElementById('toolGrid');
-    if (!grid) return;
-    grid.innerHTML = TOOL_CATALOG.map(t =>
-      '<div class="tool-card" onclick="showToolDetail(\'' + t.name + '\')">'
-      + '<div class="tool-name">' + t.name + '</div>'
-      + '<div class="tool-desc">' + t.desc + '</div>'
-      + '<span class="tool-badge ' + t.badge + '">' + t.label + '</span></div>'
-    ).join('');
+    // ── Server capabilities block
+    let html = `<div class="mcp-cap-block">
+      <h3>${schema.server.name}</h3>
+      <div style="font-size:11px;color:var(--xdim);font-family:var(--mono);margin-bottom:8px">Protocol ${schema.server.protocolVersion} &nbsp;·&nbsp; v${schema.server.version} &nbsp;·&nbsp; transport: stdio</div>
+      <div class="mcp-cap-kv">
+        <span>Tools <strong>${schema.tools.length}</strong></span>
+        <span>Resources <strong>${schema.resources.length}</strong></span>
+        <span>Prompts <strong>${schema.prompts.length}</strong></span>
+        <span>Capabilities <strong>tools · resources · prompts</strong></span>
+      </div>
+    </div>`;
+
+    // ── tools/list
+    html += `<div class="card"><div class="mcp-section-hdr">tools/list &mdash; ${schema.tools.length} tools registered</div>`;
+    schema.tools.forEach((t, i) => {
+      const badge = toolCategory[t.name] || 'tb-triage';
+      const schemaStr = JSON.stringify(t.inputSchema, null, 2)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += `<div class="mcp-tool-row" onclick="toggleMCPSchema(${i})">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <span class="mcp-tool-name">${t.name}</span>
+          <span class="tool-badge ${badge}" style="font-size:10px;padding:1px 7px">${badge.replace('tb-','')}</span>
+          <span style="font-size:10px;color:var(--xdim);margin-left:auto">click to view inputSchema ↓</span>
+        </div>
+        <div class="mcp-tool-desc">${t.description}</div>
+        <pre class="mcp-tool-schema" id="mcp-schema-${i}">${schemaStr}</pre>
+      </div>`;
+    });
+    html += '</div>';
+
+    // ── resources/list
+    html += `<div class="card"><div class="mcp-section-hdr">resources/list &mdash; ${schema.resources.length} resources</div>`;
+    schema.resources.forEach(r => {
+      html += `<div class="mcp-resource-row">
+        <span class="mcp-resource-uri">${r.uri}</span>
+        <span class="mcp-resource-desc">${r.description}</span>
+        <span class="mcp-resource-mime">${r.mimeType}</span>
+      </div>`;
+    });
+    html += '</div>';
+
+    // ── prompts/list
+    html += `<div class="card"><div class="mcp-section-hdr">prompts/list &mdash; ${schema.prompts.length} role prompts</div>`;
+    schema.prompts.forEach(p => {
+      html += `<div class="mcp-prompt-row">
+        <div class="mcp-prompt-name">${p.name}</div>
+        <div class="mcp-prompt-desc">${p.description}</div>
+      </div>`;
+    });
+    html += '</div>';
+
+    // ── Client config
+    const cfg = JSON.stringify({
+      mcpServers: {
+        "fix-mcp": {
+          command: "/path/to/fix-mcp-server/.venv/bin/fix-mcp-server",
+          args: [],
+          cwd: "/path/to/fix-mcp-server"
+        }
+      }
+    }, null, 2);
+    html += `<div class="card">
+      <div class="mcp-section-hdr">Client Configuration &mdash; claude_desktop_config.json / .claude/mcp.json</div>
+      <p style="font-size:12px;color:var(--dim);margin:0 0 6px">Add this block so Claude Desktop or Claude Code can connect to this MCP server over stdio:</p>
+      <pre class="mcp-config-pre">${cfg}</pre>
+    </div>`;
+
+    el.innerHTML = html;
   }
 
-  function showToolDetail(toolName) {
-    const t = TOOL_CATALOG.find(x => x.name === toolName);
-    if (!t) return;
-    const out = document.getElementById('output');
-    out.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;font-family:var(--mono)">' + t.name + '</div>'
-      + '<div style="font-size:12px;color:var(--dim);margin-bottom:12px">' + t.desc + '</div>'
-      + '<div class="out-section">Quick Run</div>'
-      + '<button class="btn-primary" onclick="runTool(\'' + t.name + '\',{})" style="margin-right:6px">Run (defaults)</button>'
-      + '<span style="font-size:11px;color:var(--dim)">Use the sidebar forms for parameterized calls</span>';
-    out.style.background = 'var(--bg-el)';
-    out.style.color = 'var(--text)';
-    out.className = 'pb-output';
-    switchTab('playbook');
+  function toggleMCPSchema(i) {
+    const el = document.getElementById('mcp-schema-' + i);
+    if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
   }
 
   async function runTool(tool, args) {
@@ -1254,17 +1323,40 @@ flowchart TB
         'cancel_replace':      _parseCancelReplaceOutput,
       };
       const parser = _richParsers[tool];
+      out.className = 'pb-output';
+      out.style.background = 'var(--bg-el)';
+      out.style.color = 'var(--text)';
       if (parser && data.ok) {
-        out.className = 'pb-output';
-        out.style.background = 'var(--bg-el)';
-        out.style.color = 'var(--text)';
         out.innerHTML = parser(data.output);
       } else {
-        out.textContent = data.output;
-        out.className = data.ok ? 'pb-output' : 'pb-output error';
-        out.style.background = '';
-        out.style.color = '';
+        out.innerHTML = `<pre style="white-space:pre-wrap;font-family:var(--mono);font-size:12px;color:${data.ok ? 'var(--text)' : 'var(--down)'}">${data.output}</pre>`;
       }
+      // Always append the MCP JSON-RPC envelope so the protocol is visible
+      const mcpReqId = Date.now();
+      const mcpReq = JSON.stringify({
+        jsonrpc: "2.0",
+        id: mcpReqId,
+        method: "tools/call",
+        params: { name: tool, arguments: args }
+      }, null, 2);
+      const mcpResp = JSON.stringify({
+        jsonrpc: "2.0",
+        id: mcpReqId,
+        result: { content: [{ type: "text", text: data.output.slice(0, 120) + (data.output.length > 120 ? "…" : "") }] }
+      }, null, 2);
+      out.innerHTML += `<div class="mcp-jsonrpc-wrap">
+        <div class="mcp-jsonrpc-label">MCP Protocol &mdash; tools/call (stdio transport)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+          <div>
+            <div style="font-size:10px;color:var(--xdim);margin-bottom:3px">→ Request</div>
+            <pre class="mcp-jsonrpc-pre">${mcpReq}</pre>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--xdim);margin-bottom:3px">← Response</div>
+            <pre class="mcp-jsonrpc-pre">${mcpResp}</pre>
+          </div>
+        </div>
+      </div>`;
     }
     await refresh();
   }
@@ -1384,12 +1476,15 @@ flowchart TB
     if (!events) return;
     document.querySelector('#activityTable tbody').innerHTML = events.map(e => {
       const t = new Date(e.ts).toLocaleTimeString();
-      const ok = e.ok ? '<span class="chip chip-ok" style="font-size:10px;padding:1px 7px">OK</span>' : '<span class="chip chip-down" style="font-size:10px;padding:1px 7px">ERR</span>';
+      const ok = e.ok
+        ? '<span class="chip chip-ok" style="font-size:10px;padding:1px 7px">OK</span>'
+        : '<span class="chip chip-down" style="font-size:10px;padding:1px 7px">ERR</span>';
+      const mcpCall = `{"method":"tools/call","params":{"name":"${e.tool}"}}`;
       return `<tr>
         <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;color:var(--dim)">${t}</td>
-        <td><strong>${e.tool}</strong></td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${e.tool}</td>
         <td>${ok}</td>
-        <td style="font-size:12px;color:var(--dim)">${e.summary}</td>
+        <td style="font-size:11px;color:var(--dim)">${e.summary}</td>
       </tr>`;
     }).join('');
   }
@@ -1416,7 +1511,7 @@ flowchart TB
     flowchart: { curve: 'basis', padding: 20 },
   });
   refresh();
-  renderToolCatalog();
+  renderMCPSchema();
   setInterval(refresh, 5000);
 </script>
 </body>

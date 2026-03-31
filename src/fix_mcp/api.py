@@ -338,6 +338,41 @@ class APIHandler(BaseHTTPRequestHandler):
                 self._send_json(list(_events))
             return
 
+        if self.path == "/api/mcp/schema":
+            tools = asyncio.run(server.list_tools())
+            resources = asyncio.run(server.list_resources())
+            prompts = asyncio.run(server.list_prompts())
+            self._send_json({
+                "server": {
+                    "name": "fix-trading-ops",
+                    "version": "0.1.0",
+                    "protocolVersion": "2024-11-05",
+                },
+                "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
+                "tools": [
+                    {
+                        "name": t.name,
+                        "description": t.description or "",
+                        "inputSchema": t.inputSchema if isinstance(t.inputSchema, dict) else {},
+                    }
+                    for t in tools
+                ],
+                "resources": [
+                    {
+                        "uri": str(r.uri),
+                        "name": r.name,
+                        "description": r.description or "",
+                        "mimeType": r.mimeType or "",
+                    }
+                    for r in resources
+                ],
+                "prompts": [
+                    {"name": p.name, "description": p.description or ""}
+                    for p in prompts
+                ],
+            })
+            return
+
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
