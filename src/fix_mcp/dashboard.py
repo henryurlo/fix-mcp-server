@@ -71,9 +71,17 @@ HTML = r"""<!doctype html>
     .topbar h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; color: var(--text); }
     .topbar .spacer { flex: 1; }
     .statusbar { display: flex; gap: 12px; padding: 7px 20px; background: var(--bg-el); border-bottom: 1px solid var(--border-sub); flex-wrap: wrap; align-items: center; }
-    .main { display: grid; grid-template-columns: 280px 1fr; overflow: hidden; }
-    .sidebar { border-right: 1px solid var(--border); overflow-y: auto; padding: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 10px; }
+    .main { display: grid; grid-template-columns: 220px 1fr 280px; overflow: hidden; }
+    .sidebar { border-right: 1px solid var(--border); overflow-y: auto; padding: 10px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
     .content { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; background: var(--bg); }
+    .right-panel { border-left: 1px solid var(--border); overflow-y: auto; padding: 10px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+    .rp-section { background: var(--bg-el); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+    .rp-section-hdr { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--dim); font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .rp-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 5px 4px; border-bottom: 1px solid var(--border-sub); font-size: 12px; }
+    .rp-row:last-child { border-bottom: none; }
+    .rp-row:hover { background: rgba(255,255,255,.02); border-radius: 4px; }
+    .rp-evt { display: flex; gap: 5px; align-items: baseline; padding: 3px 4px; border-bottom: 1px solid var(--border-sub); font-size: 11px; }
+    .rp-evt:last-child { border-bottom: none; }
 
     /* ── components ── */
     button { font-family: var(--sans); border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 500; transition: filter .15s; }
@@ -280,10 +288,6 @@ HTML = r"""<!doctype html>
   <!-- ── top bar ── -->
   <div class="topbar">
     <h1>FIX MCP Dashboard</h1>
-    <div class="sim-clock-wrap">
-      <div class="sim-clock" id="simClock">02:05</div>
-      <div class="sim-clock-label">ET · Sim</div>
-    </div>
     <span class="spacer"></span>
     <div style="display:flex;gap:4px;align-items:center">
       <span style="font-size:10px;color:var(--xdim);letter-spacing:1px;text-transform:uppercase;font-weight:600">Mode</span>
@@ -293,7 +297,6 @@ HTML = r"""<!doctype html>
     </div>
     <div class="vcr-bar">
       <span style="font-size:10px;color:var(--xdim);letter-spacing:1px;text-transform:uppercase;font-weight:600">Sim</span>
-      <button id="btnPlay"  class="btn-vcr btn-ok" onclick="togglePlay()" style="padding:4px 12px;font-size:11px">▶ Play Day</button>
       <button id="vcrPause" class="btn-vcr" onclick="togglePause()">⏸ Pause</button>
       <button id="vcr1x"  class="btn-vcr" onclick="setSimSpeed(1)">1×</button>
       <button id="vcr10x" class="btn-vcr active" onclick="setSimSpeed(10)">10×</button>
@@ -313,6 +316,12 @@ HTML = r"""<!doctype html>
 
     <!-- left sidebar -->
     <div class="sidebar">
+      <div class="section-label">Today's Timeline</div>
+      <div class="tl-panel">
+        <div id="timelinePanel"></div>
+      </div>
+
+      <div class="divider"></div>
       <div class="section-label">Session Health</div>
       <div id="sessionCards"></div>
 
@@ -322,11 +331,11 @@ HTML = r"""<!doctype html>
         <button class="btn-primary" onclick="runTool('run_premarket_check',{})">Pre-Market</button>
         <button class="btn-primary" onclick="runTool('check_fix_sessions',{})">Sessions</button>
         <button class="btn-primary" onclick="runTool('check_algo_status',{})">Algos</button>
-        <button class="btn-neutral" onclick="switchTab('activity')">Activity Log</button>
+        <button class="btn-neutral" onclick="runTool('validate_orders',{})">Validate</button>
       </div>
 
-      <div id="notifyPanel" style="display:none;margin-top:10px">
-        <div class="divider" style="margin-bottom:10px"></div>
+      <div id="notifyPanel" style="display:none;margin-top:4px">
+        <div class="divider" style="margin-bottom:8px"></div>
         <div class="notify-panel">
           <div class="notify-title">📞 Client Notifications Required</div>
           <div id="notifyRows"></div>
@@ -335,12 +344,16 @@ HTML = r"""<!doctype html>
 
       <div class="divider"></div>
       <div class="section-label">Send Order</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <input id="qSymbol"   placeholder="Symbol (e.g. AAPL)" value="AAPL" />
-        <input id="qQty"      placeholder="Qty" value="100" type="number" />
-        <input id="qPrice"    placeholder="Price (limit)" value="214.50" type="number" step="0.01" />
-        <select id="qSide"><option value="buy">Buy</option><option value="sell">Sell</option></select>
-        <select id="qClient">
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:grid;grid-template-columns:1fr 80px;gap:4px">
+          <input id="qSymbol" placeholder="Symbol" value="AAPL" />
+          <input id="qQty" placeholder="Qty" value="100" type="number" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <select id="qSide"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+          <input id="qPrice" placeholder="Price" value="214.50" type="number" step="0.01" />
+        </div>
+        <select id="qClient" style="font-size:11px">
           <option>Maple Capital</option><option>Rowan Partners</option>
           <option>Birch Funds</option><option>Sycamore Group</option>
           <option>Aspen Asset Management</option><option>Willow Investments</option>
@@ -352,23 +365,19 @@ HTML = r"""<!doctype html>
 
       <div class="divider"></div>
       <div class="section-label">Session Repair</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <select id="repairVenue">
-          <option>NYSE</option><option>ARCA</option><option>BATS</option>
-          <option>IEX</option><option>EDGX</option><option>NASDAQ</option>
-        </select>
-        <select id="repairAction">
-          <option value="resend_request">ResendRequest (35=2)</option>
-          <option value="reset_sequence">SequenceReset (35=4)</option>
-          <option value="reconnect">Reconnect (Logon 35=A)</option>
-        </select>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <select id="repairVenue" style="font-size:11px">
+            <option>NYSE</option><option>ARCA</option><option>BATS</option>
+            <option>IEX</option><option>EDGX</option><option>NASDAQ</option>
+          </select>
+          <select id="repairAction" style="font-size:11px">
+            <option value="resend_request">ResendReq</option>
+            <option value="reset_sequence">SeqReset</option>
+            <option value="reconnect">Reconnect</option>
+          </select>
+        </div>
         <button class="btn-danger" onclick="repairSession()">Repair Session</button>
-      </div>
-
-      <div class="divider"></div>
-      <div class="section-label">Today's Timeline</div>
-      <div class="tl-panel">
-        <div id="timelinePanel"></div>
       </div>
     </div>
 
@@ -376,10 +385,6 @@ HTML = r"""<!doctype html>
     <div class="content">
       <div class="tabs" id="tabs">
         <div class="tab active" onclick="switchTab('playbook')">▶ Playbook</div>
-        <div class="tab" onclick="switchTab('sessions')">Sessions</div>
-        <div class="tab" onclick="switchTab('orders')">Orders</div>
-        <div class="tab" onclick="switchTab('algos')">Algos</div>
-        <div class="tab" onclick="switchTab('activity')">Activity</div>
         <div class="tab" onclick="switchTab('fixmsgs')">FIX Messages</div>
         <div class="tab" onclick="switchTab('tools')">MCP Server</div>
         <div class="tab" onclick="switchTab('architecture')">Architecture</div>
@@ -388,37 +393,7 @@ HTML = r"""<!doctype html>
       <div class="tab-body active" id="tab-playbook">
         <div id="scenarioBrief"></div>
         <div class="playbook" id="workflowSteps"></div>
-        <div class="pb-output" id="output">Run a step above to see AI output here.</div>
-      </div>
-
-      <div class="tab-body" id="tab-sessions">
-        <div class="card">
-          <h4>FIX Session States</h4>
-          <table id="sessionsTable">
-            <thead><tr><th>Venue</th><th>Status</th><th>Latency</th><th>Last Sent</th><th>Last Recv</th><th>Expected</th><th>Error</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="tab-body" id="tab-orders">
-        <div class="card">
-          <h4>Open Orders</h4>
-          <table id="ordersTable">
-            <thead><tr><th>Order ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Price</th><th>Venue</th><th>Status</th><th>Client</th><th>Notional</th><th>Flags</th><th>Actions</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="tab-body" id="tab-algos">
-        <div class="card">
-          <h4>Active Algo Orders</h4>
-          <table id="algosTable">
-            <thead><tr><th>Algo ID</th><th>Symbol</th><th>Type</th><th>Total Qty</th><th>Executed</th><th>Schedule%</th><th>Exec%</th><th>Deviation</th><th>Status</th><th>Client</th><th>Flags</th><th>Actions</th></tr></thead>
-          <tbody></tbody>
-          </table>
-        </div>
+        <div class="pb-output" id="output">Select a scenario from the timeline, then run a step to see AI output here.</div>
       </div>
 
       <div class="tab-body" id="tab-fixmsgs">
@@ -432,16 +407,6 @@ HTML = r"""<!doctype html>
       <div class="tab-body" id="tab-tools">
         <div id="mcpSchemaContent" style="padding:4px 0">
           <div style="text-align:center;padding:40px;color:var(--dim);font-size:13px">Loading MCP schema&hellip;</div>
-        </div>
-      </div>
-
-      <div class="tab-body" id="tab-activity">
-        <div class="card">
-          <h4>MCP Activity — <span style="font-family:var(--mono);font-size:12px;color:var(--dim)">jsonrpc: "2.0" · method: "tools/call"</span></h4>
-          <table id="activityTable">
-            <thead><tr><th>Time</th><th>MCP Tool</th><th>Status</th><th>Result</th></tr></thead>
-            <tbody></tbody>
-          </table>
         </div>
       </div>
 
@@ -569,34 +534,56 @@ flowchart TB
         </div>
       </div>
     </div>
+
+    <!-- right panel — always-visible live data -->
+    <div class="right-panel">
+
+      <div class="rp-section">
+        <div class="rp-section-hdr">
+          FIX Sessions
+          <button class="btn-neutral" onclick="runTool('check_fix_sessions',{})" style="font-size:10px;padding:2px 7px">Check</button>
+        </div>
+        <div id="rpSessions"></div>
+      </div>
+
+      <div class="rp-section">
+        <div class="rp-section-hdr">
+          Open Orders
+          <span id="rpOrdCount" style="font-size:11px;font-weight:400;color:var(--dim)"></span>
+        </div>
+        <div id="rpOrders" style="max-height:190px;overflow-y:auto"></div>
+      </div>
+
+      <div class="rp-section" id="rpAlgoSection" style="display:none">
+        <div class="rp-section-hdr">
+          Active Algos
+          <span id="rpAlgoCount" style="font-size:11px;font-weight:400;color:var(--dim)"></span>
+        </div>
+        <div id="rpAlgos" style="max-height:150px;overflow-y:auto"></div>
+      </div>
+
+      <div class="rp-section" style="flex:1;min-height:120px">
+        <div class="rp-section-hdr">
+          MCP Activity
+          <span style="font-size:9px;font-family:var(--mono);color:var(--xdim)">tools/call</span>
+        </div>
+        <div id="rpActivity" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+
+    </div>
   </div>
 </div>
 
-<!-- narration overlay -->
-<div class="narration-overlay" id="narrationOverlay">
-  <div class="narration-box">
-    <div class="narration-time" id="narrationTime"></div>
-    <div class="narration-headline" id="narrationHeadline"></div>
-    <div class="narration-body" id="narrationBody"></div>
-    <div class="narration-agent" id="narrationAgent" style="display:none"></div>
-    <div class="narration-footer">
-      <button class="btn-neutral" onclick="closeNarration()" style="padding:6px 18px">Dismiss</button>
-      <button class="btn-ok" onclick="closeNarration();switchTab('playbook')" style="padding:6px 18px">Go to Playbook →</button>
-    </div>
-  </div>
+<!-- hidden stubs so JS refs don't throw -->
+<div style="display:none" id="narrationOverlay">
+  <div id="narrationTime"></div><div id="narrationHeadline"></div>
+  <div id="narrationBody"></div><div id="narrationAgent"></div>
 </div>
 
 <script>
   // ── state ──────────────────────────────────────────────────────────────────
   let currentStatus = null;
   let simState = {speed: 10, paused: false};
-
-  // ── sim clock state ────────────────────────────────────────────────────────
-  let _simMinutes = 125;          // 02:05 ET start
-  let _simRunning = false;
-  let _simClockHz = null;
-  let _simTickSpeed = 10;         // mirrors simState.speed
-  let _triggeredScenarios = new Set();
 
   // ── scenario situation briefings ──────────────────────────────────────────
   const SCENARIO_CONTEXT = {
@@ -866,59 +853,84 @@ flowchart TB
       </div>`;
     }).join('');
 
-    // sessions table
-    document.querySelector('#sessionsTable tbody').innerHTML = data.sessions.map(s => `
-      <tr>
-        <td><strong>${s.venue}</strong></td>
-        <td>${statusIcon(s.status)}</td>
-        <td>${s.latency_ms}ms</td>
-        <td>${s.last_sent_seq.toLocaleString()}</td>
-        <td>${s.last_recv_seq.toLocaleString()}</td>
-        <td>${s.expected_recv_seq.toLocaleString()}${s.seq_gap ? ' ⚠' : ''}</td>
-        <td style="color:var(--down);font-size:11px;font-family:var(--mono)">${s.error || ''}</td>
-      </tr>
-    `).join('');
+    // ── right panel — sessions
+    document.getElementById('rpSessions').innerHTML = data.sessions.map(s => {
+      const cls = s.status === 'active' ? 'var(--ok)' : s.status === 'degraded' ? 'var(--warn)' : 'var(--down)';
+      const badge = s.status === 'active' ? '[OK]' : s.status === 'degraded' ? '[WARN]' : '[DOWN]';
+      return `<div class="rp-row">
+        <div>
+          <strong style="font-size:12px">${s.venue}</strong>
+          ${s.seq_gap ? '<span class="flag" style="font-size:9px;padding:1px 4px;margin-left:4px">GAP</span>' : ''}
+          ${s.error ? `<div style="font-size:10px;color:var(--down);margin-top:1px">${s.error.substring(0,32)}</div>` : ''}
+        </div>
+        <div style="text-align:right;font-size:11px">
+          <span style="font-weight:700;color:${cls}">${badge}</span>
+          <div style="color:var(--xdim)">${s.latency_ms}ms</div>
+        </div>
+      </div>`;
+    }).join('');
 
-    // orders table
-    document.querySelector('#ordersTable tbody').innerHTML = data.orders.map(o => `
-      <tr>
-        <td style="font-family:var(--mono);font-size:11px">${o.order_id}</td>
-        <td><strong>${o.symbol}</strong></td>
-        <td>${o.side}</td>
-        <td>${o.quantity.toLocaleString()}</td>
-        <td>${o.order_type}</td>
-        <td>${o.price ? '$'+o.price.toFixed(2) : '—'}</td>
-        <td>${o.venue}</td>
-        <td>${o.status}</td>
-        <td>${o.client_name}</td>
-        <td>$${Math.round(o.notional || 0).toLocaleString()}</td>
-        <td>${renderFlags(o.flags)}</td>
-        <td><button class="btn-danger" style="padding:2px 8px;font-size:11px" onclick="runTool('cancel_replace',{order_id:'${o.order_id}',action:'cancel'})">Cancel</button></td>
-      </tr>
-    `).join('');
+    // ── right panel — orders
+    const rpOrdCount = document.getElementById('rpOrdCount');
+    if (rpOrdCount) rpOrdCount.textContent = data.orders_open;
+    document.getElementById('rpOrders').innerHTML = data.orders.length === 0
+      ? '<div style="color:var(--xdim);font-size:11px;padding:6px 2px;text-align:center">No open orders</div>'
+      : data.orders.slice(0, 14).map(o => {
+          const sideColor = o.side === 'buy' ? 'var(--ok)' : 'var(--down)';
+          const stuckBg   = o.status === 'stuck' ? 'background:rgba(210,153,34,.08);' : '';
+          return `<div class="rp-row" style="${stuckBg}">
+            <div style="flex:1">
+              <div style="display:flex;gap:5px;align-items:baseline">
+                <strong style="font-size:12px">${o.symbol}</strong>
+                <span style="font-size:11px;color:${sideColor};font-weight:600">${o.side.toUpperCase()}</span>
+                <span style="font-size:11px;color:var(--dim)">${o.quantity.toLocaleString()}</span>
+              </div>
+              <div style="font-size:10px;color:var(--xdim)">${o.venue} · ${o.client_name}</div>
+            </div>
+            <div style="text-align:right">
+              <button class="btn-danger" style="font-size:10px;padding:1px 6px"
+                onclick="runTool('cancel_replace',{order_id:'${o.order_id}',action:'cancel'})">✕</button>
+              <div style="font-size:10px;margin-top:2px;color:${o.status==='stuck'?'var(--warn)':'var(--xdim)'};font-weight:${o.status==='stuck'?'700':'400'}">${o.status}</div>
+            </div>
+          </div>`;
+        }).join('');
 
-    // algos table
-    document.querySelector('#algosTable tbody').innerHTML = data.algos.map(a => `
-      <tr>
-        <td style="font-family:var(--mono);font-size:11px">${a.algo_id}</td>
-        <td><strong>${a.symbol}</strong></td>
-        <td>${a.algo_type}</td>
-        <td>${a.total_qty.toLocaleString()}</td>
-        <td>${a.executed_qty.toLocaleString()}</td>
-        <td>${a.schedule_pct}%</td>
-        <td>${a.execution_pct}%<br><div class="prog-bar" style="margin-top:2px"><div class="fill ${Math.abs(a.schedule_deviation_pct||0)>10?'crit':Math.abs(a.schedule_deviation_pct||0)>3?'warn':'ok'}" style="width:${Math.min(100,a.execution_pct)}%"></div></div></td>
-        <td>${deviationCell(a.schedule_deviation_pct)}</td>
-        <td>${a.status}</td>
-        <td>${a.client_name}</td>
-        <td>${renderFlags(a.flags)}</td>
-        <td>
-          <button class="btn-neutral" style="padding:3px 8px;font-size:11px"
-            onclick="runTool('modify_algo',{algo_id:'${a.algo_id}',action:'pause'})">Pause</button>
-          <button class="btn-danger" style="padding:3px 8px;font-size:11px;margin-left:4px"
-            onclick="runTool('cancel_algo',{algo_id:'${a.algo_id}',reason:'dashboard cancel'})">Cancel</button>
-        </td>
-      </tr>
-    `).join('');
+    // ── right panel — algos
+    const rpAlgoSection = document.getElementById('rpAlgoSection');
+    const rpAlgoCount   = document.getElementById('rpAlgoCount');
+    if (rpAlgoCount) rpAlgoCount.textContent = data.algos.length;
+    if (rpAlgoSection) rpAlgoSection.style.display = data.algos.length > 0 ? '' : 'none';
+    const rpAlgos = document.getElementById('rpAlgos');
+    if (rpAlgos && data.algos.length > 0) {
+      rpAlgos.innerHTML = data.algos.slice(0, 6).map(a => {
+        const devAbs = Math.abs(a.schedule_deviation_pct || 0);
+        const devColor = devAbs > 10 ? 'var(--down)' : devAbs > 3 ? 'var(--warn)' : 'var(--ok)';
+        const devSign  = a.schedule_deviation_pct > 0 ? '+' : '';
+        return `<div class="rp-row">
+          <div style="flex:1">
+            <div style="display:flex;gap:5px;align-items:baseline">
+              <span style="font-size:10px;font-weight:600;color:var(--accent)">${a.algo_type.toUpperCase()}</span>
+              <strong style="font-size:12px">${a.symbol}</strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+              <div class="prog-bar" style="width:60px"><div class="fill ${devAbs>10?'crit':devAbs>3?'warn':'ok'}" style="width:${Math.min(100,a.execution_pct)}%"></div></div>
+              <span style="font-size:10px;color:${devColor}">${devSign}${a.schedule_deviation_pct}%</span>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <span style="font-size:10px;padding:2px 5px;border-radius:3px;background:${a.status==='running'?'var(--ok-bg)':'var(--warn-bg)'};color:${a.status==='running'?'var(--ok)':'var(--warn)'}">${a.status}</span>
+            <div style="display:flex;gap:3px;margin-top:3px;justify-content:flex-end">
+              <button class="btn-neutral" style="font-size:9px;padding:1px 5px"
+                onclick="runTool('modify_algo',{algo_id:'${a.algo_id}',action:'pause'})">⏸</button>
+              <button class="btn-danger" style="font-size:9px;padding:1px 5px"
+                onclick="runTool('cancel_algo',{algo_id:'${a.algo_id}',reason:'dashboard cancel'})">✕</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    renderEvents();
 
     // notification panel — naturally-expired SLA breaches (not stuck, so tools can't fix them)
     const breachedOrders = (data.orders || []).filter(o => o.sla_breached && o.status !== 'stuck');
@@ -1500,13 +1512,12 @@ flowchart TB
 
   function switchTab(name) {
     document.querySelectorAll('.tab').forEach((t, i) => {
-      const names = ['playbook','sessions','orders','algos','activity','fixmsgs','tools','architecture'];
+      const names = ['playbook', 'fixmsgs', 'tools', 'architecture'];
       t.classList.toggle('active', names[i] === name);
     });
     document.querySelectorAll('.tab-body').forEach(b => {
       b.classList.toggle('active', b.id === 'tab-' + name);
     });
-    if (name === 'activity') renderEvents();
   }
 
   async function switchMode(m) {
@@ -1519,7 +1530,6 @@ flowchart TB
   }
 
   async function setSimSpeed(s) {
-    _simTickSpeed = s;
     const data = await fetchJson('/api/simulation', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1553,116 +1563,37 @@ flowchart TB
   async function renderEvents() {
     const events = await fetchJson('/api/events');
     if (!events) return;
-    document.querySelector('#activityTable tbody').innerHTML = events.map(e => {
-      const t = new Date(e.ts).toLocaleTimeString();
-      const ok = e.ok
-        ? '<span class="chip chip-ok" style="font-size:10px;padding:1px 7px">OK</span>'
-        : '<span class="chip chip-down" style="font-size:10px;padding:1px 7px">ERR</span>';
+    const rpAct = document.getElementById('rpActivity');
+    if (!rpAct) return;
+    rpAct.innerHTML = events.slice(0, 20).map(e => {
+      const t = new Date(e.ts).toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
       const isClaude = e.source === 'claude';
-      const sourceBadge = isClaude
-        ? '<span style="font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(63,185,80,.18);color:var(--ok);font-weight:700;margin-right:5px">Claude</span>'
-        : '<span style="font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(56,139,253,.15);color:var(--accent);font-weight:700;margin-right:5px">Dash</span>';
-      const rowBg = isClaude ? 'background:rgba(63,185,80,.04);' : '';
-      return `<tr style="${rowBg}">
-        <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;color:var(--dim)">${t}</td>
-        <td>${sourceBadge}<span style="font-family:var(--mono);font-size:12px;color:var(--accent)">${e.tool}</span></td>
-        <td>${ok}</td>
-        <td style="font-size:11px;color:var(--dim)">${e.summary}</td>
-      </tr>`;
+      const srcBadge = isClaude
+        ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(63,185,80,.18);color:var(--ok);font-weight:700;flex-shrink:0">AI</span>'
+        : '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(56,139,253,.15);color:var(--accent);font-weight:700;flex-shrink:0">UI</span>';
+      const okMark = e.ok
+        ? '<span style="color:var(--ok);font-size:10px;flex-shrink:0">✓</span>'
+        : '<span style="color:var(--down);font-size:10px;flex-shrink:0">✗</span>';
+      return `<div class="rp-evt" style="${isClaude ? 'background:rgba(63,185,80,.03);' : ''}">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--xdim);white-space:nowrap;flex-shrink:0">${t}</span>
+        ${srcBadge}
+        ${okMark}
+        <span style="font-family:var(--mono);font-size:11px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.tool}</span>
+      </div>`;
     }).join('');
   }
 
-  // ── sim clock ─────────────────────────────────────────────────────────────
-
-  function togglePlay() {
-    _simRunning = !_simRunning;
-    const btn = document.getElementById('btnPlay');
-    if (_simRunning) {
-      btn.textContent = '\u23f8 Pause Day';
-      btn.className = 'btn-vcr active';
-      _simClockHz = setInterval(_clockTick, 1000);
-    } else {
-      btn.textContent = '\u25b6 Play Day';
-      btn.className = 'btn-vcr btn-ok';
-      clearInterval(_simClockHz);
-      _simClockHz = null;
-    }
-  }
-
-  function _clockTick() {
-    _simMinutes += _simTickSpeed / 60;
-    if (_simMinutes >= 1440) { _simMinutes = 1439; togglePlay(); return; }
-    _updateClock();
-    _checkScenarioTriggers();
-  }
-
-  function _updateClock() {
-    const h = Math.floor(_simMinutes / 60);
-    const m = Math.floor(_simMinutes % 60);
-    const pad = n => String(n).padStart(2, '0');
-    const el = document.getElementById('simClock');
-    if (el) el.textContent = pad(h) + ':' + pad(m);
-  }
-
-  function _checkScenarioTriggers() {
-    for (const s of SCENARIO_TIMELINE) {
-      if (_triggeredScenarios.has(s.name)) continue;
-      if (_simMinutes >= s.minutes) {
-        _triggeredScenarios.add(s.name);
-        _triggerScenario(s);
-        break;
-      }
-    }
-    renderTimeline();
-  }
-
-  async function _triggerScenario(s) {
-    await fetchJson('/api/reset', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({scenario: s.name}),
-    });
-    await refresh();
-    showNarration(s);
-    if (currentStatus && currentStatus.mode === 'agent') {
-      const steps = SCENARIO_STEPS[s.name] || [];
-      if (steps.length > 0) await steps[0].fn();
-    }
-  }
-
-  function showNarration(s) {
-    const ctx = SCENARIO_CONTEXT[s.name] || {};
-    document.getElementById('narrationTime').textContent = '\u23f1 ' + (ctx.time || s.time) + ' ET';
-    document.getElementById('narrationHeadline').textContent = ctx.headline || s.name;
-    document.getElementById('narrationBody').innerHTML = ctx.body || '';
-    const agentEl = document.getElementById('narrationAgent');
-    const isAgent = currentStatus && currentStatus.mode === 'agent';
-    const firstLabel = ((SCENARIO_STEPS[s.name] || [])[0] || {}).label || '';
-    if (isAgent && firstLabel) {
-      agentEl.textContent = '\uD83E\uDD16 Agent mode \u2014 auto-running: ' + firstLabel;
-      agentEl.style.display = 'block';
-    } else {
-      agentEl.style.display = 'none';
-    }
-    document.getElementById('narrationOverlay').classList.add('show');
-  }
-
-  function closeNarration() {
-    document.getElementById('narrationOverlay').classList.remove('show');
-  }
+  // ── timeline (click navigation only) ─────────────────────────────────────
 
   function renderTimeline() {
     const panel = document.getElementById('timelinePanel');
     if (!panel) return;
     const active = currentStatus && currentStatus.scenario;
     panel.innerHTML = SCENARIO_TIMELINE.map(s => {
-      const isDone   = _triggeredScenarios.has(s.name);
       const isActive = s.name === active;
-      const dotCls  = isActive ? 'tl-dot-active' : isDone ? 'tl-dot-done' : '';
-      const rowCls  = isActive ? 'tl-active' : isDone ? 'tl-done' : '';
-      const label   = (SCENARIO_CONTEXT[s.name] || {}).headline || s.name.replace(/_/g, ' ');
-      return '<div class="tl-item ' + rowCls + '" onclick="_jumpToScenario(\'' + s.name + '\')" title="' + s.time + ' \u2014 ' + label + '">'
-           + '<div class="tl-dot ' + dotCls + '"></div>'
+      const label    = (SCENARIO_CONTEXT[s.name] || {}).headline || s.name.replace(/_/g, ' ');
+      return '<div class="tl-item' + (isActive ? ' tl-active' : '') + '" onclick="_jumpToScenario(\'' + s.name + '\')" title="' + s.time + ' \u2014 ' + label + '">'
+           + '<div class="tl-dot' + (isActive ? ' tl-dot-active' : '') + '"></div>'
            + '<span class="tl-time">' + s.time + '</span>'
            + '<span class="tl-name">' + label + '</span>'
            + '</div>';
@@ -1670,13 +1601,10 @@ flowchart TB
   }
 
   async function _jumpToScenario(name) {
-    const s = SCENARIO_TIMELINE.find(x => x.name === name);
-    if (!s) return;
-    _simMinutes = s.minutes;
-    _triggeredScenarios.add(name);
-    _updateClock();
     await loadScenario(name);
   }
+
+  function closeNarration() {}   // stub — kept for any inline refs
 
   // ── init ───────────────────────────────────────────────────────────────────
   mermaid.initialize({
@@ -1701,7 +1629,6 @@ flowchart TB
   });
   refresh();
   renderMCPSchema();
-  renderTimeline();
   setInterval(refresh, 5000);
 </script>
 </body>
