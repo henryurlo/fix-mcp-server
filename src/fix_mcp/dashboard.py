@@ -183,6 +183,28 @@ HTML = r"""<!doctype html>
     .pb-output { background:#0d1117;color:var(--ok);font-family:var(--mono);font-size:12px;line-height:1.6;padding:16px;border-radius:8px;white-space:pre-wrap;word-break:break-word;min-height:80px;border:1px solid var(--border); }
     .pb-output.error { color:var(--down); }
 
+    /* ── playbook split layout ── */
+    #tab-playbook.active { display:grid; grid-template-columns:40% 1fr; gap:14px; align-items:start; }
+    .pb-steps-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow-y:auto; max-height:calc(100vh - 145px); }
+    .pb-out-col { position:sticky; top:0; min-width:0; }
+    #output { min-height:300px; max-height:calc(100vh - 145px); overflow-y:auto; background:var(--bg-el); color:var(--text); }
+
+    /* ── step card enhancements ── */
+    .pb-step-hdr { display:flex; gap:9px; align-items:flex-start; margin-bottom:7px; }
+    .pb-step-num-badge { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:rgba(56,139,253,.15); color:var(--accent); font-size:11px; font-weight:700; flex-shrink:0; margin-top:1px; border:1px solid rgba(56,139,253,.25); }
+    .pb-step-title-blk { flex:1; min-width:0; }
+    .pb-step-badges { display:flex; gap:5px; align-items:center; flex-wrap:wrap; margin-top:3px; }
+
+    /* ── tab detach button ── */
+    .tab-pop { margin-left:5px; font-size:10px; opacity:.4; cursor:pointer; border-radius:3px; padding:1px 3px; vertical-align:middle; }
+    .tab:hover .tab-pop, .tab.active .tab-pop { opacity:.75; }
+    .tab-pop:hover { opacity:1 !important; background:var(--bg-in); }
+
+    /* ── solo (pop-out) mode ── */
+    .solo-mode .topbar, .solo-mode .statusbar, .solo-mode .sidebar, .solo-mode .right-panel { display:none !important; }
+    .solo-mode .main { grid-template-columns:1fr; }
+    .solo-mode .content { height:100vh; }
+
     /* ── FIX message viewer ── */
     .fix-msg-table { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px; margin-top:8px; }
     .fix-msg-table th { text-align:left; padding:5px 10px; border-bottom:1px solid var(--border); color:var(--dim); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; }
@@ -384,16 +406,22 @@ HTML = r"""<!doctype html>
     <!-- main content -->
     <div class="content">
       <div class="tabs" id="tabs">
-        <div class="tab active" onclick="switchTab('playbook')">▶ Playbook</div>
-        <div class="tab" onclick="switchTab('fixmsgs')">FIX Messages</div>
-        <div class="tab" onclick="switchTab('tools')">MCP Server</div>
-        <div class="tab" onclick="switchTab('architecture')">Architecture</div>
+        <div class="tab active" onclick="switchTab('playbook')">▶ Playbook <span class="tab-pop" onclick="event.stopPropagation();popTab('playbook')" title="Open in new window">⊞</span></div>
+        <div class="tab" onclick="switchTab('fixmsgs')">FIX Messages <span class="tab-pop" onclick="event.stopPropagation();popTab('fixmsgs')" title="Open in new window">⊞</span></div>
+        <div class="tab" onclick="switchTab('tools')">MCP Server <span class="tab-pop" onclick="event.stopPropagation();popTab('tools')" title="Open in new window">⊞</span></div>
+        <div class="tab" onclick="switchTab('architecture')">Architecture <span class="tab-pop" onclick="event.stopPropagation();popTab('architecture')" title="Open in new window">⊞</span></div>
       </div>
 
       <div class="tab-body active" id="tab-playbook">
-        <div id="scenarioBrief"></div>
-        <div class="playbook" id="workflowSteps"></div>
-        <div class="pb-output" id="output">Select a scenario from the timeline, then run a step to see AI output here.</div>
+        <div class="pb-steps-col">
+          <div id="scenarioBrief"></div>
+          <div class="playbook" id="workflowSteps">
+            <div style="color:var(--xdim);font-size:12px;padding:8px 4px">Select a scenario from the timeline to load its steps.</div>
+          </div>
+        </div>
+        <div class="pb-out-col">
+          <div class="pb-output" id="output">Run a step to see output here.</div>
+        </div>
       </div>
 
       <div class="tab-body" id="tab-fixmsgs">
@@ -843,13 +871,22 @@ flowchart TB
       const aiBlock = s.ai
         ? `<div class="${s.approval ? 'ai-approval' : 'ai-auto'}">${s.ai}</div>`
         : '';
+      const approvalBadge = s.approval
+        ? `<span style="font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(210,153,34,.18);color:var(--warn);font-weight:700;border:1px solid rgba(210,153,34,.25)">✋ needs approval</span>`
+        : `<span style="font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(63,185,80,.1);color:var(--ok);font-weight:700;border:1px solid rgba(63,185,80,.2)">auto</span>`;
+      const titleText = s.label.replace(/^\d+[a-z]?\.\s*/i, '');
       return `
       <div class="pb-step" id="step-${s.id}">
-        <div class="pb-num">Step ${i+1}</div>
-        <h5>${s.label.replace(/^\d+\.\s*/,'')}</h5>
+        <div class="pb-step-hdr">
+          <span class="pb-step-num-badge">${i+1}</span>
+          <div class="pb-step-title-blk">
+            <h5 style="margin:0;font-size:13px;font-weight:700;color:var(--text)">${titleText}</h5>
+            <div class="pb-step-badges">${approvalBadge}</div>
+          </div>
+        </div>
         <div class="pb-desc">${s.desc}</div>
         ${aiBlock}
-        <button class="${s.cls}" onclick="runCurrentStep(${i})" style="margin-top:4px">Run →</button>
+        <button class="${s.cls}" onclick="runCurrentStep(${i})" style="margin-top:8px;width:100%;text-align:left;padding-left:12px">▶ Run — ${titleText}</button>
       </div>`;
     }).join('');
 
@@ -1393,7 +1430,6 @@ flowchart TB
     out.textContent = `⏳ Running ${tool}…`;
     out.className = 'pb-output';
     switchTab('playbook');
-    out.scrollIntoView({behavior:'smooth', block:'nearest'});
     const data = await fetchJson('/api/tool', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1459,7 +1495,7 @@ flowchart TB
 
   async function loadScenario(name) {
     document.getElementById('output').textContent = `Loading scenario: ${name}…`;
-    switchTab('output');
+    switchTab('playbook');
     const data = await fetchJson('/api/reset', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1606,7 +1642,26 @@ flowchart TB
 
   function closeNarration() {}   // stub — kept for any inline refs
 
+  // ── tab pop-out (solo window) ─────────────────────────────────────────────
+  function popTab(name) {
+    const base = location.href.split('?')[0];
+    window.open(base + '?solo=' + name, '_blank', 'width=1200,height=820,resizable=yes,scrollbars=yes');
+  }
+
   // ── init ───────────────────────────────────────────────────────────────────
+  // solo mode — activated by ?solo=<tabname> (used by pop-out windows)
+  const _soloTab = new URLSearchParams(location.search).get('solo');
+  if (_soloTab) {
+    document.querySelector('.shell').classList.add('solo-mode');
+    const tabsEl = document.querySelector('.tabs');
+    if (tabsEl) tabsEl.style.display = 'none';
+    // override playbook split so it stacks in solo mode
+    const style = document.createElement('style');
+    style.textContent = '#tab-playbook.active{grid-template-columns:42% 1fr}';
+    document.head.appendChild(style);
+    setTimeout(() => switchTab(_soloTab), 20);
+  }
+
   mermaid.initialize({
     startOnLoad: true,
     theme: 'dark',
