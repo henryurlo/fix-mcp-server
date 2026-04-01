@@ -40,12 +40,13 @@ _sim_state: dict = {"speed": 10.0, "paused": False}
 _sim_lock = threading.Lock()
 
 
-def _publish_event(tool: str, args: dict, result: str, ok: bool) -> None:
+def _publish_event(tool: str, args: dict, result: str, ok: bool, source: str = "dashboard") -> None:
     """Append event to in-memory log and optionally publish to Redis."""
     event = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "tool": tool,
         "ok": ok,
+        "source": source,
         "summary": (result or "")[:200],
     }
     with _events_lock:
@@ -58,6 +59,17 @@ def _publish_event(tool: str, args: dict, result: str, ok: bool) -> None:
             r.publish("fix:events", json.dumps(event))
         except Exception:
             pass
+
+
+def _on_tool_call(name: str, args: dict, result: str, ok: bool, source: str) -> None:
+    """Listener registered with server._tool_listeners — receives all tool calls."""
+    _publish_event(name, args, result, ok, source)
+
+
+# Register the listener once — works for both REST API calls (source="dashboard")
+# and MCP HTTP calls from Claude (source="claude").
+if _on_tool_call not in server._tool_listeners:
+    server._tool_listeners.append(_on_tool_call)
 
 
 # ---------------------------------------------------------------------------
@@ -380,14 +392,20 @@ class APIHandler(BaseHTTPRequestHandler):
             payload = self._read_json()
             tool = payload.get("tool", "")
             arguments = payload.get("arguments", {})
+            # Tag this call as "dashboard" so the Activity tab can distinguish it
+            # from Claude's MCP HTTP calls (which default to "claude").
+            token = server._call_source.set("dashboard")
             try:
                 result = asyncio.run(server.call_tool(tool, arguments))
                 result_text = result[0].text
-                _publish_event(tool, arguments, result_text, True)
+                # _publish_event is called via _on_tool_call listener in server.call_tool
                 self._send_json({"output": result_text, "ok": True})
             except Exception as exc:
-                _publish_event(tool, arguments, str(exc), False)
+                # Fallback publish for catastrophic errors that bypass the listener
+                _publish_event(tool, arguments, str(exc), False, "dashboard")
                 self._send_json({"output": str(exc), "ok": False}, HTTPStatus.BAD_REQUEST)
+            finally:
+                server._call_source.reset(token)
             return
 
         if self.path == "/api/mode":

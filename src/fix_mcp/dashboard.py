@@ -1479,10 +1479,14 @@ flowchart TB
       const ok = e.ok
         ? '<span class="chip chip-ok" style="font-size:10px;padding:1px 7px">OK</span>'
         : '<span class="chip chip-down" style="font-size:10px;padding:1px 7px">ERR</span>';
-      const mcpCall = `{"method":"tools/call","params":{"name":"${e.tool}"}}`;
-      return `<tr>
+      const isClaude = e.source === 'claude';
+      const sourceBadge = isClaude
+        ? '<span style="font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(63,185,80,.18);color:var(--ok);font-weight:700;margin-right:5px">Claude</span>'
+        : '<span style="font-size:10px;padding:1px 7px;border-radius:3px;background:rgba(56,139,253,.15);color:var(--accent);font-weight:700;margin-right:5px">Dash</span>';
+      const rowBg = isClaude ? 'background:rgba(63,185,80,.04);' : '';
+      return `<tr style="${rowBg}">
         <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;color:var(--dim)">${t}</td>
-        <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${e.tool}</td>
+        <td>${sourceBadge}<span style="font-family:var(--mono);font-size:12px;color:var(--accent)">${e.tool}</span></td>
         <td>${ok}</td>
         <td style="font-size:11px;color:var(--dim)">${e.summary}</td>
       </tr>`;
@@ -1593,19 +1597,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 
 def _start_embedded_api(api_port: int) -> None:
-    """Start fix_mcp.api in a daemon thread so the dashboard is self-contained.
-
-    Called automatically when API_URL is the default Docker address, meaning
-    no external API server has been configured. The embedded server runs on
-    127.0.0.1 only (not exposed externally) and shares process memory with
-    the dashboard.
-    """
+    """Start fix_mcp.api in a daemon thread so the dashboard is self-contained."""
     global API_URL
     from fix_mcp.api import APIHandler  # imported lazily to avoid circular import
     server = ThreadingHTTPServer(("127.0.0.1", api_port), APIHandler)
     t = threading.Thread(target=server.serve_forever, daemon=True, name="fix-mcp-api")
     t.start()
     API_URL = f"http://127.0.0.1:{api_port}"
+
+
+def _start_mcp_http_server(mcp_port: int) -> None:
+    """Start the MCP streamable HTTP server so Claude can connect on port 8001.
+
+    Runs in the same process as the dashboard and API, so all three share the
+    same OMS/session state.  Tool calls from Claude update the live dashboard.
+    """
+    from fix_mcp.mcp_http import start_in_thread
+    start_in_thread(host="0.0.0.0", port=mcp_port)
 
 
 # ---------------------------------------------------------------------------
@@ -1619,15 +1627,20 @@ def main() -> None:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--api-port", type=int, default=8000,
-                        help="Port for the embedded API server (default: 8000)")
+                        help="Port for the embedded REST API (default: 8000)")
+    parser.add_argument("--mcp-port", type=int, default=8001,
+                        help="Port for the MCP HTTP server — Claude connects here (default: 8001)")
     parser.add_argument("--no-embed", action="store_true",
-                        help="Skip embedded API — use API_URL env var to point at an external server")
+                        help="Skip embedded API/MCP servers — use API_URL env var for external server")
     args = parser.parse_args()
 
-    # Embed the API unless an external one is explicitly configured
+    # Embed the API and MCP HTTP servers unless an external API is configured
     if API_URL == _API_URL_DEFAULT and not args.no_embed:
         _start_embedded_api(args.api_port)
-        print(f"FIX MCP API    → http://127.0.0.1:{args.api_port}")
+        _start_mcp_http_server(args.mcp_port)
+        print(f"FIX MCP REST API  → http://127.0.0.1:{args.api_port}")
+        print(f"FIX MCP HTTP      → http://127.0.0.1:{args.mcp_port}/mcp  ← Claude connects here")
+        print(f"  Add to .claude/mcp.json: {{\"mcpServers\": {{\"fix-mcp\": {{\"url\": \"http://localhost:{args.mcp_port}/mcp\"}}}}}}")
 
     httpd = ThreadingHTTPServer((args.host, args.port), DashboardHandler)
     print(f"FIX MCP Dashboard → http://127.0.0.1:{args.port}")

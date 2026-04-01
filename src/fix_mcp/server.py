@@ -2,6 +2,7 @@
 """FIX Protocol MCP Server — Trading Operations Assistant."""
 
 import asyncio
+import contextvars as _cv
 import json
 import os
 from datetime import datetime, timezone
@@ -45,6 +46,20 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 app = Server("fix-trading-ops")
+
+# ---------------------------------------------------------------------------
+# Event listener infrastructure
+#
+# Any transport (stdio, HTTP MCP, REST API) that invokes a tool ends up in
+# call_tool() below.  Listeners registered here are notified after every
+# invocation so the dashboard can show live activity regardless of who
+# triggered the call.
+#
+# Listener signature: (name: str, args: dict, text: str, ok: bool, source: str)
+# source values: "claude" (MCP transports) | "dashboard" (REST /api/tool)
+# ---------------------------------------------------------------------------
+_tool_listeners: list = []
+_call_source: _cv.ContextVar[str] = _cv.ContextVar("_call_source", default="claude")
 
 SCENARIO = os.environ.get("SCENARIO", "morning_triage")
 CONFIG_DIR = os.environ.get("FIX_MCP_CONFIG_DIR")
@@ -520,37 +535,36 @@ async def list_tools() -> list[Tool]:
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    result = await _dispatch_tool(name, arguments)
+    if _tool_listeners:
+        txt = result[0].text if result else ""
+        ok = not txt.startswith("ERROR")
+        src = _call_source.get()
+        for cb in _tool_listeners:
+            try:
+                cb(name, arguments, txt, ok, src)
+            except Exception:  # noqa: BLE001
+                pass
+    return result
+
+
+async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
     try:
-        if name == "query_orders":
-            return await _tool_query_orders(arguments)
-        if name == "check_fix_sessions":
-            return await _tool_check_fix_sessions(arguments)
-        if name == "send_order":
-            return await _tool_send_order(arguments)
-        if name == "cancel_replace":
-            return await _tool_cancel_replace(arguments)
-        if name == "check_ticker":
-            return await _tool_check_ticker(arguments)
-        if name == "update_ticker":
-            return await _tool_update_ticker(arguments)
-        if name == "load_ticker":
-            return await _tool_load_ticker(arguments)
-        if name == "fix_session_issue":
-            return await _tool_fix_session_issue(arguments)
-        if name == "validate_orders":
-            return await _tool_validate_orders(arguments)
-        if name == "run_premarket_check":
-            return await _tool_run_premarket_check(arguments)
-        if name == "send_algo_order":
-            return await _tool_send_algo_order(arguments)
-        if name == "check_algo_status":
-            return await _tool_check_algo_status(arguments)
-        if name == "modify_algo":
-            return await _tool_modify_algo(arguments)
-        if name == "cancel_algo":
-            return await _tool_cancel_algo(arguments)
-        if name == "list_scenarios":
-            return await _tool_list_scenarios(arguments)
+        if name == "query_orders":        return await _tool_query_orders(arguments)
+        if name == "check_fix_sessions":  return await _tool_check_fix_sessions(arguments)
+        if name == "send_order":          return await _tool_send_order(arguments)
+        if name == "cancel_replace":      return await _tool_cancel_replace(arguments)
+        if name == "check_ticker":        return await _tool_check_ticker(arguments)
+        if name == "update_ticker":       return await _tool_update_ticker(arguments)
+        if name == "load_ticker":         return await _tool_load_ticker(arguments)
+        if name == "fix_session_issue":   return await _tool_fix_session_issue(arguments)
+        if name == "validate_orders":     return await _tool_validate_orders(arguments)
+        if name == "run_premarket_check": return await _tool_run_premarket_check(arguments)
+        if name == "send_algo_order":     return await _tool_send_algo_order(arguments)
+        if name == "check_algo_status":   return await _tool_check_algo_status(arguments)
+        if name == "modify_algo":         return await _tool_modify_algo(arguments)
+        if name == "cancel_algo":         return await _tool_cancel_algo(arguments)
+        if name == "list_scenarios":      return await _tool_list_scenarios(arguments)
         return _tc(f"ERROR: Unknown tool '{name}'")
     except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR: Unhandled exception in tool '{name}': {exc!r}")
