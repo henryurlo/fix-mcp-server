@@ -244,6 +244,34 @@ HTML = r"""<!doctype html>
     .mcp-jsonrpc-wrap { margin-top:14px; border-top:1px solid var(--border-sub); padding-top:10px; }
     .mcp-jsonrpc-label { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--xdim); margin-bottom:5px; font-weight:700; }
     .mcp-jsonrpc-pre { background:var(--bg-in); border:1px solid var(--border-sub); border-radius:4px; padding:10px 12px; font-family:var(--mono); font-size:11px; color:var(--dim); white-space:pre; overflow-x:auto; }
+
+    /* ── sim clock ── */
+    .sim-clock { font-family:var(--mono); font-size:20px; font-weight:700; color:#ffd680; letter-spacing:2px; line-height:1; }
+    .sim-clock-wrap { display:flex; flex-direction:column; align-items:center; padding:0 10px; border-left:1px solid var(--border); margin-left:6px; }
+    .sim-clock-label { font-size:9px; color:var(--xdim); text-transform:uppercase; letter-spacing:1px; margin-top:1px; }
+
+    /* ── timeline panel ── */
+    .tl-panel { background:var(--bg-el); border:1px solid var(--border); border-radius:8px; padding:8px; overflow-y:auto; max-height:220px; }
+    .tl-item { display:flex; align-items:center; gap:6px; padding:4px 5px; border-radius:4px; cursor:pointer; font-size:11px; transition:background .12s; }
+    .tl-item:hover { background:var(--bg-in); }
+    .tl-item.tl-active { background:rgba(56,139,253,.12); }
+    .tl-item.tl-done { opacity:.65; }
+    .tl-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--border); border:1px solid var(--xdim); transition:background .2s; }
+    .tl-dot.tl-dot-done   { background:var(--ok); border-color:var(--ok); }
+    .tl-dot.tl-dot-active { background:var(--accent); border-color:var(--accent); box-shadow:0 0 5px var(--accent); }
+    .tl-time { font-family:var(--mono); font-size:10px; color:var(--xdim); width:38px; flex-shrink:0; }
+    .tl-name { flex:1; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* ── narration overlay ── */
+    .narration-overlay { display:none; position:fixed; inset:0; background:rgba(13,17,23,.88); z-index:999; align-items:center; justify-content:center; }
+    .narration-overlay.show { display:flex; }
+    .narration-box { background:var(--bg-el); border:1px solid var(--accent); border-radius:12px; padding:28px 32px; max-width:600px; width:92%; box-shadow:0 8px 40px rgba(56,139,253,.3); animation:narrate-in .25s ease; }
+    @keyframes narrate-in { from { opacity:0; transform:translateY(-16px); } to { opacity:1; transform:none; } }
+    .narration-time { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+    .narration-headline { font-size:18px; font-weight:700; color:var(--text); margin-bottom:12px; line-height:1.3; }
+    .narration-body { font-size:13px; line-height:1.75; color:var(--dim); margin-bottom:18px; }
+    .narration-agent { font-size:11px; color:var(--ok); font-family:var(--mono); background:var(--ok-bg); border-radius:5px; padding:7px 12px; margin-bottom:16px; border-left:3px solid var(--ok); }
+    .narration-footer { display:flex; gap:8px; justify-content:flex-end; }
   </style>
 </head>
 <body>
@@ -252,6 +280,10 @@ HTML = r"""<!doctype html>
   <!-- ── top bar ── -->
   <div class="topbar">
     <h1>FIX MCP Dashboard</h1>
+    <div class="sim-clock-wrap">
+      <div class="sim-clock" id="simClock">02:05</div>
+      <div class="sim-clock-label">ET · Sim</div>
+    </div>
     <span class="spacer"></span>
     <div style="display:flex;gap:4px;align-items:center">
       <span style="font-size:10px;color:var(--xdim);letter-spacing:1px;text-transform:uppercase;font-weight:600">Mode</span>
@@ -261,6 +293,7 @@ HTML = r"""<!doctype html>
     </div>
     <div class="vcr-bar">
       <span style="font-size:10px;color:var(--xdim);letter-spacing:1px;text-transform:uppercase;font-weight:600">Sim</span>
+      <button id="btnPlay"  class="btn-vcr btn-ok" onclick="togglePlay()" style="padding:4px 12px;font-size:11px">▶ Play Day</button>
       <button id="vcrPause" class="btn-vcr" onclick="togglePause()">⏸ Pause</button>
       <button id="vcr1x"  class="btn-vcr" onclick="setSimSpeed(1)">1×</button>
       <button id="vcr10x" class="btn-vcr active" onclick="setSimSpeed(10)">10×</button>
@@ -330,6 +363,12 @@ HTML = r"""<!doctype html>
           <option value="reconnect">Reconnect (Logon 35=A)</option>
         </select>
         <button class="btn-danger" onclick="repairSession()">Repair Session</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label">Today's Timeline</div>
+      <div class="tl-panel">
+        <div id="timelinePanel"></div>
       </div>
     </div>
 
@@ -533,10 +572,31 @@ flowchart TB
   </div>
 </div>
 
+<!-- narration overlay -->
+<div class="narration-overlay" id="narrationOverlay">
+  <div class="narration-box">
+    <div class="narration-time" id="narrationTime"></div>
+    <div class="narration-headline" id="narrationHeadline"></div>
+    <div class="narration-body" id="narrationBody"></div>
+    <div class="narration-agent" id="narrationAgent" style="display:none"></div>
+    <div class="narration-footer">
+      <button class="btn-neutral" onclick="closeNarration()" style="padding:6px 18px">Dismiss</button>
+      <button class="btn-ok" onclick="closeNarration();switchTab('playbook')" style="padding:6px 18px">Go to Playbook →</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // ── state ──────────────────────────────────────────────────────────────────
   let currentStatus = null;
   let simState = {speed: 10, paused: false};
+
+  // ── sim clock state ────────────────────────────────────────────────────────
+  let _simMinutes = 125;          // 02:05 ET start
+  let _simRunning = false;
+  let _simClockHz = null;
+  let _simTickSpeed = 10;         // mirrors simState.speed
+  let _triggeredScenarios = new Set();
 
   // ── scenario situation briefings ──────────────────────────────────────────
   const SCENARIO_CONTEXT = {
@@ -554,6 +614,23 @@ flowchart TB
     vwap_vol_spike_1130:  { time:'11:35 ET', headline:'VWAP Over-Participation', body:'<strong>MSFT VWAP is participating at 15% vs 10% cap</strong> — vol spike widened spreads and triggered aggressive slice sizing. <strong>AMD POV also over-participating at 15% vs 8% limit.</strong> Both algos are creating visible market impact — client exposure.' },
     is_dark_failure_1415: { time:'14:15 ET', headline:'IS Shortfall + Dark Pool Freeze', body:'<strong>TSLA Implementation Shortfall algo is 108bps over arrival price</strong> — avg fill 251.20 vs arrival 248.50. Client SLA breach at 50bps. <strong>AMZN dark aggregator has zero fills</strong> — Liquidnet and IEX dark are both rejecting. Dark venues are frozen.' },
   };
+
+  // ── scenario timeline — 13 episodes keyed to sim-clock times ─────────────
+  const SCENARIO_TIMELINE = [
+    { name:'bats_startup_0200',     time:'02:05', minutes:125 },
+    { name:'predawn_adrs_0430',     time:'04:35', minutes:275 },
+    { name:'morning_triage',        time:'07:00', minutes:420 },
+    { name:'preopen_auction_0900',  time:'09:02', minutes:542 },
+    { name:'open_volatility_0930',  time:'09:35', minutes:575 },
+    { name:'twap_slippage_1000',    time:'10:05', minutes:605 },
+    { name:'venue_degradation_1030',time:'10:32', minutes:632 },
+    { name:'ssr_and_split_1130',    time:'11:34', minutes:694 },
+    { name:'vwap_vol_spike_1130',   time:'11:35', minutes:695 },
+    { name:'iex_recovery_1400',     time:'14:03', minutes:843 },
+    { name:'is_dark_failure_1415',  time:'14:15', minutes:855 },
+    { name:'eod_moc_1530',          time:'15:31', minutes:931 },
+    { name:'afterhours_dark_1630',  time:'16:32', minutes:992 },
+  ];
 
   // ── workflow definitions — one step set per scenario ──────────────────────
   const SCENARIO_STEPS = {
@@ -861,6 +938,7 @@ flowchart TB
     } else {
       notifyPanel.style.display = 'none';
     }
+    renderTimeline();
   }
 
   // ── actions ────────────────────────────────────────────────────────────────
@@ -1441,6 +1519,7 @@ flowchart TB
   }
 
   async function setSimSpeed(s) {
+    _simTickSpeed = s;
     const data = await fetchJson('/api/simulation', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -1493,6 +1572,112 @@ flowchart TB
     }).join('');
   }
 
+  // ── sim clock ─────────────────────────────────────────────────────────────
+
+  function togglePlay() {
+    _simRunning = !_simRunning;
+    const btn = document.getElementById('btnPlay');
+    if (_simRunning) {
+      btn.textContent = '\u23f8 Pause Day';
+      btn.className = 'btn-vcr active';
+      _simClockHz = setInterval(_clockTick, 1000);
+    } else {
+      btn.textContent = '\u25b6 Play Day';
+      btn.className = 'btn-vcr btn-ok';
+      clearInterval(_simClockHz);
+      _simClockHz = null;
+    }
+  }
+
+  function _clockTick() {
+    _simMinutes += _simTickSpeed / 60;
+    if (_simMinutes >= 1440) { _simMinutes = 1439; togglePlay(); return; }
+    _updateClock();
+    _checkScenarioTriggers();
+  }
+
+  function _updateClock() {
+    const h = Math.floor(_simMinutes / 60);
+    const m = Math.floor(_simMinutes % 60);
+    const pad = n => String(n).padStart(2, '0');
+    const el = document.getElementById('simClock');
+    if (el) el.textContent = pad(h) + ':' + pad(m);
+  }
+
+  function _checkScenarioTriggers() {
+    for (const s of SCENARIO_TIMELINE) {
+      if (_triggeredScenarios.has(s.name)) continue;
+      if (_simMinutes >= s.minutes) {
+        _triggeredScenarios.add(s.name);
+        _triggerScenario(s);
+        break;
+      }
+    }
+    renderTimeline();
+  }
+
+  async function _triggerScenario(s) {
+    await fetchJson('/api/reset', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({scenario: s.name}),
+    });
+    await refresh();
+    showNarration(s);
+    if (currentStatus && currentStatus.mode === 'agent') {
+      const steps = SCENARIO_STEPS[s.name] || [];
+      if (steps.length > 0) await steps[0].fn();
+    }
+  }
+
+  function showNarration(s) {
+    const ctx = SCENARIO_CONTEXT[s.name] || {};
+    document.getElementById('narrationTime').textContent = '\u23f1 ' + (ctx.time || s.time) + ' ET';
+    document.getElementById('narrationHeadline').textContent = ctx.headline || s.name;
+    document.getElementById('narrationBody').innerHTML = ctx.body || '';
+    const agentEl = document.getElementById('narrationAgent');
+    const isAgent = currentStatus && currentStatus.mode === 'agent';
+    const firstLabel = ((SCENARIO_STEPS[s.name] || [])[0] || {}).label || '';
+    if (isAgent && firstLabel) {
+      agentEl.textContent = '\uD83E\uDD16 Agent mode \u2014 auto-running: ' + firstLabel;
+      agentEl.style.display = 'block';
+    } else {
+      agentEl.style.display = 'none';
+    }
+    document.getElementById('narrationOverlay').classList.add('show');
+  }
+
+  function closeNarration() {
+    document.getElementById('narrationOverlay').classList.remove('show');
+  }
+
+  function renderTimeline() {
+    const panel = document.getElementById('timelinePanel');
+    if (!panel) return;
+    const active = currentStatus && currentStatus.scenario;
+    panel.innerHTML = SCENARIO_TIMELINE.map(s => {
+      const isDone   = _triggeredScenarios.has(s.name);
+      const isActive = s.name === active;
+      const dotCls  = isActive ? 'tl-dot-active' : isDone ? 'tl-dot-done' : '';
+      const rowCls  = isActive ? 'tl-active' : isDone ? 'tl-done' : '';
+      const label   = (SCENARIO_CONTEXT[s.name] || {}).headline || s.name.replace(/_/g, ' ');
+      return '<div class="tl-item ' + rowCls + '" onclick="_jumpToScenario(\'' + s.name + '\')" title="' + s.time + ' \u2014 ' + label + '">'
+           + '<div class="tl-dot ' + dotCls + '"></div>'
+           + '<span class="tl-time">' + s.time + '</span>'
+           + '<span class="tl-name">' + label + '</span>'
+           + '</div>';
+    }).join('');
+  }
+
+  async function _jumpToScenario(name) {
+    const s = SCENARIO_TIMELINE.find(x => x.name === name);
+    if (!s) return;
+    _simMinutes = s.minutes;
+    _triggeredScenarios.add(name);
+    _updateClock();
+    await loadScenario(name);
+  }
+
   // ── init ───────────────────────────────────────────────────────────────────
   mermaid.initialize({
     startOnLoad: true,
@@ -1516,6 +1701,7 @@ flowchart TB
   });
   refresh();
   renderMCPSchema();
+  renderTimeline();
   setInterval(refresh, 5000);
 </script>
 </body>
