@@ -3,6 +3,11 @@
 # MCP stdio:  docker compose run --rm mcp-server
 # API:        http://localhost:8000
 # Dashboard:  http://localhost:8787
+#
+# NOTE: API (8000) and Dashboard (8787) are bound to 0.0.0.0 (all interfaces)
+# so they are accessible from the host browser. PostgreSQL (5432) and Redis
+# (6379) stay on 127.0.0.1 (localhost-only) since they have no auth and are
+# infra-only services.
 
 services:
 
@@ -35,7 +40,7 @@ services:
     stdin_open: true
     tty: true
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     environment:
       - SCENARIO=${SCENARIO:-morning_triage}
       - FIX_MCP_CONFIG_DIR=/app/config
@@ -47,6 +52,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     volumes:
       - ./config:/app/config:ro
 
@@ -59,13 +70,20 @@ services:
     stdin_open: true
     tty: true
     ports:
-      - "127.0.0.1:8787:8080"
+      - "8787:8080"
     environment:
       - FIX_MCP_CONFIG_DIR=/app/config
       - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - api-server
+      api-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080\")'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     volumes:
       - ./config:/app/config:ro
 
