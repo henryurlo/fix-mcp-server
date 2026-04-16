@@ -5,6 +5,8 @@ import asyncio
 import contextvars as _cv
 import json
 import os
+import threading
+import re
 from datetime import datetime, timezone
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -61,6 +63,35 @@ app = Server("fix-trading-ops")
 _tool_listeners: list = []
 _call_source: _cv.ContextVar[str] = _cv.ContextVar("_call_source", default="claude")
 
+# ---------------------------------------------------------------------------
+# Thread safety — reset_runtime swaps globally-attached engine references.
+# The lock serialises reset against concurrent tool execution.
+# ---------------------------------------------------------------------------
+_engine_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# Input validators — applied to every tool entry point.
+# ---------------------------------------------------------------------------
+
+_SYMBOL_RE = re.compile(r"^[A-Z]{1,5}$")
+_CLIENT_RE = re.compile(r"^[A-Za-z0-9 _\-]{1,64}$")
+
+
+def _assert_symbol(sym: str) -> None:
+    if not _SYMBOL_RE.fullmatch(sym):
+        raise ValueError(f"Invalid symbol {sym!r}: must be 1-5 uppercase letters")
+
+
+def _assert_client(name: str) -> None:
+    if not _CLIENT_RE.fullmatch(name):
+        raise ValueError(f"Invalid client name {name!r}: must be 1-64 alphanumeric characters")
+
+
+def _assert_venue_or_side(value: str, label: str) -> None:
+    if not re.fullmatch(r"^[A-Z0-9_ ]{1,16}$", value):
+        raise ValueError(f"Invalid {label} {value!r}")
+
+
 SCENARIO = os.environ.get("SCENARIO", "morning_triage")
 CONFIG_DIR = os.environ.get("FIX_MCP_CONFIG_DIR")
 
@@ -75,20 +106,21 @@ msg_builder = FIXMessageBuilder(
 
 
 def reset_runtime(scenario_name: str | None = None) -> str:
-    """Reload scenario-backed runtime state in-process."""
+    """Reload scenario-backed runtime state in-process (thread-safe)."""
     global SCENARIO, oms, session_manager, ref_store, algo_engine, msg_builder
 
-    if scenario_name:
-        SCENARIO = scenario_name
+    with _engine_lock:  # serialise against concurrent tool dispatch
+        if scenario_name:
+            SCENARIO = scenario_name
 
-    oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
-    algo_engine = engine.algo_engine
-    msg_builder = FIXMessageBuilder(
-        sender_comp_id="FIRM_PROD",
-        target_comp_id="EXCHANGE_GW",
-        session_manager=SequenceManager(),
-    )
-    return SCENARIO
+        oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
+        algo_engine = engine.algo_engine
+        msg_builder = FIXMessageBuilder(
+            sender_comp_id="FIRM_PROD",
+            target_comp_id="EXCHANGE_GW",
+            session_manager=SequenceManager(),
+        )
+        return SCENARIO
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -696,7 +728,15 @@ async def _tool_send_order(args: dict) -> list[TextContent]:
 
         warnings = []
 
-        # 1. Validate symbol
+        # 1. Input sanitisation
+        _assert_symbol(symbol)
+        _assert_client(client_name)
+        if side_str not in ("buy", "sell"):
+            return _tc(f"ORDER REJECTED — Invalid side: {side_str!r} (must be 'buy' or 'sell')")
+        if order_type_str not in ("market", "limit", "stop"):
+            return _tc(f"ORDER REJECTED — Invalid order type: {order_type_str!r}")
+
+        # 2. Validate symbol
         valid, reason = ref_store.is_symbol_valid(symbol)
         if not valid:
             return _tc(f"ORDER REJECTED — Symbol validation failed: {reason}")

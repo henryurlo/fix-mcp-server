@@ -268,18 +268,24 @@ class ReferenceDataStore:
         return client
 
     def get_client(self, name: str) -> Optional[Client]:
-        """Find a client by a case-insensitive partial name match.
+        """Find a client by exact or case-insensitive partial name match.
 
-        Iterates over all clients and returns the first whose ``name``
-        contains *name* (case-insensitive substring match).
+        Attempts an exact match first, then falls back to substring search.
+        This prevents accidental collisions (e.g. "Map" matching both
+        "Maple Capital" *and* "Aspen Asset Management").
 
         Args:
-            name: Partial or full client name to search for.
+            name: Exact or partial client name to search for.
 
         Returns:
-            The first matching :class:`Client`, or ``None``.
+            The best matching :class:`Client`, or ``None``.
         """
         name_lower = name.lower()
+        # Exact match takes priority — avoids substring collisions.
+        for client in self.clients.values():
+            if client.name.lower() == name_lower:
+                return client
+        # Fallback: first substring match.
         for client in self.clients.values():
             if name_lower in client.name.lower():
                 return client
