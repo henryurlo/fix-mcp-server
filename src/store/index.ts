@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAudit } from './audit';
+import { SYSTEM_PROMPT, SCENARIO_OVERLAYS, KNOWN_TOOLS } from './prompts';
 
 // ── Backend URL — Next.js dev server proxies /api/* to the Python backend
 const BACKEND = '';
@@ -173,11 +174,6 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-const SYSTEM_PROMPT = `You are FIX-MCP Copilot — an AI trading operations assistant.
-You have access to the FIX MCP server tools: check_fix_sessions, send_order, query_orders, cancel_order, fix_session_issue, release_stuck_orders, update_venue_status, update_ticker, load_ticker, validate_orders, run_premarket_check.
-When diagnosing issues, FIRST check sessions, THEN check affected orders, THEN propose a fix.
-Be concise. Use bullet points. Always explain the impact of your proposed actions.`;
-
 interface ChatState {
   messages: ChatMessage[];
   openRouterKey: string | null;
@@ -219,8 +215,11 @@ export const useChat = create<ChatState>((set, get) => ({
         `Recent events: ${JSON.stringify(events.slice(0, 5))}`,
       ].join('\n');
 
+      const scenarioOverlay = status.scenario ? SCENARIO_OVERLAYS[status.scenario] : undefined;
+
       const msgs = [
         { role: 'system', content: SYSTEM_PROMPT },
+        ...(scenarioOverlay ? [{ role: 'system', content: `Active scenario context:\n${scenarioOverlay}` }] : []),
         { role: 'system', content: `Current system state:\n${contextHint}` },
         ...get().messages.filter((m) => m.role !== 'system').slice(-12).map((m) => ({ role: m.role, content: m.content })),
         { role: 'user', content },
@@ -237,7 +236,7 @@ export const useChat = create<ChatState>((set, get) => ({
         body: JSON.stringify({
           model: 'qwen/qwen3.6-plus',
           messages: msgs,
-          max_tokens: 1024,
+          max_tokens: 2048,
         }),
       });
 
@@ -249,9 +248,10 @@ export const useChat = create<ChatState>((set, get) => ({
       const data: { choices?: { message?: { content: string } }[] } = await resp.json();
       const reply = data.choices?.[0]?.message?.content || 'I could not process that request.';
 
-      // Detect tool call proposals
-      const knownTools = ['check_fix_sessions', 'send_order', 'query_orders', 'cancel_order', 'fix_session_issue', 'release_stuck_orders', 'update_venue_status', 'update_ticker', 'load_ticker', 'validate_orders', 'run_premarket_check'];
-      const toolCalls: ToolCallTrace[] = knownTools.filter((t) => reply.includes(t)).map((t) => ({ tool: t, args: {}, status: 'proposed' as const }));
+      // Detect tool call proposals (names must match src/fix_mcp/server.py).
+      const toolCalls: ToolCallTrace[] = KNOWN_TOOLS
+        .filter((t) => reply.includes(t))
+        .map((t) => ({ tool: t, args: {}, status: 'proposed' as const }));
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
