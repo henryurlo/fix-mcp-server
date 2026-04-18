@@ -16,31 +16,27 @@ body{background:#0a0b0e;color:#e4e7f1;font-family:-apple-system,BlinkMacSystemFo
 @keyframes fI{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .fi{animation:fI .3s ease-out}
 .fm{font-family:'SF Mono','Fira Code','Consolas',monospace}
-</style>
+@keyframes spin{to{transform:rotate(360deg)}}</style>
 </head>
 <body>
-<div id="root"></div>
-<script>// Loading indicator
-(function(){
-  var root=document.getElementById('root');
-  root.innerHTML='<div id="loading-screen" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;background:#0a0b0e;color:#e4e7f1">'
-    +'<div style="font-size:24px;font-family:system-ui;margin-bottom:16px">FIX MCP Simulator</div>'
-    +'<div style="font-size:14px;color:#8b8fa3;font-family:monospace" id="load-status">Loading React...</div></div>';
-})();
-
-// Error boundary
+<div id="root"><div id="load-screen" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;"><div style="font-size:48px;margin-bottom:16px">&#9876;</div><div style="font-size:24px;font-weight:700;margin-bottom:8px;font-family:system-ui">FIX MCP Simulator</div><div style="font-size:14px;color:#5a6178;margin-bottom:24px;font-family:system-ui">Trading operations &mdash; diagnose, fix, recover</div><div style="width:40px;height:40px;border:3px solid #2a2f42;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite"></div><div style="font-size:12px;color:#3b82f6;margin-top:16px;font-family:monospace" id="load-status">Loading...</div></div></div>
+<script>// Error boundary
 window.onerror=function(msg,url,line){
   var s=document.getElementById('load-status');
-  if(s){s.style.color='#ef4444';s.innerHTML='<b>ERROR:</b> '+msg+'<br>(line '+line+')';}
+  if(s){s.style.color='#ef4444';s.textContent='ERROR: '+msg+' (line '+line+')';}
   return false;
 };
+window.addEventListener('unhandledrejection',function(e){
+  var s=document.getElementById('load-status');
+  if(s){s.style.color='#ef4444';s.textContent='PROMISE ERROR: '+String(e.reason||'unknown');}
+});
 
 // Verify CDN scripts loaded before proceeding
 function waitForDeps(cb){
   if(typeof React==='undefined'||typeof ReactDOM==='undefined'){
     var s=document.getElementById('load-status');
-    if(s){s.innerHTML='CDN scripts loading... Retrying in 3s...';}
-    setTimeout(function(){location.reload();},3000);
+    if(s){s.style.color='#ef4444';s.textContent='CDN scripts failed to load.';}
+    setTimeout(function(){location.reload();},5000);
     return;
   }
   cb();
@@ -111,8 +107,8 @@ function App(){
   /* Select screen */
   if(!scn&&!ld){
     var cards=[];
-    scns.forEach(function(s){var d=SCENARIOS[s.name];if(!d)return;
-      cards.push(React.createElement('div',{key:s.name,onClick:function(){start(s.name)},style:{cursor:'pointer',padding:16,borderRadius:12,background:'#12141a',border:'1px solid #2a2f42',transition:'all .15s'},onMouseEnter:function(e){e.currentTarget.style.borderColor='#3b82f6';e.currentTarget.style.background='#1a1d26'},onMouseLeave:function(e){e.currentTarget.style.borderColor='#2a2f42';e.currentTarget.style.background='#12141a'}},
+    Object.keys(SCENARIOS).forEach(function(name){var d=SCENARIOS[name];if(!d)return;
+      cards.push(React.createElement('div',{key:name,onClick:function(){start(name)},style:{cursor:'pointer',padding:16,borderRadius:12,background:'#12141a',border:'1px solid #2a2f42',transition:'all .15s'},onMouseEnter:function(e){e.currentTarget.style.borderColor='#3b82f6';e.currentTarget.style.background='#1a1d26'},onMouseLeave:function(e){e.currentTarget.style.borderColor='#2a2f42';e.currentTarget.style.background='#12141a'}},
         React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:6}},
           React.createElement('span',{style:{fontSize:20}},d.icon),
           React.createElement('div',null,React.createElement('div',{style:{fontSize:14,fontWeight:600}},d.name),React.createElement('div',{className:'fm',style:{fontSize:11,color:'#5a6178'}},d.time+' \u00b7 '+d.diff)),
@@ -240,6 +236,8 @@ function App(){
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+// Remove loading screen after successful render
+var ls=document.getElementById('load-screen');if(ls)ls.remove();
 
 });
 </script>
