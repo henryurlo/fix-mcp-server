@@ -15,6 +15,7 @@ services:
   mcp-server:
     build: .
     container_name: fix-mcp-server
+    restart: unless-stopped
     environment:
       - SCENARIO=${SCENARIO:-morning_triage}
       - FIX_MCP_CONFIG_DIR=/app/config
