@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIX MCP · AI Operations Theater</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/lucide-static@latest/font/lucide.css">
+<style>
+  body { background: #0a0b0e; color: #e4e7f1; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0a0b0e; }
+  ::-webkit-scrollbar-thumb { background: #2a2f42; border-radius: 2px; }
+  @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.4)} 70%{box-shadow:0 0 0 6px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+const API_URL = window.location.origin; // same origin as the page
+
+async function get(path) {
+  const res = await fetch(`${API_URL}${path}`);
+  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  return res.json();
+}
+
+async function post(path, body) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  return res.json();
+}
+
+function StatusDot({ active }) {
+  return <span className={`w-2 h-2 rounded-full inline-block ${active ? 'bg-emerald-400' : 'bg-red-400'}`} />;
+}
+
+function Header({ scenario, scenarios, loading, connected, error, mode, setMode, startScenario, onToggleChat, chatOpen }) {
+  return (
+    <header className="h-12 bg-[#0a0b0e] border-b border-[#1e2233] flex items-center justify-between px-4 shrink-0">
+      <div className="flex items-center gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.93a1 1 0 0 1-.68-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.52 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+        <span className="text-sm font-bold tracking-wider">FIX MCP</span>
+        <span className="text-[10px] text-[#5a6178] font-mono hidden sm:inline">AI Operations Theater</span>
+        {scenario && (
+          <span className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1a1d26] border border-[#2a2f42] text-[10px] font-mono text-[#3b82f6]">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> {scenario}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        {error && <span className="text-[10px] text-red-400 font-mono">{error}</span>}
+        <StatusDot active={connected} />
+        <button onClick={() => setMode(mode === 'human' ? 'agent' : 'human')} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all ${mode === 'agent' ? 'bg-purple-500/15 text-purple-400 border border-purple-500/40' : 'text-[#5a6178] border border-[#2a2f42]'}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          {mode === 'agent' ? 'AGENT' : 'HUMAN'}
+        </button>
+        <select value={scenario || ''} onChange={(e) => e.target.value && startScenario(e.target.value)} className="bg-[#12141a] border border-[#2a2f42] rounded-lg px-2 py-1 text-[10px] text-[#e4e7f1] focus:outline-none focus:border-blue-500 min-w-[180px]">
+          <option value="">Scenario...</option>
+          {scenarios.map((s, i) => <option key={s.name} value={s.name}>{s.name}</option>)}
+        </select>
+        <button onClick={onToggleChat} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${chatOpen ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40' : 'text-[#5a6178] border-[#2a2f42]'}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+          Copilot
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function NodeCard({ venue, status, latency }) {
+  const color = status === 'active' ? 'emerald' : status === 'degraded' ? 'amber' : 'red';
+  const borderColor = `border-${color}-500/40`;
+  const glowColor = `shadow-${color}-500/20`;
+  return (
+    <div className={`border ${borderColor} bg-[#0d0e12] rounded-lg p-3 shadow-sm ${glowColor} min-w-[120px]`}>
+      <div className="flex items-center gap-2 mb-1">
+        <StatusDot active={status === 'active'} />
+        <span className="text-xs font-semibold text-gray-200">{venue}</span>
+      </div>
+      <div className="text-[10px] text-gray-500 font-mono">{status} · {latency}ms</div>
+    </div>
+  );
+}
+
+function TopologyGraph({ sessions, orders, events }) {
+  return (
+    <div className="p-4 space-y-4">
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Session Topology</h3>
+        <div className="flex flex-wrap gap-3">
+          {sessions.map((s, i) => <NodeCard key={s.venue} venue={s.venue} status={s.status} latency={s.latency_ms || '--'} />)}
+        </div>
+      </div>
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Active Orders</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-500 border-b border-[#1e2233]">
+                <th className="py-1 px-2 text-left font-mono">ID</th>
+                <th className="py-1 px-2 text-left">Symbol</th>
+                <th className="py-1 px-2 text-left">Side</th>
+                <th className="py-1 px-2 text-right">Qty</th>
+                <th className="py-1 px-2 text-left">Venue</th>
+                <th className="py-1 px-2 text-left">Status</th>
+                <th className="py-1 px-2 text-left">Client</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.slice(0, 20).map((o, i) => (
+                <tr key={o.order_id} className="border-b border-[#1e2233]/50 hover:bg-[#12141a]">
+                  <td className="py-1 px-2 font-mono text-blue-400">{o.order_id}</td>
+                  <td className="py-1 px-2 font-semibold">{o.symbol}</td>
+                  <td className={`py-1 px-2 ${o.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>{o.side}</td>
+                  <td className="py-1 px-2 text-right font-mono">{o.quantity}</td>
+                  <td className="py-1 px-2 font-mono text-gray-400">{o.venue}</td>
+                  <td className="py-1 px-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                      o.status === 'stuck' ? 'bg-red-500/15 text-red-400' :
+                      o.status === 'new' ? 'bg-blue-500/15 text-blue-400' :
+                      'bg-gray-500/15 text-gray-400'
+                    }`}>{o.status}</span>
+                  </td>
+                  <td className="py-1 px-2 text-gray-400">{o.client_name}</td>
+                </tr>
+              ))}
+              {orders.length === 0 && <tr><td colSpan="7" className="py-4 text-center text-gray-600">No active orders</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Recent Events</h3>
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {events.slice(0, 15).map((e, i) => (
+            <div key={i} className="flex items-start gap-2 text-[11px] bg-[#0d0e12] p-2 rounded">
+              <span className={`w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 ${e.ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
+              <span className="font-mono text-gray-500 flex-shrink-0">{e.tool}</span>
+              <span className="text-gray-300 truncate">{e.summary}</span>
+            </div>
+          ))}
+          {events.length === 0 && <div className="text-center text-gray-600 py-4 text-[11px]">No events yet</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [scenario, setScenario] = useState(null);
+  const [scenarios, setScenarios] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [mode, setMode] = useState('human');
+  const [loading, setLoading] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [error, setError] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const status = await get('/api/status');
+      const ordersRes = await get('/api/orders');
+      const eventsRes = await get('/api/events');
+
+      setScenario(status.scenario || null);
+      setScenarios((status.available_scenarios || []).map(name => ({ name })));
+      setSessions(status.sessions?.detail || []);
+      setOrders(ordersRes || []);
+      setEvents(eventsRes || []);
+      setConnected(true);
+      setError(null);
+    } catch (err) {
+      setConnected(false);
+      setError(err.message);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, []);
+  useEffect(() => { const iv = setInterval(refresh, 5000); return () => clearInterval(iv); }, [refresh]);
+
+  const startScenario = async (name) => {
+    setLoading(true);
+    try {
+      await post('/api/reset', { scenario: name });
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="h-screen flex flex-col">
+      <Header scenario={scenario} scenarios={scenarios} loading={loading} connected={connected} error={error} mode={mode} setMode={setMode} startScenario={startScenario} onToggleChat={() => setChatOpen(!chatOpen)} chatOpen={chatOpen} />
+      <div className="flex-1 flex overflow-hidden">
+        <main className="flex-1 overflow-y-auto">
+          {!scenario && !loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0b0e]/80 backdrop-blur-sm z-10">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5" className="mb-4"><path d="M20 13c0 5-3.5 7.5-7.66 8.93a1 1 0 0 1-.68-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.52 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+              <h1 className="text-2xl font-bold mb-2">AI Operations Theater</h1>
+              <p className="text-sm text-[#5a6178] text-center max-w-sm mb-6">Select a scenario above to begin simulation</p>
+            </div>
+          )}
+          <TopologyGraph sessions={sessions} orders={orders} events={events} />
+        </main>
+        {chatOpen && (
+          <aside className="w-96 bg-[#0d0e12] border-l border-[#1e2233] p-4">
+            <div className="text-sm font-semibold mb-4">Copilot Coming Soon</div>
+            <div className="text-xs text-gray-500">OpenRouter integration in progress...</div>
+          </aside>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>

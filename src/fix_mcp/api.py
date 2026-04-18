@@ -270,6 +270,17 @@ class APIHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/" or self.path == "":
+            # Serve the AI Operations Theater frontend
+            html_path = Path(__file__).parent.parent / 'ui' / 'index.html'
+            if html_path.exists():
+                body = html_path.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             self._send_json({"api": "fix-mcp", "version": "0.1.0", "endpoints": ["/health", "/api/status", "/api/detail", "/api/sessions", "/api/orders", "/api/algos", "/api/scenarios", "/api/events", "/api/mode", "/api/simulation", "/api/tool (POST)", "/api/reset (POST)", "/api/mode (POST)", "/api/simulation (POST)"]})
             return
 
