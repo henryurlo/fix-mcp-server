@@ -8,6 +8,7 @@ import os
 import threading
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent, Resource, Prompt
@@ -621,6 +622,18 @@ async def list_tools() -> list[Tool]:
             description="Release all stuck orders across all venues by removing venue_down flags.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="update_venue_status",
+            description="Change venue status (active/degraded/down). Use fix_session_issue to recover a degraded/down venue.",
+            inputSchema={
+                "type": "object",
+                "required": ["venue", "status"],
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name"},
+                    "status": {"type": "string", "enum": ["active", "degraded", "down"]},
+                },
+            },
+        ),
     ]
 
 
@@ -666,6 +679,11 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
         if name == "tail_logs":            return await _tool_tail_logs(arguments)
         if name == "grep_logs":            return await _tool_grep_logs(arguments)
         if name == "release_stuck_orders": return await _tool_release_stuck_orders(arguments)
+        if name == "update_venue_status":  return await _tool_update_venue_status(arguments)
+        if name == "cancel_order":
+            # Alias: cancel_order → cancel_replace with action="cancel"
+            args = {**arguments, "action": arguments.get("action", "cancel")}
+            return await _tool_cancel_replace(args)
         return _tc(f"ERROR: Unknown tool '{name}'")
     except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR: Unhandled exception in tool '{name}': {exc!r}")
@@ -1987,6 +2005,50 @@ async def _tool_grep_logs(args: dict) -> list[TextContent]:
         return _tc(f"GREP '{pattern}' in {file_path} (simulated, 3 matches):\n" + "\n".join(simulated_lines))
     except Exception as exc:
         return _tc(f"ERROR in grep_logs: {exc!r}")
+
+
+async def _tool_update_venue_status(args: dict) -> list[TextContent]:
+    """Change venue status (active/degraded/down) and affect SOR routing."""
+    try:
+        import random
+        venue = args.get("venue", "").upper()
+        if not venue:
+            return _tc("ERROR: venue is required.")
+        new_status = args.get("status", "active").lower()
+        if new_status not in ("active", "degraded", "down"):
+            return _tc(f"ERROR: Invalid status '{new_status}'. Must be active, degraded, or down.")
+        session = session_manager.get_session(venue)
+        if session is None:
+            return _tc(f"ERROR: No FIX session found for venue '{venue}'.")
+        old_status = session.status
+        old_latency = session.latency_ms
+        new_latency = args.get("latency_ms") or {
+            "active": random.randint(1, 10),
+            "degraded": random.randint(100, 300),
+            "down": 999,
+        }.get(new_status, 5)
+        session_manager.update_session_status(venue, new_status)
+        session.latency_ms = new_latency
+        if new_status == "down" and old_status != "down":
+            for o in oms.orders.values():
+                if o.venue.upper() == venue and o.status not in _TERMINAL_STATUSES:
+                    if "venue_down" not in o.flags:
+                        o.flags.append("venue_down")
+                        o.updated_at = datetime.now(timezone.utc).isoformat()
+        elif new_status == "active" and old_status == "down":
+            _release_venue_stuck_orders(venue)
+        refreshed = session_manager.get_session(venue)
+        lines = [f"VENUE STATUS UPDATE \u2014 {venue}"]
+        lines.append(f"  Status:   {old_status.upper()} -> {new_status.upper()}")
+        lines.append(f"  Latency:  {old_latency}ms -> {new_latency}ms")
+        if refreshed:
+            lines.append(f"  Session:  {refreshed.status.upper()}")
+        if session.error:
+            session.error = None
+            lines.append(f"  Error:    Cleared")
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR in update_venue_status: {exc!r}")
 
 
 async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
