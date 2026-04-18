@@ -5,9 +5,15 @@
 # Dashboard:  http://localhost:8787
 #
 # NOTE: API (8000) and Dashboard (8787) are bound to 0.0.0.0 (all interfaces)
-# so they are accessible from the host browser. PostgreSQL (5432) and Redis
-# (6379) stay on 127.0.0.1 (localhost-only) since they have no auth and are
-# infra-only services.
+# so they are accessible from the host browser. PostgreSQL and Redis are
+# reachable only on the internal compose network (service names: postgres,
+# redis) — no host port binding. This avoids collisions with a native
+# Postgres/Redis on the host and keeps the unauthenticated infra unreachable
+# from outside the compose network.
+#
+# To access the DB from the host for debugging:
+#   docker compose exec postgres psql -U trading -d trading
+#   docker compose exec redis  redis-cli
 
 services:
 
@@ -157,8 +163,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
-    ports:
-      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
       interval: 5s
@@ -172,8 +176,6 @@ services:
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redis_data:/data
-    ports:
-      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
