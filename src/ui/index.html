@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FIX MCP Simulator</title>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <style>
@@ -105,7 +104,8 @@ function App(){
   const stuckC=ords.filter(o=>o.status==='stuck').length;
 
   /* Select screen */
-  if(!scn&&!ld){
+  if(!scn){
+    if(ld)return React.createElement('div',{style:{minHeight:'100vh',background:'#0a0b0e',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column'}},React.createElement('div',{style:{width:40,height:40,border:'3px solid #2a2f42',borderTop:'3px solid #3b82f6',borderRadius:'50%',animation:'spin .8s linear infinite',marginBottom:16}}),React.createElement('div',{style:{fontSize:14,color:'#3b82f6'}},'Starting scenario...'));
     var cards=[];
     Object.keys(SCENARIOS).forEach(function(name){var d=SCENARIOS[name];if(!d)return;
       cards.push(React.createElement('div',{key:name,onClick:function(){start(name)},style:{cursor:'pointer',padding:16,borderRadius:12,background:'#12141a',border:'1px solid #2a2f42',transition:'all .15s'},onMouseEnter:function(e){e.currentTarget.style.borderColor='#3b82f6';e.currentTarget.style.background='#1a1d26'},onMouseLeave:function(e){e.currentTarget.style.borderColor='#2a2f42';e.currentTarget.style.background='#12141a'}},
@@ -236,8 +236,6 @@ function App(){
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
-// Remove loading screen after successful render
-var ls=document.getElementById('load-screen');if(ls)ls.remove();
 
 });
 </script>
