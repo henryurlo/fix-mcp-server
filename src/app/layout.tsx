@@ -1,20 +1,9 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "FIX MCP — AI Operations Theater",
-  description: "AI-native trading operations console with scenario-driven execution, topology visualization, and agent-assisted remediation",
+  title: 'FIX-MCP Mission Control',
+  description: 'FIX-MCP Mission Control — Trading infrastructure monitoring and diagnostics',
 };
 
 export default function RootLayout({
@@ -23,11 +12,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full bg-[#0a0b0e] text-[#e4e7f1]">{children}</body>
+    <html lang="en" className="dark">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-[#06080d] text-[#e4e7f1] antialiased font-sans">
+        {children}
+      </body>
     </html>
   );
 }

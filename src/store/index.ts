@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAudit } from './audit';
 
 // ── Backend URL — Next.js dev server proxies /api/* to the Python backend
 const BACKEND = '';
@@ -25,11 +26,6 @@ export interface SessionInfo {
   status: 'active' | 'degraded' | 'down';
   latency_ms?: number;
   session_id?: string;
-  seq_gap?: boolean;
-  last_sent_seq?: number;
-  last_recv_seq?: number;
-  expected_recv_seq?: number;
-  error?: string | null;
 }
 
 export interface OrderInfo {
@@ -52,24 +48,11 @@ export interface EventEntry {
   summary: string;
 }
 
-export type ScenarioDef = { name: string; context: string; is_algo: boolean };
-
-export type StatusResponse = {
+type ScenarioDef = { name: string; context: string; is_algo: boolean };
+type StatusResponse = {
   scenario: string;
-  available_scenarios: string[];
-  sessions: {
-    detail: {
-      venue: string;
-      status: string;
-      latency_ms?: number;
-      session_id?: string;
-      seq_gap?: boolean;
-      last_sent_seq?: number;
-      last_recv_seq?: number;
-      expected_recv_seq?: number;
-      error?: string | null;
-    }[];
-  };
+  available_scenarios: string[];  // API returns string array, not objects
+  sessions: { detail: { venue: string; status: string; latency_ms?: number; session_id?: string }[] };
   orders: { open: number; stuck: number };
 };
 type ModeResponse = { mode: string };
@@ -107,12 +90,11 @@ export const useSystem = create<SystemState>((set, get) => ({
 
   refresh: async () => {
     try {
-      const [statusRes, ordersRes, eventsRes, modeRes, scenariosRes] = await Promise.all([
-        jsonFetch<StatusResponse>('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),
+      const [statusRes, ordersRes, eventsRes, modeRes] = await Promise.all([
+        jsonFetch<StatusResponse>('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),  
         jsonFetch<OrderInfo[]>('/api/orders').catch(e => { console.error('/api/orders failed:', e); return null; }),
         jsonFetch<EventEntry[]>('/api/events').catch(e => { console.error('/api/events failed:', e); return null; }),
         jsonFetch<ModeResponse>('/api/mode').catch(e => { console.error('/api/mode failed:', e); return null; }),
-        jsonFetch<ScenarioDef[]>('/api/scenarios').catch(e => { console.error('/api/scenarios failed:', e); return null; }),
       ]);
 
       if (!statusRes) { set({ connected: false, error: '/api/status failed', loading: false }); return; }
@@ -122,23 +104,18 @@ export const useSystem = create<SystemState>((set, get) => ({
         status: (s.status || 'active') as SessionInfo['status'],
         latency_ms: s.latency_ms,
         session_id: s.session_id,
-        seq_gap: s.seq_gap,
-        last_sent_seq: s.last_sent_seq,
-        last_recv_seq: s.last_recv_seq,
-        expected_recv_seq: s.expected_recv_seq,
-        error: s.error ?? null,
       }));
-
-      const scenarios: ScenarioDef[] = scenariosRes && scenariosRes.length > 0
-        ? scenariosRes
-        : (statusRes.available_scenarios || []).map((name: string) => ({ name, context: '', is_algo: false }));
 
       set({
         sessions,
         orders: ordersRes ?? [],
         events: (eventsRes ?? []).slice(0, 50),
         scenario: statusRes.scenario,
-        available_scenarios: scenarios,
+        available_scenarios: (statusRes.available_scenarios || []).map((name: string) => ({
+          name,
+          context: '',
+          is_algo: false,
+        })),
         mode: (modeRes?.mode as SystemState['mode']) || 'human',
         open_count: statusRes.orders?.open || 0,
         stuck_count: statusRes.orders?.stuck || 0,
@@ -162,9 +139,16 @@ export const useSystem = create<SystemState>((set, get) => ({
   },
 
   callTool: async (tool: string, args: Record<string, unknown>) => {
-    const res = await jsonPost('/api/tool', { tool, arguments: args });
-    await get().refresh();
-    return (res as { output?: string }).output || '';
+    const auditId = useAudit.getState().addEntry(tool, args);
+    try {
+      const res = await jsonPost('/api/tool', { tool, arguments: args });
+      useAudit.getState().completeEntry(auditId, (res as { output?: string }).output || 'Done', true);
+      await get().refresh();
+      return (res as { output?: string }).output || '';
+    } catch (err: unknown) {
+      useAudit.getState().completeEntry(auditId, (err as Error).message, false);
+      throw err;
+    }
   },
 
   setMode: async (mode: 'human' | 'agent' | 'mixed') => {
@@ -251,7 +235,7 @@ export const useChat = create<ChatState>((set, get) => ({
           'X-Title': 'FIX MCP Console',
         },
         body: JSON.stringify({
-          model: 'openrouter/anthropic/claude-sonnet-4-20250514',
+          model: 'qwen/qwen3.6-plus',
           messages: msgs,
           max_tokens: 1024,
         }),

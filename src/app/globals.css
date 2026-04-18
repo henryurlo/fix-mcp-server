@@ -1,73 +1,345 @@
 @import "tailwindcss";
 
+/* ── FIX-MCP Mission Control Design System ─────────────────── */
+
 :root {
-  --bg: #0a0b0e;
-  --surface: #12141a;
-  --elevated: #1a1d26;
-  --hover: #222633;
-  --border: #2a2f42;
-  --border-subtle: #1e2233;
-  --text: #e4e7f1;
-  --text-secondary: #8b92a8;
-  --text-muted: #5a6178;
-  --green: #10b981;
-  --amber: #f59e0b;
-  --red: #ef4444;
-  --blue: #3b82f6;
+  /* Core palette */
+  --bg-void: #06080d;
+  --bg-base: #0a0e1a;
+  --bg-surface: #10131f;
+  --bg-elevated: #161b2e;
+  --bg-hover: #1c2240;
+  
+  /* Borders */
+  --border-dim: #1a1f35;
+  --border-base: #252c4a;
+  --border-bright: #3a4470;
+  
+  /* Text */
+  --text-primary: #e8ecf4;
+  --text-secondary: #8b92b0;
+  --text-muted: #555d7a;
+  --text-dim: #4a5070;
+  
+  /* Accent colors */
+  --cyan: #00d4ff;
+  --cyan-dim: #00d4ff30;
+  --green: #00ff88;
+  --green-dim: #00ff8830;
+  --orange: #ff6b35;
+  --orange-dim: #ff6b3530;
+  --red: #ff3366;
+  --red-dim: #ff336630;
   --purple: #8b5cf6;
+  --purple-dim: #8b5cf630;
+  --blue: #3b82f6;
+  --blue-dim: #3b82f630;
+  --amber: #f59e0b;
+  --amber-dim: #f59e0b30;
 }
 
-@theme inline {
-  --color-background: var(--bg);
-  --color-foreground: var(--text);
-  --color-surface: var(--surface);
-  --color-elevated: var(--elevated);
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-base) transparent;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-base);
+  border-radius: 3px;
+}
+
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg-void);
+  color: var(--text-primary);
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Glow effects ─────────────────────────────────────────── */
+
+@keyframes pulse-glow-cyan {
+  0%, 100% { box-shadow: 0 0 4px var(--cyan-dim); }
+  50% { box-shadow: 0 0 16px var(--cyan-dim), 0 0 32px #00d4ff10; }
+}
+
+@keyframes pulse-glow-green {
+  0%, 100% { box-shadow: 0 0 4px var(--green-dim); }
+  50% { box-shadow: 0 0 16px var(--green-dim), 0 0 32px #00ff8810; }
+}
+
+@keyframes pulse-glow-red {
+  0%, 100% { box-shadow: 0 0 8px var(--red-dim); }
+  50% { box-shadow: 0 0 20px var(--red-dim), 0 0 40px #ff336620; }
+}
+
+@keyframes pulse-glow-amber {
+  0%, 100% { box-shadow: 0 0 4px var(--amber-dim); }
+  50% { box-shadow: 0 0 14px var(--amber-dim), 0 0 28px #f59e0b10; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes data-flow {
+  0% { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-right {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+.animate-slide-up { animation: slide-up 0.4s ease-out; }
+.animate-slide-right { animation: slide-right 0.3s ease-out; }
+.animate-spin-slow { animation: spin-slow 3s linear infinite; }
+
+/* ── Glass panels ─────────────────────────────────────────── */
+
+.glass-panel {
+  background: linear-gradient(135deg, rgba(16, 19, 31, 0.8), rgba(22, 27, 46, 0.6));
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+}
+
+.glass-panel-bright {
+  background: linear-gradient(135deg, rgba(16, 19, 31, 0.9), rgba(22, 27, 46, 0.7));
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-base);
+  border-radius: 12px;
+}
+
+/* ── Status indicators ────────────────────────────────────── */
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.healthy { background: var(--green); box-shadow: 0 0 6px var(--green-dim); }
+.status-dot.degraded { background: var(--amber); box-shadow: 0 0 6px var(--amber-dim); animation: pulse-glow-amber 2s infinite; }
+.status-dot.down { background: var(--red); box-shadow: 0 0 8px var(--red-dim); animation: pulse-glow-red 1.5s infinite; }
+.status-dot.active { background: var(--cyan); box-shadow: 0 0 6px var(--cyan-dim); animation: pulse-glow-cyan 2s infinite; }
+
+/* ── Data table ───────────────────────────────────────────── */
+
+.data-grid {
+  display: grid;
+  gap: 1px;
+  background: var(--border-dim);
+  border-radius: 8px;
   overflow: hidden;
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-/* ReactFlow overrides */
-.react-flow__node {
-  background: transparent !important;
-  border: none !important;
-  padding: 0 !important;
-}
-.react-flow__edge-path { stroke: var(--border); stroke-width: 1.5; }
-.react-flow__controls { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
-.react-flow__controls button {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--text-secondary) !important;
-}
-.react-flow__controls button:hover { background: var(--elevated) !important; }
-.react-flow__minimap { background: var(--surface) !important; border-color: var(--border) !important; }
-
-/* Pulsing animations */
-@keyframes pulse-glow-red {
-  0%, 100% { filter: drop-shadow(0 0 6px rgba(239,68,68,0.4)); }
-  50% { filter: drop-shadow(0 0 18px rgba(239,68,68,0.8)); }
-}
-@keyframes pulse-glow-amber {
-  0%, 100% { filter: drop-shadow(0 0 6px rgba(245,158,11,0.3)); }
-  50% { filter: drop-shadow(0 0 14px rgba(245,158,11,0.6)); }
-}
-@keyframes flow-dash {
-  to { stroke-dashoffset: -20; }
+.data-grid > * {
+  background: var(--bg-surface);
+  padding: 8px 12px;
 }
 
-.flow-edge {
-  stroke-dasharray: 5 5;
-  animation: flow-dash 1s linear infinite;
+/* ── React Flow overrides ─────────────────────────────────── */
+
+.react-flow__background {
+  background: var(--bg-void) !important;
+}
+
+.react-flow__controls {
+  border: 1px solid var(--border-dim) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.react-flow__controls-button {
+  background: var(--bg-surface) !important;
+  border-bottom-color: var(--border-dim) !important;
+  fill: var(--text-secondary) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-elevated) !important;
+}
+
+.react-flow__minimap {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-dim) !important;
+  border-radius: 8px !important;
+}
+
+/* ── Tab transitions ──────────────────────────────────────── */
+
+.tab-content-enter {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* ── Scenario card ────────────────────────────────────────── */
+
+.scenario-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scenario-card:hover {
+  border-color: var(--border-bright);
+  background: var(--bg-elevated);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.scenario-card.active {
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan-dim);
+}
+
+/* ── Input styles ─────────────────────────────────────────── */
+
+.input-base {
+  background: var(--bg-base);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: border-color 0.2s;
+  outline: none;
+  width: 100%;
+}
+
+.input-base:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-dim);
+}
+
+.input-base::placeholder {
+  color: var(--text-dim);
+}
+
+/* ── Button styles ────────────────────────────────────────── */
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--cyan), #0099cc);
+  color: #000;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--cyan-dim);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-base);
+}
+
+.btn-danger {
+  background: var(--red-dim);
+  color: var(--red);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #ff336640;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #ff336640;
+  box-shadow: 0 0 8px var(--red-dim);
+}
+
+/* ── Accessibility: Focus rings ─────────────────────────────── */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Accessibility: Reduced motion ────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-pulse, .animate-spin, .animate-spin-slow {
+    animation: none !important;
+  }
+}
+
+/* ── Clickable cursor ─────────────────────────────────────── */
+
+button, [role="button"], a, select, .scenario-card {
+  cursor: pointer;
+}
+
+/* ── Tabular numbers for data ─────────────────────────────── */
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
 }
