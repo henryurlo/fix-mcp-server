@@ -558,6 +558,69 @@ async def list_tools() -> list[Tool]:
                 },
             },
         ),
+        # ── New terminal CLI tools ──────────────────────────────────────
+        Tool(
+            name="session_heartbeat",
+            description="Send a heartbeat and return the heartbeat status for a specific venue session.",
+            inputSchema={
+                "type": "object",
+                "required": ["venue"],
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name (e.g. NYSE, BATS, ARCA)"},
+                },
+            },
+        ),
+        Tool(
+            name="reset_sequence",
+            description="Reset FIX sequence numbers for a venue session.",
+            inputSchema={
+                "type": "object",
+                "required": ["venue"],
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name"},
+                },
+            },
+        ),
+        Tool(
+            name="dump_session_state",
+            description="Return full session diagnostics for a venue including sequence numbers, latency, heartbeat age, and associated orders.",
+            inputSchema={
+                "type": "object",
+                "required": ["venue"],
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name"},
+                },
+            },
+        ),
+        Tool(
+            name="tail_logs",
+            description="Return the last N lines of a log file.",
+            inputSchema={
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                    "file": {"type": "string", "description": "Log file path or name"},
+                    "lines": {"type": "integer", "description": "Number of lines to return (default 20)"},
+                },
+            },
+        ),
+        Tool(
+            name="grep_logs",
+            description="Search log files for a pattern and return matching lines.",
+            inputSchema={
+                "type": "object",
+                "required": ["pattern", "file"],
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex or literal pattern to search for"},
+                    "file": {"type": "string", "description": "Log file path or name"},
+                },
+            },
+        ),
+        Tool(
+            name="release_stuck_orders",
+            description="Release all stuck orders across all venues by removing venue_down flags.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -597,6 +660,12 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
         if name == "modify_algo":         return await _tool_modify_algo(arguments)
         if name == "cancel_algo":         return await _tool_cancel_algo(arguments)
         if name == "list_scenarios":      return await _tool_list_scenarios(arguments)
+        if name == "session_heartbeat":    return await _tool_session_heartbeat(arguments)
+        if name == "reset_sequence":       return await _tool_reset_sequence(arguments)
+        if name == "dump_session_state":   return await _tool_dump_session_state(arguments)
+        if name == "tail_logs":            return await _tool_tail_logs(arguments)
+        if name == "grep_logs":            return await _tool_grep_logs(arguments)
+        if name == "release_stuck_orders": return await _tool_release_stuck_orders(arguments)
         return _tc(f"ERROR: Unknown tool '{name}'")
     except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR: Unhandled exception in tool '{name}': {exc!r}")
@@ -1700,6 +1769,256 @@ async def _tool_list_scenarios(args: dict) -> list[TextContent]:
         return _tc(f"ERROR: Unknown action '{action}' — use 'list' or 'load'")
     except Exception as exc:
         return _tc(f"ERROR in list_scenarios: {exc!r}")
+
+
+# ── New terminal CLI tool implementations ────────────────────────────
+
+async def _tool_session_heartbeat(args: dict) -> list[TextContent]:
+    """Send a heartbeat probe to a venue and return status."""
+    try:
+        venue = args.get("venue", "").upper()
+        if not venue:
+            # Return all venue heartbeat summaries
+            sessions = session_manager.get_all_sessions()
+            lines = ["HEARTBEAT SUMMARY", "═" * 50]
+            for s in sessions:
+                icon = _session_status_icon(s.status)
+                hb_age = s.heartbeat_age_seconds
+                hb_str = f"{hb_age:.0f}s ago" if hb_age is not None else "never"
+                lines.append(f"  {icon} {s.venue:<8}  latency={s.latency_ms}ms  hb={hb_str}  seq_out={s.last_sent_seq}  seq_in={s.last_recv_seq}")
+            return _tc("\n".join(lines))
+
+        session = session_manager.get_session(venue)
+        if session is None:
+            return _tc(f"ERROR: No FIX session found for venue '{venue}'.")
+
+        icon = _session_status_icon(session.status)
+        hb_age = session.heartbeat_age_seconds
+        hb_str = f"{hb_age:.0f}s ago" if hb_age is not None else "never"
+
+        lines = [
+            f"HEARTBEAT — {venue}",
+            f"  Status:    {session.status.upper()}",
+            f"  Latency:   {session.latency_ms}ms",
+            f"  Hb Age:    {hb_str}",
+            f"  Seq Out:   {session.last_sent_seq}",
+            f"  Seq In:    {session.last_recv_seq}",
+            f"  Expected:  {session.expected_recv_seq}",
+        ]
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR in session_heartbeat: {exc!r}")
+
+
+async def _tool_reset_sequence(args: dict) -> list[TextContent]:
+    """Reset FIX sequence numbers for a venue."""
+    try:
+        venue = args.get("venue", "").upper()
+        if not venue:
+            return _tc("ERROR: venue is required.")
+
+        session = session_manager.get_session(venue)
+        if session is None:
+            return _tc(f"ERROR: No FIX session found for venue '{venue}'.")
+
+        new_seq = max(session.last_recv_seq, session.last_sent_seq, session.expected_recv_seq)
+        fix_msg = msg_builder.build_sequence_reset(new_seq=new_seq)
+        session_manager.apply_sequence_reset(venue, new_seq=new_seq)
+
+        refreshed = session_manager.get_session(venue)
+        lines = [
+            f"SEQUENCE RESET — {venue}",
+            f"  New Seq:     {new_seq}",
+            f"  Status:      {refreshed.status.upper() if refreshed else 'unknown'}",
+        ]
+        if refreshed:
+            lines.append(f"  Sent Seq:    {refreshed.last_sent_seq}")
+            lines.append(f"  Recv Seq:    {refreshed.last_recv_seq}")
+            lines.append(f"  Expected:    {refreshed.expected_recv_seq}")
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR in reset_sequence: {exc!r}")
+
+
+async def _tool_dump_session_state(args: dict) -> list[TextContent]:
+    """Return full session diagnostics for a venue."""
+    try:
+        venue = args.get("venue", "").upper()
+        if not venue:
+            return _tc("ERROR: venue is required.")
+
+        session = session_manager.get_session(venue)
+        if session is None:
+            return _tc(f"ERROR: No FIX session found for venue '{venue}'.")
+
+        venue_orders = [
+            o for o in oms.orders.values()
+            if o.venue.upper() == venue
+        ]
+        open_orders = [o for o in venue_orders if o.status not in _TERMINAL_STATUSES]
+        stuck_orders = [o for o in venue_orders if "venue_down" in o.flags]
+
+        icon = _session_status_icon(session.status)
+        lines = [
+            f"SESSION DUMP — {venue}",
+            "═" * 60,
+            f"  {icon} Venue:          {session.venue}",
+            f"     Session ID:    {session.session_id}",
+            f"     Status:        {session.status.upper()}",
+            f"     FIX Version:   {session.fix_version}",
+            f"     Host:          {session.host}:{session.port}",
+            f"     Sent Seq:      {session.last_sent_seq}",
+            f"     Recv Seq:      {session.last_recv_seq}",
+            f"     Expected:      {session.expected_recv_seq}",
+            f"     Seq Gap:       {session.sequence_gap_size if session.has_sequence_gap else 'none'}",
+            f"     Latency:       {session.latency_ms}ms",
+            f"     Hb Age:        {session.heartbeat_age_seconds:.0f}s" if session.heartbeat_age_seconds is not None else "     Hb Age:        never",
+        ]
+        if session.error:
+            lines.append(f"     Error:         {session.error}")
+        if session.connected_since:
+            lines.append(f"     Connected:     {session.connected_since}")
+
+        lines.append(f"")
+        lines.append(f"     Total Orders:  {len(venue_orders)}")
+        lines.append(f"     Open Orders:   {len(open_orders)}")
+        lines.append(f"     Stuck Orders:  {len(stuck_orders)}")
+
+        if stuck_orders:
+            lines.append(f"")
+            lines.append(f"     [!] STUCK ORDERS:")
+            for o in stuck_orders:
+                sla = _sla_countdown(o)
+                sla_str = f"  *** {sla} ***" if sla else ""
+                lines.append(f"       {o.order_id}  {o.symbol}  {o.side.upper()}  {o.quantity:,}  status={o.status}{sla_str}")
+
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR in dump_session_state: {exc!r}")
+
+
+async def _tool_tail_logs(args: dict) -> list[TextContent]:
+    """Return the last N lines of a log file."""
+    try:
+        file_path = args.get("file", "")
+        n = args.get("lines", 20)
+
+        if not file_path:
+            return _tc("ERROR: file is required.")
+
+        # Try common log locations
+        candidates = [
+            Path(file_path),
+            Path(f"/tmp/{file_path}"),
+            Path(f"/var/log/{file_path}"),
+            Path(f"{os.environ.get('FIX_MCP_CONFIG_DIR', '')}/{file_path}"),
+        ]
+
+        log_file = None
+        for c in candidates:
+            if c.exists() and c.is_file():
+                log_file = c
+                break
+
+        if log_file:
+            raw = log_file.read_text(errors="replace")
+            text_lines = raw.splitlines()
+            tail = text_lines[-int(n):]
+            return _tc(f"TAIL {file_path} ({len(tail)} lines):\n" + "\n".join(tail))
+
+        # Simulated data when no file found
+        now = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        simulated = [
+            f"{now} INFO  Session heartbeat check complete",
+            f"{now} INFO  FIX message dispatched to NYSE (seq=1247)",
+            f"{now} WARN  Elevated latency at BATS: 45ms",
+            f"{now} INFO  Order ORD-0042 filled at NYSE — TSLA 100@412.50",
+            f"{now} INFO  VWAP algo slice scheduled for AAPL",
+            f"{now} INFO  Heartbeat received from LSE (seq=891)",
+            f"{now} INFO  Market data feed refreshed — XNYS fresh={3}ms",
+            f"{now} WARN  Venue ARCA reporting seq gap — expected 445, got 442",
+            f"{now} INFO  ResendRequest sent to ARCA for 442..445",
+            f"{now} INFO  Gap recovery complete at ARCA",
+        ]
+        return _tc(f"TAIL {file_path} (simulated, last {min(n, len(simulated))} lines):\n" + "\n".join(simulated[-int(n):]))
+    except Exception as exc:
+        return _tc(f"ERROR in tail_logs: {exc!r}")
+
+
+async def _tool_grep_logs(args: dict) -> list[TextContent]:
+    """Search log files for a pattern."""
+    try:
+        pattern = args.get("pattern", "")
+        file_path = args.get("file", "")
+
+        if not pattern:
+            return _tc("ERROR: pattern is required.")
+
+        if not file_path:
+            return _tc("ERROR: file is required.")
+
+        # Try real file first
+        candidates = [
+            Path(file_path),
+            Path(f"/tmp/{file_path}"),
+            Path(f"/var/log/{file_path}"),
+        ]
+        log_file = None
+        for c in candidates:
+            if c.exists() and c.is_file():
+                log_file = c
+                break
+
+        if log_file:
+            raw = log_file.read_text(errors="replace")
+            compiled = re.compile(pattern, re.IGNORECASE)
+            matches = [line for line in raw.splitlines() if compiled.search(line)]
+            if matches:
+                return _tc(f"GREP '{pattern}' in {file_path} — {len(matches)} matches:\n" + "\n".join(matches))
+            return _tc(f"GREP '{pattern}' in {file_path} — no matches.")
+
+        # Simulated data
+        now = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        simulated_lines = [
+            f"{now} ERROR {pattern} — session timeout at BATS",
+            f"{now} WARN  {pattern} — retry attempt 1/3",
+            f"{now} INFO  {pattern} — session recovered",
+        ]
+        return _tc(f"GREP '{pattern}' in {file_path} (simulated, 3 matches):\n" + "\n".join(simulated_lines))
+    except Exception as exc:
+        return _tc(f"ERROR in grep_logs: {exc!r}")
+
+
+async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
+    """Release all stuck orders across all venues."""
+    try:
+        all_sessions = session_manager.get_all_sessions()
+        released_all = []
+        for s in all_sessions:
+            if s.status == "down" or s.has_sequence_gap:
+                released = _release_venue_stuck_orders(s.venue)
+                released_all.extend(released)
+
+        # Also release orders stuck regardless of session status
+        for order in list(oms.orders.values()):
+            if order.status == "stuck" and "venue_down" in order.flags:
+                order.flags.remove("venue_down")
+                order.status = "new"
+                order.updated_at = datetime.now(timezone.utc).isoformat()
+                if order not in released_all:
+                    released_all.append(order)
+
+        lines = [f"RELEASED STUCK ORDERS — {len(released_all)} order(s)"]
+        if released_all:
+            for o in released_all:
+                sla = _sla_countdown(o)
+                sla_str = f"  *** {sla} ***" if sla else ""
+                lines.append(f"  {o.order_id}  {o.symbol}  {o.side.upper()}  {o.quantity:,}  venue={o.venue}  status={o.status}{sla_str}")
+        else:
+            lines.append("  No stuck orders found.")
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR in release_stuck_orders: {exc!r}")
 
 
 # ---------------------------------------------------------------------------
