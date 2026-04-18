@@ -1,0 +1,17 @@
+{
+  "name": "market_data_delay",
+  "title": "Market Data Feed Latency Spike",
+  "description": "Simulates a degraded market data feed on NYSE with significant message delays causing stale pricing information.",
+  "background": "A network switch on the NYSE colocation floor is failing intermittently, causing market data updates to be delayed by 30 seconds. Traders relying on real-time quotes may be making decisions on stale prices. The FIX connection stays up but the data throughput drops drastically.",
+  "steps": [
+    {"step": 1, "action": "Verify all venue feeds show normal latency (<10ms)", "expected_state": "All MarketDataHub venues reporting hb_age_s < 0.5s"},
+    {"step": 2, "action": "Inject 30-second delay on XNYS venue feed", "expected_state": "XNYS venue shows stale quotes; other venues (XTSE, XLON) update normally"},
+    {"step": 3, "action": "Route a buy order for AAPL", "expected_state": "BrokerHost routes to non-XNYS venue with fresher pricing; order fills at non-stale price"},
+    {"step": 4, "action": "Monitor order fills for price discrepancies", "expected_state": "Fill prices on non-delayed venues reflect current market; XNYS quotes lag"},
+    {"step": 5, "action": "Resolve scenario and reset XNYS feed", "expected_state": "XNYS quotes resume normal cadence; all venues in sync"}
+  ],
+  "injections": [
+    {"component": "market_data", "fault": "delay", "venue": "XNYS", "duration_ms": 30000}
+  ],
+  "resolve_actions": ["reset_feed", "reconnect_session"]
+}

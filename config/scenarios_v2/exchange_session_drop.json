@@ -1,0 +1,17 @@
+{
+  "name": "exchange_session_drop",
+  "title": "Exchange Session Drop",
+  "description": "Simulates a FIX session drop from an exchange simulator, testing session reconnection logic.",
+  "background": "The NYSE exchange simulator experiences a connection failure — the TCP session drops after being up for hours. The exchange's outgoing queue is flushed, sequence numbers reset, and any in-flight NewOrderSingle messages are lost. This tests the broker's ability to detect the drop, attempt reconnection, and recover sequence numbers via logon/sequence reset.",
+  "steps": [
+    {"step": 1, "action": "Verify XNYS exchange simulator session is active", "expected_state": "ExchangeSimulator[XNYS] connected_clients > 0, running = true"},
+    {"step": 2, "action": "Inject disconnect fault on XNYS exchange", "expected_state": "XNYS connected_clients drops to 0; session state = disconnected"},
+    {"step": 3, "action": "Attempt to route a new order while XNYS is down", "expected_state": "BrokerHost detects venue unavailable; routes to fallback venue or marks order stuck"},
+    {"step": 4, "action": "Reconnect XNYS session and verify reset", "expected_state": "Logon exchange completes; sequence numbers reset to 1; quotes resume"},
+    {"step": 5, "action": "Verify previously stuck orders are re-routed", "expected_state": "BrokerHost re-processes stuck orders; orders complete via restored venue"}
+  ],
+  "injections": [
+    {"component": "exchange", "fault": "disconnect", "venue": "XNYS", "duration_ms": 45000}
+  ],
+  "resolve_actions": ["reconnect_session", "reset_feed"]
+}
