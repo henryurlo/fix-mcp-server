@@ -14,7 +14,7 @@ const QUICK_PROMPTS = [
 ];
 
 export function ChatPanel() {
-  const { messages, isOpen, isTyping, openRouterKey, toggleOpen, send, setKey, clear } = useChat();
+  const { messages, isOpen, isTyping, openRouterKey, toggleOpen, send, setKey, clear, approveToolCall } = useChat();
   const { mode } = useSystem();
   const [input, setInput] = useState('');
   const [keyInput, setKeyInput] = useState('');
@@ -92,7 +92,7 @@ export function ChatPanel() {
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
                   <div className="mt-2 space-y-1.5">
                     {msg.toolCalls.map((tc, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[10px] font-mono">
+                      <div key={i} className="flex items-center gap-1.5 text-[10px] font-mono bg-[#0a0b0e] border border-[#1a1d26] rounded px-2 py-1">
                         {tc.status === 'proposed' && <AlertTriangle size={10} className="text-[#f59e0b]" />}
                         {tc.status === 'executing' && <Loader2 size={10} className="text-[#3b82f6] animate-spin" />}
                         {tc.status === 'success' && <CheckCircle size={10} className="text-[#10b981]" />}
@@ -100,10 +100,25 @@ export function ChatPanel() {
                         {tc.status === 'approved' && <CheckCircle size={10} className="text-[#8b5cf6]" />}
 
                         <span className="text-[#e4e7f1]">{tc.tool}</span>
-                        <span className="text-[#5a6178]">({JSON.stringify(tc.args)})</span>
+                        <span className="text-[#5a6178] truncate">({Object.keys(tc.args).length ? JSON.stringify(tc.args) : ''})</span>
 
-                        {tc.result && (
-                          <span className="text-[#10b981] ml-1 truncate">✓</span>
+                        {tc.status === 'proposed' && (
+                          <button
+                            onClick={() => approveToolCall(msg.id, i)}
+                            className="ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded bg-[#8b5cf6]/15 text-[#8b5cf6] border border-[#8b5cf6]/40 hover:bg-[#8b5cf6]/25"
+                          >
+                            APPROVE
+                          </button>
+                        )}
+                        {tc.result && tc.status === 'success' && (
+                          <span className="ml-auto text-[#10b981] truncate max-w-[140px]" title={tc.result}>
+                            ✓ {tc.result.slice(0, 40)}
+                          </span>
+                        )}
+                        {tc.result && tc.status === 'error' && (
+                          <span className="ml-auto text-[#ef4444] truncate max-w-[140px]" title={tc.result}>
+                            ✗ {tc.result.slice(0, 40)}
+                          </span>
                         )}
                       </div>
                     ))}

@@ -8,6 +8,7 @@ import { Activity, Shield, Bell, Terminal, Settings, Bot, ArrowRight, AlertTrian
 // Client-only ReactFlow
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
 const ChatPanel = dynamic(() => import('@/components/ChatPanel').then(m => ({ default: m.ChatPanel })), { ssr: false });
+const IncidentWorkspace = dynamic(() => import('@/components/IncidentWorkspace').then(m => ({ default: m.IncidentWorkspace })), { ssr: false });
 
 export default function Home() {
   const { scenario, available_scenarios: available, loading, startScenario, refresh, mode, setMode, sessions, events, error, connected } = useSystem();
@@ -106,21 +107,31 @@ export default function Home() {
       {header}
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Topology Canvas */}
-        <main className="flex-1 relative">
-          <TopologyGraph />
+        {/* Center: Topology + Incident Workspace */}
+        <main className="flex-1 flex flex-col relative">
+          {/* Topology — always visible, shrinks when scenario active */}
+          <div className={`relative transition-all duration-300 ${scenario ? 'h-3/5' : 'h-full'}`}>
+            <TopologyGraph />
 
-          {/* Empty state overlay */}
-          {!scenario && !loading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0b0e]/80 backdrop-blur-sm z-10">
-              <Shield size={48} className="text-[#10b981] mb-4" />
-              <h1 className="text-2xl font-bold text-[#e4e7f1] mb-2">AI Operations Theater</h1>
-              <p className="text-sm text-[#5a6178] text-center max-w-sm mb-6">
-                A scenario-driven trading operations console where an LLM agent diagnoses failures, proposes fixes, and executes through MCP tools — with human approval
-              </p>
-              <div className="text-[10px] text-[#5a6178] mb-4">
-                Select a scenario above to begin
+            {/* Empty state overlay (no scenario) */}
+            {!scenario && !loading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0b0e]/80 backdrop-blur-sm z-10">
+                <Shield size={48} className="text-[#10b981] mb-4" />
+                <h1 className="text-2xl font-bold text-[#e4e7f1] mb-2">AI Operations Theater</h1>
+                <p className="text-sm text-[#5a6178] text-center max-w-sm mb-6">
+                  A scenario-driven trading operations console where an LLM agent diagnoses failures, proposes fixes, and executes through MCP tools — with human approval
+                </p>
+                <div className="text-[10px] text-[#5a6178] mb-4">
+                  Select a scenario above to begin
+                </div>
               </div>
+            )}
+          </div>
+
+          {/* Incident Workspace — auto-opens when scenario is active */}
+          {scenario && (
+            <div className="h-2/5 border-t border-[#1e2233] bg-[#0a0b0e] overflow-hidden">
+              <IncidentWorkspace />
             </div>
           )}
         </main>

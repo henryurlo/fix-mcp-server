@@ -25,6 +25,11 @@ export interface SessionInfo {
   status: 'active' | 'degraded' | 'down';
   latency_ms?: number;
   session_id?: string;
+  seq_gap?: boolean;
+  last_sent_seq?: number;
+  last_recv_seq?: number;
+  expected_recv_seq?: number;
+  error?: string | null;
 }
 
 export interface OrderInfo {
@@ -47,11 +52,24 @@ export interface EventEntry {
   summary: string;
 }
 
-type ScenarioDef = { name: string; context: string; is_algo: boolean };
-type StatusResponse = {
+export type ScenarioDef = { name: string; context: string; is_algo: boolean };
+
+export type StatusResponse = {
   scenario: string;
-  available_scenarios: string[];  // API returns string array, not objects
-  sessions: { detail: { venue: string; status: string; latency_ms?: number; session_id?: string }[] };
+  available_scenarios: string[];
+  sessions: {
+    detail: {
+      venue: string;
+      status: string;
+      latency_ms?: number;
+      session_id?: string;
+      seq_gap?: boolean;
+      last_sent_seq?: number;
+      last_recv_seq?: number;
+      expected_recv_seq?: number;
+      error?: string | null;
+    }[];
+  };
   orders: { open: number; stuck: number };
 };
 type ModeResponse = { mode: string };
@@ -89,11 +107,12 @@ export const useSystem = create<SystemState>((set, get) => ({
 
   refresh: async () => {
     try {
-      const [statusRes, ordersRes, eventsRes, modeRes] = await Promise.all([
-        jsonFetch<StatusResponse>('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),  
+      const [statusRes, ordersRes, eventsRes, modeRes, scenariosRes] = await Promise.all([
+        jsonFetch<StatusResponse>('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),
         jsonFetch<OrderInfo[]>('/api/orders').catch(e => { console.error('/api/orders failed:', e); return null; }),
         jsonFetch<EventEntry[]>('/api/events').catch(e => { console.error('/api/events failed:', e); return null; }),
         jsonFetch<ModeResponse>('/api/mode').catch(e => { console.error('/api/mode failed:', e); return null; }),
+        jsonFetch<ScenarioDef[]>('/api/scenarios').catch(e => { console.error('/api/scenarios failed:', e); return null; }),
       ]);
 
       if (!statusRes) { set({ connected: false, error: '/api/status failed', loading: false }); return; }
@@ -103,18 +122,23 @@ export const useSystem = create<SystemState>((set, get) => ({
         status: (s.status || 'active') as SessionInfo['status'],
         latency_ms: s.latency_ms,
         session_id: s.session_id,
+        seq_gap: s.seq_gap,
+        last_sent_seq: s.last_sent_seq,
+        last_recv_seq: s.last_recv_seq,
+        expected_recv_seq: s.expected_recv_seq,
+        error: s.error ?? null,
       }));
+
+      const scenarios: ScenarioDef[] = scenariosRes && scenariosRes.length > 0
+        ? scenariosRes
+        : (statusRes.available_scenarios || []).map((name: string) => ({ name, context: '', is_algo: false }));
 
       set({
         sessions,
         orders: ordersRes ?? [],
         events: (eventsRes ?? []).slice(0, 50),
         scenario: statusRes.scenario,
-        available_scenarios: (statusRes.available_scenarios || []).map((name: string) => ({
-          name,
-          context: '',
-          is_algo: false,
-        })),
+        available_scenarios: scenarios,
         mode: (modeRes?.mode as SystemState['mode']) || 'human',
         open_count: statusRes.orders?.open || 0,
         stuck_count: statusRes.orders?.stuck || 0,
