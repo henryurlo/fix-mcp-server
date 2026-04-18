@@ -1,65 +1,137 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useCallback } from 'react';
+import { useSystem, useChat } from '@/store';
+import dynamic from 'next/dynamic';
+import { Activity, Shield, Bell, Terminal, Settings, Bot, ArrowRight, AlertTriangle, CheckCircle, XCircle, Play, RefreshCw } from 'lucide-react';
+
+// Client-only ReactFlow
+const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
+const ChatPanel = dynamic(() => import('@/components/ChatPanel').then(m => ({ default: m.ChatPanel })), { ssr: false });
 
 export default function Home() {
+  const { scenario, available_scenarios: available, loading, startScenario, refresh, mode, setMode, sessions, events, error, connected } = useSystem();
+  const { isOpen, openRouterKey, toggleOpen } = useChat();
+
+  // Debug: log store state
+  useEffect(() => {
+    console.log('[debug] connected:', connected, 'error:', error, 'scenarios:', available?.length, 'scenario:', scenario);
+  }, [connected, error, available, scenario]);
+
+  // Initial load
+  useEffect(() => { 
+    console.log('[fix-console] v2 — refreshing store');
+    refresh(); 
+  }, []);
+
+  // Auto-refresh every 5s
+  useEffect(() => {
+    const iv = setInterval(refresh, 5000);
+    return () => clearInterval(iv);
+  }, [refresh]);
+
+  // ── HEADER ───────────────────────────────────────────────────────
+  const header = (
+    <header className="h-12 bg-[#0a0b0e] border-b border-[#1e2233] flex items-center justify-between px-4 shrink-0">
+      {/* Left: Brand */}
+      <div className="flex items-center gap-3">
+        <Shield size={18} className="text-[#10b981]" />
+        <span className="text-sm font-bold tracking-wider">FIX MCP</span>
+        <span className="text-[10px] text-[#5a6178] font-mono">AI Operations Theater</span>
+        {scenario && (
+          <span className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1a1d26] border border-[#2a2f42] text-[10px] font-mono text-[#3b82f6]">
+            <Activity size={10} /> {scenario}
+          </span>
+        )}
+      </div>
+
+      {/* Right: Controls */}
+      <div className="flex items-center gap-2">
+        {error && (
+          <span className="text-[10px] text-[#ef4444] font-mono">{error}</span>
+        )}
+        {connected && (
+          <span className="flex items-center gap-1 text-[10px] text-[#10b981] font-mono">
+            <CheckCircle size={10} /> Connected
+          </span>
+        )}
+
+        {/* Mode Toggle */}
+        <button
+          onClick={() => setMode(mode === 'human' ? 'agent' : 'human')}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all ${
+            mode === 'agent'
+              ? 'bg-[#8b5cf6]/15 text-[#8b5cf6] border border-[#8b5cf6]/40'
+              : 'text-[#5a6178] border border-[#2a2f42]'
+          }`}
+        >
+          <Bot size={12} />
+          {mode === 'agent' ? 'AGENT' : 'HUMAN'}
+        </button>
+
+        {/* Scenario Selector */}
+        <select
+          value={scenario || ''}
+          onChange={(e) => e.target.value && startScenario(e.target.value)}
+          className="bg-[#12141a] border border-[#2a2f42] rounded-lg px-2 py-1 text-[10px] text-[#e4e7f1] focus:outline-none focus:border-[#3b82f6]"
+        >
+          <option value="">Scenario...</option>
+          {available?.map((s: any) => (
+            <option key={s.name} value={s.name}>
+              {s.name}{s.is_algo ? ' ⚡' : ''}
+            </option>
+          ))}
+        </select>
+
+        {/* Copilot Toggle */}
+        <button
+          onClick={toggleOpen}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+            openRouterKey
+              ? 'bg-[#10b981]/15 text-[#10b981] border-[#10b981]/40'
+              : 'text-[#5a6178] border-[#2a2f42]'
+          }`}
+        >
+          <Terminal size={12} />
+          Copilot
+          {!openRouterKey && <span className="ml-1 text-[#f59e0b]">🔑</span>}
+        </button>
+      </div>
+    </header>
+  );
+
+  // ── MAIN CONTENT ─────────────────────────────────────────────────
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="h-screen flex flex-col bg-[#0a0b0e] text-[#e4e7f1]">
+      {header}
+
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Topology Canvas */}
+        <main className="flex-1 relative">
+          <TopologyGraph />
+
+          {/* Empty state overlay */}
+          {!scenario && !loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0b0e]/80 backdrop-blur-sm z-10">
+              <Shield size={48} className="text-[#10b981] mb-4" />
+              <h1 className="text-2xl font-bold text-[#e4e7f1] mb-2">AI Operations Theater</h1>
+              <p className="text-sm text-[#5a6178] text-center max-w-sm mb-6">
+                A scenario-driven trading operations console where an LLM agent diagnoses failures, proposes fixes, and executes through MCP tools — with human approval
+              </p>
+              <div className="text-[10px] text-[#5a6178] mb-4">
+                Select a scenario above to begin
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* Right: Copilot Slide */}
+        <aside className={`transition-all duration-300 bg-[#0d0e12] border-l border-[#1e2233] ${
+          isOpen ? 'w-96' : 'w-0'
+        } overflow-hidden shrink-0`}>
+          <ChatPanel />
+        </aside>
+      </div>
     </div>
   );
 }

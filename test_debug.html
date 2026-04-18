@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIX MCP Simulator - Debug</title>
+</head>
+<body style="background:#0a0b0e;color:#00ff00;font-family:monospace;padding:20px">
+<h2>Debug Output:</h2>
+<div id="debug"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+var d = document.getElementById('debug');
+if(typeof React === 'undefined'){
+  d.innerHTML += '<p>❌ FAIL: React NOT loaded</p>';
+} else {
+  d.innerHTML += '<p>✅ React loaded</p>';
+}
+if(typeof ReactDOM === 'undefined'){
+  d.innerHTML += '<p>❌ FAIL: ReactDOM NOT loaded</p>';
+} else {
+  d.innerHTML += '<p>✅ ReactDOM loaded</p>';
+}
+try {
+  var root = ReactDOM.createRoot(document.getElementById('root') || document.body.appendChild(document.createElement('div')));
+  root.render(React.createElement('h1', {style:{color:'#00ff00'}}, 'FIX MCP Simulator is WORKING'));
+  d.innerHTML += '<p>✅ React app rendered</p>';
+} catch(e) {
+  d.innerHTML += '<p>❌ RENDER ERROR: ' + e.message + '</p>';
+}
+</script>
+<div id="root"></div>
+</body>
+</html>
