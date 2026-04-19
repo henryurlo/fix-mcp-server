@@ -33,7 +33,7 @@ const TelemetryDashboard = dynamic(() => import('@/components/TelemetryDashboard
 const ScenarioCreator = dynamic(() => import('@/components/ScenarioCreator'), { ssr: false });
 const AuthGate = dynamic(() => import('@/components/AuthGate'), { ssr: false });
 const FixTerminal = dynamic(() => import('@/components/FixTerminal'), { ssr: false });
-const McpAuditLog = dynamic(() => import('@/components/McpAuditLog'), { ssr: false });
+const FixWireLog = dynamic(() => import('@/components/McpAuditLog'), { ssr: false });
 const HeartbeatPanel = dynamic(() => import('@/components/HeartbeatPanel'), { ssr: false });
 
 type TabId = 'mission-control' | 'telemetry' | 'scenario-library';
@@ -124,24 +124,24 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <div>
             <span className="text-sm font-bold tracking-wider">FIX-MCP</span>
-            <span className="text-[9px] text-[var(--text-muted)] font-mono ml-2">Mission Control</span>
+            <span className="text-[12px] text-[var(--text-muted)] font-mono ml-2">Mission Control</span>
           </div>
           {scenarioContext && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
               <Radio size={10} className="text-[var(--cyan)] animate-pulse" />
-              <span className="text-[11px] font-mono font-semibold text-[var(--cyan)]">{scenarioDisplay}</span>
+              <span className="text-[14px] font-mono font-semibold text-[var(--cyan)]">{scenarioDisplay}</span>
             </div>
           )}
           {!scenarioContext && scenario && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
               <Radio size={10} className="text-[var(--cyan)] animate-pulse" />
-              <span className="text-[11px] font-mono font-semibold text-[var(--cyan)]">{scenario}</span>
+              <span className="text-[14px] font-mono font-semibold text-[var(--cyan)]">{scenario}</span>
             </div>
           )}
           {runbook && runbook.hints && runbook.hints.keyProblems.length > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--red-dim)] border border-[var(--red)]/30">
               <AlertTriangle size={11} className="text-[var(--red)]" />
-              <span className="text-[10px] font-mono font-semibold text-[var(--red)]">{runbook.hints.keyProblems.length} ISSUES</span>
+              <span className="text-[13px] font-mono font-semibold text-[var(--red)]">{runbook.hints.keyProblems.length} ISSUES</span>
             </div>
           )}
         </div>
@@ -152,7 +152,7 @@ export default function Home() {
             const isActive = activeTab === tab.id;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[14px] font-semibold transition-all ${
                   isActive ? 'bg-[var(--bg-elevated)] text-[var(--cyan)] border border-[var(--cyan)]/20' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]/50'
                 }`}>
                 <Icon size={13} /> {tab.label}
@@ -162,15 +162,15 @@ export default function Home() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {error && <span className="text-[10px] text-[var(--red)] font-mono max-w-[200px] truncate">{error}</span>}
+          {error && <span className="text-[13px] text-[var(--red)] font-mono max-w-[200px] truncate">{error}</span>}
           {connected ? (
-            <span className="flex items-center gap-1 text-[10px] text-[var(--green)] font-mono"><span className="status-dot healthy" /> LIVE</span>
+            <span className="flex items-center gap-1 text-[13px] text-[var(--green)] font-mono"><span className="status-dot healthy" /> LIVE</span>
           ) : (
-            <span className="flex items-center gap-1 text-[10px] text-[var(--red)] font-mono"><span className="status-dot down" /> OFFLINE</span>
+            <span className="flex items-center gap-1 text-[13px] text-[var(--red)] font-mono"><span className="status-dot down" /> OFFLINE</span>
           )}
 
           <select value={scenario || ''} onChange={(e) => e.target.value && startScenario(e.target.value)}
-            className="input-base !w-auto !py-1 !px-2.5 !text-[10px] !font-mono !rounded-lg max-w-[160px]">
+            className="input-base !w-auto !py-1 !px-2.5 !text-[13px] !font-mono !rounded-lg max-w-[160px]">
             <option value="">Launch Scenario…</option>
             {available?.map((s: any) => (
               <option key={s.name} value={s.name}>
@@ -180,14 +180,14 @@ export default function Home() {
           </select>
 
           <button onClick={toggleOpen}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold border transition-all ${
               isOpen ? 'bg-[var(--green-dim)] text-[var(--green)] border-[var(--green)]/30' : 'text-[var(--text-muted)] border-[var(--border-dim)] hover:border-[var(--border-base)]'
             }`}>
             <Terminal size={12} /> SRE Copilot
           </button>
 
           <div className="flex items-center gap-2 ml-1 pl-2 border-l border-[var(--border-dim)]">
-            <span className="text-[10px] font-mono text-[var(--text-secondary)]">{user?.username || 'anon'}</span>
+            <span className="text-[13px] font-mono text-[var(--text-secondary)]">{user?.username || 'anon'}</span>
             <button onClick={logout} className="text-[var(--text-dim)] hover:text-[var(--red)] transition-colors" title="Logout">
               <LogOut size={13} />
             </button>
@@ -280,16 +280,16 @@ function MissionControlTab() {
             <TopologyGraph />
             {!scenario && !selectedScenario && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--bg-void)]/70 backdrop-blur-sm z-10">
-                <h2 className="text-[11px] font-bold mb-1 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
+                <h2 className="text-[14px] font-bold mb-1 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
                   FIX-MCP Mission Control
                 </h2>
-                <p className="text-[9px] text-[var(--text-muted)] font-mono">Pick a scenario ↓</p>
+                <p className="text-[12px] text-[var(--text-muted)] font-mono">Pick a scenario ↓</p>
               </div>
             )}
             {runbook && totalSteps > 0 && (
               <div className="absolute top-1 left-1 right-1 z-10">
                 <div className="flex items-center gap-1 px-2 py-1 bg-[var(--bg-void)]/90 rounded-md backdrop-blur-sm border border-[var(--border-dim)]">
-                  <span className="text-[8px] font-mono">{currentPhase.icon}</span>
+                  <span className="text-[14px] font-mono">{currentPhase.icon}</span>
                   {PHASES.map((p, i) => (
                     <div key={p.key} className="flex-1 flex flex-col items-center">
                       <div className={`h-1.5 rounded-full w-full ${
@@ -297,7 +297,7 @@ function MissionControlTab() {
                       }`} />
                     </div>
                   ))}
-                  <span className="text-[7px] font-mono text-[var(--text-dim)]">{pct}%</span>
+                  <span className="text-[13px] font-mono text-[var(--text-dim)]">{pct}%</span>
                 </div>
               </div>
             )}
@@ -309,10 +309,10 @@ function MissionControlTab() {
           {/* Scenario Picker */}
           <div className="flex-1 overflow-y-auto p-2">
             <div className="flex items-center justify-between mb-1.5 px-1">
-              <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+              <span className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                 <Layers size={9} /> Scenarios
               </span>
-              <span className="text-[8px] font-mono text-[var(--text-dim)]">{available?.length || 0}</span>
+              <span className="text-[14px] font-mono text-[var(--text-dim)]">{available?.length || 0}</span>
             </div>
             <div className="space-y-1">
               {available?.map((s: any) => {
@@ -332,16 +332,16 @@ function MissionControlTab() {
                         ? <Radio size={9} className="text-[var(--cyan)] animate-pulse shrink-0" />
                         : <Play size={9} className="text-[var(--text-dim)] shrink-0" />
                       }
-                      <span className="text-[10px] font-mono font-semibold truncate flex-1">{s.title || s.name}</span>
+                      <span className="text-[13px] font-mono font-semibold truncate flex-1">{s.title || s.name}</span>
                       <span
-                        className="text-[7px] font-bold px-1 py-px rounded shrink-0"
+                        className="text-[13px] font-bold px-1 py-px rounded shrink-0"
                         style={{ backgroundColor: sevColor, color: '#0a0b0e' }}
                       >
                         {s.severity?.toUpperCase()}
                       </span>
                     </div>
                     {s.description && (
-                      <span className="text-[8px] text-[var(--text-muted)] truncate pl-3.5">{s.description.slice(0, 80)}…</span>
+                      <span className="text-[14px] text-[var(--text-muted)] truncate pl-3.5">{s.description.slice(0, 80)}…</span>
                     )}
                   </button>
                 );
@@ -356,7 +356,7 @@ function MissionControlTab() {
         </div>
       </div>
 
-      {/* ── BOTTOM ROW: Runbook (left) + MCP Audit Log (right) ──── */}
+      {/* ── BOTTOM ROW: Runbook (left) + FIX Wire Log (right) ──── */}
       <div className="h-[38%] min-h-[180px] flex">
         {/* LEFT: Runbook Panel */}
         <div className="w-[30%] min-w-[220px] max-w-[340px] bg-[var(--bg-base)] border-r border-[var(--border-dim)] overflow-hidden flex flex-col">
@@ -366,35 +366,48 @@ function MissionControlTab() {
               <div className="px-3 py-2 border-b border-[var(--border-dim)] shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="status-dot active w-1.5 h-1.5" />
-                  <span className="text-[9px] font-bold text-[var(--cyan)] uppercase tracking-wider">
+                  <span className="text-[12px] font-bold text-[var(--cyan)] uppercase tracking-wider">
                     {scenario ? 'Active' : 'Preview'}
                   </span>
                   {allStepsComplete && runbook.successCriteria && runbook.successCriteria.length > 0 && (
-                    <span className="text-[9px] font-bold text-[var(--green)] uppercase tracking-wider flex items-center gap-0.5">
+                    <span className="text-[12px] font-bold text-[var(--green)] uppercase tracking-wider flex items-center gap-0.5">
                       ✓ RESOLVED
                     </span>
                   )}
                 </div>
-                <h3 className="text-[11px] font-bold mt-0.5">{runbook.title}</h3>
+                <h3 className="text-[14px] font-bold mt-0.5">{runbook.title}</h3>
                 {scenarioContext && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[8px] font-mono text-[var(--text-muted)]">
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="text-[11px] font-mono text-[var(--text-muted)]">
                       {scenarioContext.simulated_time}
                     </span>
-                    <span className="text-[8px] font-mono text-[var(--text-dim)]">
-                      {scenarioContext.estimated_minutes}m
+                    <span className="text-[11px] font-mono text-[var(--text-dim)]">
+                      {scenarioContext.estimated_minutes}m · {scenarioContext.estimated_minutes < 20 ? 'Quick' : scenarioContext.estimated_minutes < 30 ? 'Moderate' : 'Extended'}
                     </span>
-                    <span className="text-[8px] font-mono text-[var(--text-dim)]">
+                    <span className="text-[11px] font-mono text-[var(--text-dim)]">
                       {DIFFICULTY_LABELS[scenarioContext.difficulty] || ''} {scenarioContext.difficulty}
                     </span>
                     {scenarioContext.categories?.slice(0, 3).map((cat: string) => (
-                      <span key={cat} className="text-[7px] px-1 py-px rounded bg-[var(--bg-void)] text-[var(--text-dim)] font-mono">
+                      <span key={cat} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-void)] text-[var(--text-dim)] font-mono">
                         {cat}
                       </span>
                     ))}
                   </div>
                 )}
-                <p className="text-[9px] text-[var(--text-secondary)] mt-1 leading-relaxed">{runbook.narrative}</p>
+
+                {/* Key Problems — show immediately so operator knows what's wrong */}
+                {runbook.hints?.keyProblems && runbook.hints.keyProblems.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {runbook.hints.keyProblems.map((p, i) => (
+                      <div key={i} className="flex items-start gap-1.5 text-[12px] text-[var(--red)] leading-relaxed">
+                        <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                        <span>{p}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-[12px] text-[var(--text-secondary)] mt-2 leading-relaxed">{runbook.narrative}</p>
               </div>
 
               {/* Steps */}
@@ -411,18 +424,18 @@ function MissionControlTab() {
                       }`}
                     >
                       {/* Step # + Title */}
-                      <div className="text-[10px] font-bold text-[var(--text-primary)] mb-0.5">
+                      <div className="text-[13px] font-bold text-[var(--text-primary)] mb-0.5">
                         #{step.step} {step.title}
                       </div>
 
                       {/* Narrative */}
-                      <div className="text-[9px] text-[var(--text-secondary)] leading-relaxed mb-1.5">
+                      <div className="text-[12px] text-[var(--text-secondary)] leading-relaxed mb-1.5">
                         {step.narrative}
                       </div>
 
                       {/* CLI command */}
                       <div className="bg-[var(--bg-void)] rounded px-2 py-1 mb-1.5">
-                        <code className="text-[9px] font-mono text-[var(--green)]">
+                        <code className="text-[12px] font-mono text-[var(--green)]">
                           fix-cli&gt; {step.tool}{Object.keys(step.tool_args || {}).length ? ` ${JSON.stringify(step.tool_args)}` : ''}
                         </code>
                       </div>
@@ -433,14 +446,14 @@ function MissionControlTab() {
                           e.stopPropagation();
                           handleRunStep(step);
                         }}
-                        className="w-full btn-secondary !text-[9px] !py-0.5 !px-2 flex items-center justify-center gap-1"
+                        className="w-full btn-secondary !text-[12px] !py-0.5 !px-2 flex items-center justify-center gap-1"
                       >
                         <Activity size={9} /> Run {step.tool}
                       </button>
 
                       {/* Step result if available */}
                       {stepResults[step.step] && (
-                        <div className={`mt-1 text-[8px] font-mono leading-relaxed ${
+                        <div className={`mt-1 text-[14px] font-mono leading-relaxed ${
                           stepResults[step.step].startsWith('Error:')
                             ? 'text-[var(--red)]'
                             : 'text-[var(--green)]'
@@ -450,7 +463,7 @@ function MissionControlTab() {
                       )}
 
                       {/* Expected */}
-                      <p className="text-[8px] text-[var(--text-dim)] mt-1">
+                      <p className="text-[14px] text-[var(--text-dim)] mt-1">
                         Expected: {step.expected}
                       </p>
                     </div>
@@ -459,7 +472,7 @@ function MissionControlTab() {
                   {/* Success Criteria */}
                   {runbook.successCriteria && runbook.successCriteria.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-[var(--border-dim)]">
-                      <div className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <div className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
                         ✓ Success Criteria ({completedSteps}/{runbook.successCriteria.length} complete)
                       </div>
                       <div className="space-y-1">
@@ -467,7 +480,7 @@ function MissionControlTab() {
                           runbook.successCriteria.map((c, i) => {
                             const isComplete = i < completedSteps;
                             return (
-                              <div key={i} className={`text-[8px] font-mono flex items-start gap-1 ${
+                              <div key={i} className={`text-[14px] font-mono flex items-start gap-1 ${
                                 isComplete ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'
                               }`}>
                                 <span>{isComplete ? '✓' : '○'}</span>
@@ -487,7 +500,7 @@ function MissionControlTab() {
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => handleRunStep(runbook.steps[activeStep] || runbook.steps[0])}
-                    className="btn-secondary flex-1 flex items-center justify-center gap-1 text-[9px]"
+                    className="btn-secondary flex-1 flex items-center justify-center gap-1 text-[12px]"
                   >
                     <Wrench size={10} /> Run Step
                   </button>
@@ -496,7 +509,7 @@ function MissionControlTab() {
                       if (!isOpen) toggleOpen();
                       send(`I'm on step ${activeStep + 1} of the ${runbook.title} runbook: "${runbook.steps[activeStep]?.title}"`);
                     }}
-                    className="btn-primary flex-1 flex items-center justify-center gap-1 text-[9px]"
+                    className="btn-primary flex-1 flex items-center justify-center gap-1 text-[12px]"
                   >
                     <Terminal size={10} /> Copilot
                   </button>
@@ -506,14 +519,14 @@ function MissionControlTab() {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
               <BookOpen size={24} className="text-[var(--text-dim)] mb-2" />
-              <p className="text-[10px] text-[var(--text-muted)]">Select a scenario to see the runbook.</p>
+              <p className="text-[13px] text-[var(--text-muted)]">Select a scenario to see the runbook.</p>
             </div>
           )}
         </div>
 
-        {/* RIGHT: MCP Audit Log */}
+        {/* RIGHT: FIX Wire Log */}
         <div className="flex-1 min-w-0 overflow-hidden p-2">
-          <McpAuditLog />
+          <FixWireLog />
         </div>
       </div>
     </div>
@@ -529,7 +542,7 @@ function StatBox({ label, value, icon, color }: { label: string; value: number |
     <div className="bg-[var(--bg-surface)] p-3">
       <div className="flex items-center gap-1.5 mb-1">
         <span className={colorMap[color] || 'text-[var(--text-muted)]'}>{icon}</span>
-        <span className="text-[9px] font-mono text-[var(--text-muted)] uppercase">{label}</span>
+        <span className="text-[12px] font-mono text-[var(--text-muted)] uppercase">{label}</span>
       </div>
       <div className={`text-lg font-bold font-mono ${colorMap[color] || 'text-[var(--text-primary)]'}`}>{value}</div>
     </div>

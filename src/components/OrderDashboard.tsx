@@ -23,7 +23,7 @@ function StatusBadge({ status }: { status: string }) {
   const config = STATUS_COLORS[status.toLowerCase()] || { bg: 'bg-[var(--bg-elevated)]', text: 'text-[var(--text-muted)]' };
   const label = status.toUpperCase().replace(/_/g, ' ');
   return (
-    <span className={`${config.bg} ${config.text} text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${config.pulse ? 'animate-pulse' : ''}`}>
+    <span className={`${config.bg} ${config.text} text-[12px] font-mono font-bold px-1.5 py-0.5 rounded ${config.pulse ? 'animate-pulse' : ''}`}>
       {label}
     </span>
   );
@@ -116,7 +116,7 @@ export default function OrderDashboard() {
     <div className="h-full flex flex-col bg-[var(--bg-base)]">
       {/* Header */}
       <div className="px-3 py-2 border-b border-[var(--border-dim)] flex items-center justify-between shrink-0">
-        <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+        <span className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
           Order Dashboard — {filteredAndSorted.length} order(s)
         </span>
       </div>
@@ -125,19 +125,19 @@ export default function OrderDashboard() {
       <div className="px-3 py-1.5 border-b border-[var(--border-dim)] flex items-center gap-2 shrink-0 bg-[var(--bg-surface)]">
         <Filter size={10} className="text-[var(--text-dim)] shrink-0" />
         <input
-          className="input-base !text-[10px] !py-1 !px-2 !w-20 !font-mono"
+          className="input-base !text-[13px] !py-1 !px-2 !w-20 !font-mono"
           placeholder="Symbol…"
           value={filterSymbol}
           onChange={e => setFilterSymbol(e.target.value)}
         />
         <input
-          className="input-base !text-[10px] !py-1 !px-2 !w-24 !font-mono"
+          className="input-base !text-[13px] !py-1 !px-2 !w-24 !font-mono"
           placeholder="Status…"
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value)}
         />
         <input
-          className="input-base !text-[10px] !py-1 !px-2 !w-20 !font-mono"
+          className="input-base !text-[13px] !py-1 !px-2 !w-20 !font-mono"
           placeholder="Venue…"
           value={filterVenue}
           onChange={e => setFilterVenue(e.target.value)}
@@ -145,7 +145,7 @@ export default function OrderDashboard() {
         {(filterSymbol || filterStatus || filterVenue) && (
           <button
             onClick={() => { setFilterSymbol(''); setFilterStatus(''); setFilterVenue(''); }}
-            className="text-[9px] text-[var(--red)] hover:text-[var(--text-primary)] font-mono ml-auto"
+            className="text-[12px] text-[var(--red)] hover:text-[var(--text-primary)] font-mono ml-auto"
           >
             Clear
           </button>
@@ -158,7 +158,7 @@ export default function OrderDashboard() {
           <button
             key={col.key}
             onClick={() => handleSort(col.key)}
-            className={`flex items-center gap-0.5 group cursor-pointer ${col.width} text-${col.align} text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-secondary)] transition-colors`}
+            className={`flex items-center gap-0.5 group cursor-pointer ${col.width} text-${col.align} text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-secondary)] transition-colors`}
           >
             {col.label}
             <SortIcon colKey={col.key} />
@@ -169,7 +169,7 @@ export default function OrderDashboard() {
       {/* Orders */}
       <div className="flex-1 overflow-y-auto">
         {filteredAndSorted.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-[var(--text-dim)] text-[10px] font-mono">
+          <div className="flex items-center justify-center h-full text-[var(--text-dim)] text-[13px] font-mono">
             No orders
           </div>
         ) : (
@@ -178,30 +178,30 @@ export default function OrderDashboard() {
               key={o.order_id}
               className="flex items-center px-3 py-1.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-dim)]/30"
             >
-              <span className={`w-20 text-[10px] font-mono text-[var(--text-secondary)] truncate`}>
+              <span className={`w-20 text-[13px] font-mono text-[var(--text-secondary)] truncate`}>
                 {o.order_id.split('-').slice(-1)[0]}
               </span>
-              <span className={`w-14 text-[10px] font-mono font-semibold text-[var(--text-primary)]`}>
+              <span className={`w-14 text-[13px] font-mono font-semibold text-[var(--text-primary)]`}>
                 {o.symbol}
               </span>
-              <span className={`w-12 text-center text-[10px] font-mono ${
+              <span className={`w-12 text-center text-[13px] font-mono ${
                 o.side === 'buy' ? 'text-[var(--green)]' : 'text-[var(--red)]'
               }`}>
                 {o.side.slice(0, 1).toUpperCase()}
               </span>
-              <span className={`w-16 text-[10px] font-mono text-[var(--text-primary)] text-right`}>
+              <span className={`w-16 text-[13px] font-mono text-[var(--text-primary)] text-right`}>
                 {o.quantity.toLocaleString()}
               </span>
-              <span className={`w-20 text-[10px] font-mono text-[var(--text-secondary)] text-right`}>
+              <span className={`w-20 text-[13px] font-mono text-[var(--text-secondary)] text-right`}>
                 {o.price != null ? `$${o.price.toFixed(2)}` : 'MKT'}
               </span>
               <span className={`w-20 text-center`}>
                 <StatusBadge status={o.status} />
               </span>
-              <span className={`w-14 text-[10px] font-mono text-[var(--text-muted)] text-center`}>
+              <span className={`w-14 text-[13px] font-mono text-[var(--text-muted)] text-center`}>
                 {o.venue}
               </span>
-              <span className={`w-20 text-[10px] font-mono text-[var(--text-dim)]`}>
+              <span className={`w-20 text-[13px] font-mono text-[var(--text-dim)]`}>
                 {timeCell(o as any)}
               </span>
             </div>

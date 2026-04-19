@@ -85,18 +85,18 @@ export function ChatPanel() {
             <Terminal size={12} className="text-white" />
           </div>
           <div>
-            <span className="text-[11px] font-bold text-[var(--text-primary)]">SRE Copilot</span>
+            <span className="text-[14px] font-bold text-[var(--text-primary)]">SRE Copilot</span>
             {scenario && (
               <div className="flex items-center gap-1">
                 <Radio size={8} className="text-[var(--cyan)] animate-pulse" />
-                <span className="text-[8px] font-mono text-[var(--cyan)]">{scenario}</span>
+                <span className="text-[14px] font-mono text-[var(--cyan)]">{scenario}</span>
               </div>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1">
           {mode === 'agent' && (
-            <span className="text-[8px] bg-[var(--purple-dim)] text-[var(--purple)] px-2 py-0.5 rounded-full font-bold font-mono">
+            <span className="text-[14px] bg-[var(--purple-dim)] text-[var(--purple)] px-2 py-0.5 rounded-full font-bold font-mono">
               AGENT
             </span>
           )}
@@ -122,8 +122,8 @@ export function ChatPanel() {
         {messages.length === 0 && (
           <div className="text-center py-8">
             <Terminal size={24} className="text-[var(--text-dim)] mx-auto mb-3" />
-            <p className="text-[11px] text-[var(--text-muted)] mb-1">SRE Copilot Ready</p>
-            <p className="text-[9px] text-[var(--text-dim)]">
+            <p className="text-[14px] text-[var(--text-muted)] mb-1">SRE Copilot Ready</p>
+            <p className="text-[12px] text-[var(--text-dim)]">
               {scenarioContext
                 ? `Scenario: ${scenarioContext.title}. ${scenarioContext.runbook?.steps?.length || 0} runbook steps. Ask me to diagnose or fix issues.`
                 : scenario
@@ -137,18 +137,18 @@ export function ChatPanel() {
           <div key={msg.id} className={`animate-fade-in ${msg.role === 'user' ? 'ml-6' : 'mr-2'}`}>
             {msg.role === 'user' && (
               <div className="bg-[var(--bg-elevated)] rounded-xl px-3 py-2 border border-[var(--border-dim)]">
-                <p className="text-[11px] text-[var(--text-primary)] whitespace-pre-wrap">{msg.content}</p>
+                <p className="text-[14px] text-[var(--text-primary)] whitespace-pre-wrap">{msg.content}</p>
               </div>
             )}
 
             {msg.role === 'assistant' && (
               <div className="bg-[var(--bg-surface)] rounded-xl px-3 py-2 border border-[var(--border-dim)]">
-                <p className="text-[11px] text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                <p className="text-[14px] text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{msg.content}</p>
 
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
                   <div className="mt-2 space-y-1 border-t border-[var(--border-dim)] pt-2">
                     {msg.toolCalls.map((tc, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[9px] font-mono">
+                      <div key={i} className="flex items-center gap-1.5 text-[12px] font-mono">
                         {tc.status === 'proposed' && <AlertTriangle size={9} className="text-[var(--amber)]" />}
                         {tc.status === 'executing' && <Loader2 size={9} className="text-[var(--blue)] animate-spin" />}
                         {tc.status === 'success' && <CheckCircle size={9} className="text-[var(--green)]" />}
@@ -168,7 +168,7 @@ export function ChatPanel() {
         ))}
 
         {isTyping && (
-          <div className="flex items-center gap-2 text-[var(--text-dim)] text-[10px]">
+          <div className="flex items-center gap-2 text-[var(--text-dim)] text-[13px]">
             <Loader2 size={12} className="animate-spin text-[var(--purple)]" />
             Analyzing...
           </div>
@@ -183,7 +183,7 @@ export function ChatPanel() {
             <button
               key={i}
               onClick={() => { send(qp.prompt); }}
-              className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[9px] text-[var(--text-muted)] hover:border-[var(--cyan)]/30 hover:text-[var(--text-secondary)] transition-colors"
+              className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[12px] text-[var(--text-muted)] hover:border-[var(--cyan)]/30 hover:text-[var(--text-secondary)] transition-colors"
             >
               <span>{qp.icon}</span>
               {qp.label}
@@ -196,7 +196,7 @@ export function ChatPanel() {
       <div className="p-3 border-t border-[var(--border-dim)] bg-[var(--bg-surface)] shrink-0">
         <div className="flex gap-2">
           <input
-            className="input-base flex-1 !text-[11px] !py-2"
+            className="input-base flex-1 !text-[14px] !py-2"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
@@ -221,12 +221,12 @@ export function ChatPanel() {
               <Shield size={16} className="text-[var(--green)]" />
               <h3 className="text-sm font-bold">OpenRouter API Key</h3>
             </div>
-            <p className="text-[10px] text-[var(--text-muted)] mb-3">
+            <p className="text-[13px] text-[var(--text-muted)] mb-3">
               Your key stays in this browser session — never sent anywhere except OpenRouter's API.
             </p>
             <input
               type="password"
-              className="input-base font-mono !text-[11px] mb-3"
+              className="input-base font-mono !text-[14px] mb-3"
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
               placeholder="sk-or-v1-..."

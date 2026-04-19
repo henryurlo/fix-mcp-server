@@ -18,7 +18,7 @@ export default function HeartbeatPanel({ onVenueClick }: HeartbeatPanelProps) {
 
   if (sessions.length === 0) {
     return (
-      <div className="p-3 flex items-center justify-center text-[var(--text-dim)] text-[10px] font-mono">
+      <div className="p-3 flex items-center justify-center text-[var(--text-dim)] text-[13px] font-mono">
         No venue sessions
       </div>
     );
@@ -31,7 +31,7 @@ export default function HeartbeatPanel({ onVenueClick }: HeartbeatPanelProps) {
   return (
     <div className="p-2">
       <div className="flex items-center justify-between mb-1.5 px-1">
-        <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+        <span className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
           <Radio size={9} /> FIX Sessions
         </span>
       </div>
@@ -46,10 +46,10 @@ export default function HeartbeatPanel({ onVenueClick }: HeartbeatPanelProps) {
             <span className={`status-dot w-[6px] h-[6px] ${
               s.status === 'active' ? 'healthy' : s.status === 'degraded' ? 'degraded' : 'down'
             }`} />
-            <span className="text-[10px] font-mono font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
+            <span className="text-[13px] font-mono font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
               {s.venue}
             </span>
-            <span className="text-[9px] font-mono ml-auto">
+            <span className="text-[12px] font-mono ml-auto">
               {s.latency_ms != null ? (
                 <span className={
                   s.latency_ms > 100 ? 'text-[var(--red)]' :
@@ -66,7 +66,7 @@ export default function HeartbeatPanel({ onVenueClick }: HeartbeatPanelProps) {
         {hasMore && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-full flex items-center justify-center py-1 text-[9px] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
+            className="w-full flex items-center justify-center py-1 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
           >
             {expanded ? (
               <><ChevronUp size={10} /> Show less</>

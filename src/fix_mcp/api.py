@@ -404,6 +404,61 @@ class APIHandler(BaseHTTPRequestHandler):
                 self._send_json(list(_events))
             return
 
+        if self.path == "/api/fix-wire":
+            # Aggregate FIX wire messages from all orders + session-level events
+            wire_events = []
+            
+            # FIX messages from orders
+            for o in server.oms.orders.values():
+                for i, msg in enumerate(o.fix_messages):
+                    # Parse key fields from the raw FIX message
+                    parts = {}
+                    for seg in msg.split('|'):
+                        if '=' in seg:
+                            k, v = seg.split('=', 1)
+                            parts[k] = v
+                    msg_type = parts.get('35', '?')
+                    msg_type_name = {
+                        'A': 'Logon', '0': 'Heartbeat', 'D': 'NewOrderSingle',
+                        '8': 'ExecutionReport', 'F': 'OrderCancel', 'G': 'CancelReplace',
+                        '2': 'ResendRequest', '5': 'Logout', '4': 'SeqReset',
+                        '1': 'TestRequest', '3': 'Reject', '9': 'OrderCancelAck',
+                    }.get(msg_type, f'Unknown({msg_type})')
+                    symbol = parts.get('55', '')
+                    side = parts.get('54', '')
+                    qty = parts.get('38', '')
+                    venue = o.venue if hasattr(o, 'venue') else ''
+                    wire_events.append({
+                        'ts': parts.get('52', ''),
+                        'type': msg_type_name,
+                        'msg_type': msg_type,
+                        'venue': venue,
+                        'symbol': symbol,
+                        'side': 'Buy' if side == '1' else 'Sell' if side == '2' else '',
+                        'qty': qty,
+                        'cl_ord_id': parts.get('11', ''),
+                        'raw': msg,
+                    })
+            
+            # Session-level heartbeat events
+            for s in server.session_manager.get_all_sessions():
+                wire_events.append({
+                    'ts': s.last_heartbeat or '',
+                    'type': 'SessionState',
+                    'msg_type': 'HB',
+                    'venue': s.venue,
+                    'symbol': '',
+                    'side': '',
+                    'qty': '',
+                    'cl_ord_id': '',
+                    'raw': f'{s.venue} status={s.status} latency={s.latency_ms}ms seq={s.last_sent_seq}/{s.last_recv_seq}',
+                })
+            
+            # Sort by timestamp descending, keep most recent
+            wire_events.sort(key=lambda e: e['ts'], reverse=True)
+            self._send_json(wire_events[:200])
+            return
+
         if self.path == "/api/mcp/schema":
             tools = asyncio.run(server.list_tools())
             resources = asyncio.run(server.list_resources())
