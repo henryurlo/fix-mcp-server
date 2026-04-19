@@ -1,7 +1,7 @@
 {
   "name": "venue_degradation_1030",
-  "description": "10:32 AM NYSE latency crisis: RTT spiked to 180ms at 10:17 ET (SLA threshold 10ms) — NOC engaged, root cause identified as route flap on core Mahwah switch; 12 orders in NYSE queue unacknowledged for 8-15 minutes ($4.1M notional) — 3 institutional with SLA timers running; SOR auto-diverted 10 orders to BATS (healthy); 2 orders carry client mandate for NYSE primary-listing execution (listing_venue_required) and cannot be rerouted; ARCA and IEX healthy.",
-  "simulated_time": "2026-03-28T10:32:00",
+  "description": "10:32 AM NYSE latency crisis: RTT spiked to 180ms at 10:17 ET (SLA threshold 10ms) \u2014 NOC engaged, root cause identified as route flap on core Mahwah switch; 12 orders in NYSE queue unacknowledged for 8-15 minutes ($4.1M notional) \u2014 3 institutional with SLA timers running; SOR auto-diverted 10 orders to BATS (healthy); 2 orders carry client mandate for NYSE primary-listing execution (listing_venue_required) and cannot be rerouted; ARCA and IEX healthy.",
+  "simulated_time": "10:32 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -17,7 +17,7 @@
       "latency_ms": 180,
       "host": "nyse-gateway.prod.internal",
       "port": 4001,
-      "error": "Route flap on Mahwah core switch — NOC ticket #44827; latency 180ms vs 10ms SLA; seq acks delayed; estimated recovery 15-25 min",
+      "error": "Route flap on Mahwah core switch \u2014 NOC ticket #44827; latency 180ms vs 10ms SLA; seq acks delayed; estimated recovery 15-25 min",
       "connected_since": "2026-03-28T04:00:01"
     },
     {
@@ -81,14 +81,17 @@
       "side": "buy",
       "quantity": 2000,
       "order_type": "limit",
-      "price": 211.50,
+      "price": 211.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:17:00",
@@ -102,14 +105,17 @@
       "side": "sell",
       "quantity": 1500,
       "order_type": "limit",
-      "price": 420.50,
+      "price": 420.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:17:30",
@@ -130,7 +136,10 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:18:00",
@@ -144,14 +153,17 @@
       "side": "sell",
       "quantity": 800,
       "order_type": "limit",
-      "price": 175.50,
+      "price": 175.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:18:30",
@@ -165,14 +177,17 @@
       "side": "buy",
       "quantity": 1200,
       "order_type": "limit",
-      "price": 184.50,
+      "price": 184.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:19:00",
@@ -186,14 +201,17 @@
       "side": "sell",
       "quantity": 600,
       "order_type": "limit",
-      "price": 173.00,
+      "price": 173.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:19:30",
@@ -207,14 +225,17 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 579.00,
+      "price": 579.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:20:00",
@@ -228,14 +249,17 @@
       "side": "sell",
       "quantity": 3000,
       "order_type": "limit",
-      "price": 42.50,
+      "price": 42.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:20:30",
@@ -256,7 +280,10 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:21:00",
@@ -270,14 +297,17 @@
       "side": "buy",
       "quantity": 5000,
       "order_type": "limit",
-      "price": 38.50,
+      "price": 38.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:22:00",
@@ -291,14 +321,17 @@
       "side": "sell",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 107.50,
+      "price": 107.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:23:00",
@@ -312,14 +345,17 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 491.00,
+      "price": 491.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:25:00",
@@ -333,14 +369,18 @@
       "side": "buy",
       "quantity": 3000,
       "order_type": "limit",
-      "price": 286.00,
+      "price": 286.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog", "listing_venue_required"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog",
+        "listing_venue_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:17:45",
@@ -354,14 +394,18 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 160.00,
+      "price": 160.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["venue_degraded", "seq_backlog", "listing_venue_required"],
+      "flags": [
+        "venue_degraded",
+        "seq_backlog",
+        "listing_venue_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:18:15",
@@ -375,7 +419,7 @@
       "side": "sell",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Aspen Asset Management",
@@ -396,7 +440,7 @@
       "side": "buy",
       "quantity": 300,
       "order_type": "limit",
-      "price": 877.00,
+      "price": 877.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Sycamore Group",
@@ -417,7 +461,7 @@
       "side": "buy",
       "quantity": 600,
       "order_type": "limit",
-      "price": 419.50,
+      "price": 419.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
@@ -459,7 +503,7 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 183.50,
+      "price": 183.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Willow Investments",
@@ -480,7 +524,7 @@
       "side": "sell",
       "quantity": 500,
       "order_type": "limit",
-      "price": 175.00,
+      "price": 175.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Cedar Trading",
@@ -501,7 +545,7 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 172.00,
+      "price": 172.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Firm Prop Desk",
@@ -535,5 +579,103 @@
       "created_at": "2026-03-28T10:21:00",
       "updated_at": "2026-03-28T10:21:30"
     }
+  ],
+  "title": "Venue Degradation \u2014 NYSE Latency Crisis",
+  "severity": "critical",
+  "estimated_minutes": 30,
+  "categories": [
+    "session",
+    "orders"
+  ],
+  "difficulty": "intermediate",
+  "runbook": {
+    "narrative": "It's 10:32 AM. NYSE latency jumped from 3ms to 180ms due to a Mahwah co-location route flap. NoC ticket #44827 is open. 14 orders are stuck in the NYSE queue unacknowledged for 8-15 minutes, 3 are institutional with SLA clocks running. The smart order router diverted 10 orders to BATS, but 2 carry listing-venue-required mandates and CANNOT be rerouted. ARCA and IEX are healthy.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Confirm NYSE Degradation",
+        "narrative": "Heartbeat NYSE to confirm the latency spike. You should see RTT around 180ms vs normal 2-4ms.",
+        "tool": "session_heartbeat",
+        "tool_args": {
+          "venue": "NYSE"
+        },
+        "expected": "NYSE confirms 180ms latency, status degraded"
+      },
+      {
+        "step": 2,
+        "title": "Full Session Diagnostic",
+        "narrative": "Dump NYSE session state \u2014 check sequence numbers, error counts, and message backlog.",
+        "tool": "dump_session_state",
+        "tool_args": {
+          "venue": "NYSE"
+        },
+        "expected": "Sequence gap detected, elevated error count, seq_backlog present"
+      },
+      {
+        "step": 3,
+        "title": "Assess Stuck Orders",
+        "narrative": "Show NYSE orders. The institutional ones with listing_venue_required need special handling \u2014 they cannot be rerouted.",
+        "tool": "query_orders",
+        "tool_args": {
+          "venue": "NYSE"
+        },
+        "expected": "14 stuck orders, 2 with listing_venue_required mandate"
+      },
+      {
+        "step": 4,
+        "title": "Attempt Session Fix",
+        "narrative": "Try reconnecting the NYSE session. If NoC resolved the route flap, a fresh logon may restore normal latency.",
+        "tool": "fix_session_issue",
+        "tool_args": {
+          "venue": "NYSE",
+          "action": "reconnect"
+        },
+        "expected": "NYSE latency drops below 10ms, status returns to active"
+      },
+      {
+        "step": 5,
+        "title": "Release Stuck Orders",
+        "narrative": "After reconnection, release the stuck orders. Watch for listing_venue_required orders \u2014 they must stay on NYSE.",
+        "tool": "release_stuck_orders",
+        "tool_args": {},
+        "expected": "All stuck orders released, SLA timers cleared"
+      },
+      {
+        "step": 6,
+        "title": "Verify Full Recovery",
+        "narrative": "Confirm NYSE is back to normal latency and orders are flowing. Heartbeat should show <10ms.",
+        "tool": "session_heartbeat",
+        "tool_args": {
+          "venue": "NYSE"
+        },
+        "expected": "NYSE latency <10ms, status active, no sequence gaps"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "NYSE RTT spiked to 180ms from 3ms \u2014 Mahwah switch route flap, NoC ticket #44827",
+      "14 orders stuck in NYSE queue, $4.1M notional, 3 institutional with SLA timers",
+      "2 orders carry listing_venue_required mandate \u2014 cannot reroute to BATS or any other venue"
+    ],
+    "flag_meanings": {
+      "venue_degraded": "Session is alive but performance is severely reduced. Orders may be delayed or unacknowledged.",
+      "seq_backlog": "Message sequence numbers have backed up \u2014 there is a gap between what was sent and what was received.",
+      "listing_venue_required": "Client mandate requires execution on the primary listing venue. Do NOT reroute these orders."
+    },
+    "diagnosis_path": "Confirm NYSE latency first with a heartbeat. Then dump session state to check sequence gaps. Assess which orders are stuck and identify the listing_venue_required ones.",
+    "common_mistakes": [
+      "Rerouting listing_venue_required orders to BATS \u2014 violates client mandate and could cause compliance issues.",
+      "Waiting too long before attempting reconnection \u2014 SLA breaches are time-sensitive.",
+      "Not checking for sequence gaps after reconnection \u2014 gaps mean message loss risk."
+    ]
+  },
+  "success_criteria": [
+    "NYSE latency is below 10ms",
+    "NYSE session status is active (not degraded)",
+    "No orders have venue_down or venue_degraded flag",
+    "No orders are stuck",
+    "All SLA timers cleared for institutional orders",
+    "No sequence gaps in NYSE session"
   ]
 }

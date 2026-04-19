@@ -237,79 +237,14 @@ Institutional SLA defaults:
 Factor time-to-open into urgency. A 20-minute fix is CRITICAL at 06:15 ET and an
 immediate blocker at 09:10 ET.`;
 
-// Scenario-specific context — injected as an additional system message when a
-// scenario is active. Mirrors SCENARIO_PROMPTS in trading_ops.py.
+// Scenario overlays are now served dynamically from the scenario JSON files
+// via GET /api/scenario/{name} and injected as context in useChat.send().
+// The SCENARIO_OVERLAYS constant below is DEPRECATED -- kept only for fallback
+// when the backend cannot serve dynamic context (e.g., offline dev).
 export const SCENARIO_OVERLAYS: Record<string, string> = {
-  morning_triage:
-    '06:15 ET — Pre-market triage. ARCA session DOWN (reconnect required). ' +
-    'BATS sequence gap on overnight failover. Ticker: RDSA→SHEL rename pending. ' +
-    'Priority: restore sessions before 06:30 ET DMA flow; reconcile symbols before 07:00 ET.',
-  bats_startup_0200:
-    '02:05 ET — Overnight BATS startup. SequenceReset rejected: NewSeqNo=1 but peer expects 2,450. ' +
-    '8 GTC overnight orders stuck (venue_down). 2 crypto ETF orders (BITO, GBTC) pending symbol load. ' +
-    'Priority: resolve seq reset before institutional DMA sessions begin at 04:00 ET.',
-  predawn_adrs_0430:
-    '04:35 ET — Pre-dawn ADR/ticker window. Shell rebrand: RDSA→SHEL effective today (4 stale orders). ' +
-    'ARCA latency 220ms (network route flap — 5 orders degraded). ' +
-    '3 FX-linked stop orders on BP/HSBC/BCS with stale FX rates. ' +
-    'Priority: ticker update before ARCA pre-market opens; resolve FX stop pricing.',
-  preopen_auction_0900:
-    '09:02 ET — Pre-open auction window. 6 MOO orders for NVDA routing into ' +
-    '2.1M-share sell imbalance ($18.2M notional). IEX imbalance feed stale since 08:45 (11 min). ' +
-    '4 GTC orders should be DAY for auction participation. ' +
-    'Priority: validate MOO imbalance exposure; fix TIF before 09:28 ET auction lock.',
-  open_volatility_0930:
-    '09:35 ET — Opening volatility. GME LULD Level-1 halt at 09:31:44 (4 orders blocked). ' +
-    'BATS 450ms packet loss (5 orders venue_degraded). ' +
-    '3 NYSE rejections for orders outside LULD price band. Duplicate ClOrdID: CLO-413/CLO-413-DUP. ' +
-    'Priority: identify halted orders, reroute BATS flow, clear duplicate before resend.',
-  venue_degradation_1030:
-    '10:32 ET — NYSE degraded: 180ms latency (Mahwah route flap, NOC ticket #44827). ' +
-    '12 orders stuck with venue_degraded+seq_backlog ($4.1M notional). ' +
-    '2 listing-venue-required orders (CRM, ICE) cannot reroute off NYSE. ' +
-    '6 orders already SOR-diverted to BATS. ' +
-    'Priority: seq backlog recovery on NYSE; protect listing-venue orders.',
-  ssr_and_split_1130:
-    '11:34 ET — SSR and corporate action window. RIDE SSR since 10:45 ' +
-    '(5 short-sale orders rejected; 1 prop desk needs locate). ' +
-    'AAPL 4:1 split effective 12:00 ET in 26 minutes — 8 orders need qty×4 / price÷4 adjustment. ' +
-    'Priority: apply AAPL split adjustments before 12:00 ET; resolve RIDE SSR compliance.',
-  iex_recovery_1400:
-    '14:03 ET — IEX session recovered at 14:00:12 after 1-hour outage. ' +
-    'Seq gap 8938–8940 resolved via ResendRequest. ' +
-    '6 orders rerouted to BATS during outage (iex_rerouted — can return to IEX). ' +
-    '4 partial fills on NYSE mid-flight (do not move). ' +
-    '4 D-Limit orders require IEX — must reroute back now that session is healthy. ' +
-    'Priority: restore D-Limit orders to IEX; leave partial fills in place.',
-  eod_moc_1530:
-    '15:31 ET — End-of-day MOC window. ARCA MOC cutoff missed at 15:28 (2 orders). ' +
-    'NYSE MOC cutoff in 14 minutes — 6 orders pending ($18.9M). ' +
-    'Maple 500K AAPL MOC ($106M) flagged large_moc_regulatory_review. ' +
-    '6 DAY orders auto-canceling at 16:00. 5 Birch Funds GTC orders must be preserved. ' +
-    'Priority: NYSE MOC before 15:45 cutoff; escalate Maple large MOC; protect GTC orders.',
-  afterhours_dark_1630:
-    '16:32 ET — After-hours. NYSE/ARCA logged out (market closed 16:00 ET). ' +
-    'BATS extended-hours session active (16:00–20:00 ET). ' +
-    'IEX dark pool sub-component offline: Liquidnet FIX rejected SessionStatus=8. ' +
-    '200K NVDA block ($175M, Birch Funds) stuck dark_pool_unavailable. ' +
-    '4 additional dark pool orders blocked. 5 DAY orders not cleaned up (OMS job failed). ' +
-    'Priority: triage block trade alternatives; cancel uncleaned DAY orders; confirm extended-hours orders healthy.',
-  twap_slippage_1000:
-    '10:05 ET — TWAP slippage. NVDA 500K TWAP (Maple Capital, $437.5M) 5.2 ppts behind schedule: ' +
-    '24% executed vs 29.2% time elapsed. BATS degraded 85ms — 2 slices rejected since 09:52. ' +
-    'AAPL 50K TWAP (Rowan Partners) running, slightly behind. ' +
-    'Priority: reroute NVDA slices to NYSE/IEX; assess BATS degradation.',
-  vwap_vol_spike_1130:
-    '11:35 ET — VWAP crisis. GME LULD Level-1 halt at 11:31:44 — ALGO-012 (Sycamore Group) halted, ' +
-    '3 child slices unconfirmed (no exec reports). TSLA volume spike 8x normal — ALGO-011 (Maple Capital) ' +
-    'over-participating at 15% vs 10% POV target. ' +
-    'Priority: pause TSLA algo to stop over-participation; resolve GME unconfirmed fills.',
-  is_dark_failure_1415:
-    '14:15 ET — IS shortfall + dark failure. MSFT IS 100K (Willow Investments) shortfall 66.8bps vs 30bps limit ' +
-    '(spread widened 3bps→22bps post-Fed minutes). NVDA dark aggregator 150K (Birch Funds): Liquidnet offline, ' +
-    'IEX dark degraded — routing lit (VWAP benchmark leaking). ' +
-    'Priority: IS pause decision; client approval for NVDA full lit execution.',
+  // Fallbacks -- the authoritative data lives in config/scenarios/*.json
 };
+
 
 // The actual MCP tool surface — must match src/fix_mcp/server.py.
 export const KNOWN_TOOLS = [

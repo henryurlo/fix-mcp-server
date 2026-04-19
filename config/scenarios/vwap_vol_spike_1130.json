@@ -1,7 +1,7 @@
 {
   "name": "vwap_vol_spike_1130",
-  "description": "11:35 AM VWAP over-participation crisis: GME LULD Level-1 halt at 11:31:44 has frozen ALGO-012 (Sycamore Group, 50K GME VWAP) mid-execution with 3 unconfirmed child fills; TSLA volume spike 8x normal caused ALGO-011 (Maple Capital, 200K VWAP) to over-participate at 15% vs 10% POV target — operator must pause TSLA algo to avoid adverse selection and resolve GME unconfirmed fills before LULD band reopens.",
-  "simulated_time": "2026-03-28T11:35:00",
+  "description": "11:35 AM VWAP over-participation crisis: GME LULD Level-1 halt at 11:31:44 has frozen ALGO-012 (Sycamore Group, 50K GME VWAP) mid-execution with 3 unconfirmed child fills; TSLA volume spike 8x normal caused ALGO-011 (Maple Capital, 200K VWAP) to over-participate at 15% vs 10% POV target \u2014 operator must pause TSLA algo to avoid adverse selection and resolve GME unconfirmed fills before LULD band reopens.",
+  "simulated_time": "11:35 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -68,7 +68,7 @@
       "latency_ms": 45,
       "host": "iex-gateway.prod.internal",
       "port": 4004,
-      "error": "Elevated latency 45ms — IEX processing GME LULD halt notifications; GME order acceptance suspended",
+      "error": "Elevated latency 45ms \u2014 IEX processing GME LULD halt notifications; GME order acceptance suspended",
       "connected_since": "2026-03-28T04:00:07"
     }
   ],
@@ -83,17 +83,19 @@
       "algo_type": "VWAP",
       "start_time": "2026-03-28T09:30:00",
       "end_time": "2026-03-28T15:30:00",
-      "pov_rate": 0.10,
+      "pov_rate": 0.1,
       "total_slices": 24,
       "completed_slices": 8,
       "executed_qty": 66000,
-      "avg_px": 171.80,
-      "arrival_px": 170.50,
-      "benchmark_px": 171.20,
+      "avg_px": 171.8,
+      "arrival_px": 170.5,
+      "benchmark_px": 171.2,
       "schedule_pct": 33.3,
       "execution_pct": 33.0,
       "status": "running",
-      "flags": ["over_participation"],
+      "flags": [
+        "over_participation"
+      ],
       "child_order_ids": [
         "ORD-20260328-1101",
         "ORD-20260328-1102"
@@ -101,7 +103,7 @@
       "venue": "BATS",
       "is_institutional": true,
       "sla_minutes": 15,
-      "notes": "GME halt caused TSLA volume spike 8x normal. VWAP pacing mis-timed — actual participation 15% vs 10% target for last 4 slices. Pause recommended to avoid adverse selection."
+      "notes": "GME halt caused TSLA volume spike 8x normal. VWAP pacing mis-timed \u2014 actual participation 15% vs 10% target for last 4 slices. Pause recommended to avoid adverse selection."
     },
     {
       "algo_id": "ALGO-20260328-012",
@@ -113,17 +115,20 @@
       "algo_type": "VWAP",
       "start_time": "2026-03-28T09:30:00",
       "end_time": "2026-03-28T12:00:00",
-      "pov_rate": 0.10,
+      "pov_rate": 0.1,
       "total_slices": 10,
       "completed_slices": 5,
       "executed_qty": 25000,
-      "avg_px": 26.80,
-      "arrival_px": 25.40,
-      "benchmark_px": 26.10,
+      "avg_px": 26.8,
+      "arrival_px": 25.4,
+      "benchmark_px": 26.1,
       "schedule_pct": 82.2,
       "execution_pct": 50.0,
       "status": "halted",
-      "flags": ["halt_mid_algo", "unconfirmed_fills"],
+      "flags": [
+        "halt_mid_algo",
+        "unconfirmed_fills"
+      ],
       "child_order_ids": [
         "ORD-20260328-1103",
         "ORD-20260328-1104",
@@ -134,7 +139,7 @@
       "venue": "NYSE",
       "is_institutional": true,
       "sla_minutes": 25,
-      "notes": "LULD Level-1 halt triggered at 11:31:44 ET. 3 child slices (1103, 1105, 1107) sent just before halt — no execution reports received. Verify fill status before resuming when band reopens."
+      "notes": "LULD Level-1 halt triggered at 11:31:44 ET. 3 child slices (1103, 1105, 1107) sent just before halt \u2014 no execution reports received. Verify fill status before resuming when band reopens."
     }
   ],
   "orders": [
@@ -146,14 +151,16 @@
       "side": "buy",
       "quantity": 8000,
       "order_type": "limit",
-      "price": 171.50,
+      "price": 171.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 8000,
       "fix_messages": [],
       "created_at": "2026-03-28T11:25:00",
@@ -167,14 +174,17 @@
       "side": "buy",
       "quantity": 8000,
       "order_type": "limit",
-      "price": 172.00,
+      "price": 172.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["algo_child", "over_participation"],
+      "flags": [
+        "algo_child",
+        "over_participation"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T11:33:00",
@@ -195,7 +205,9 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 5000,
       "fix_messages": [],
       "created_at": "2026-03-28T10:00:00",
@@ -209,14 +221,16 @@
       "side": "buy",
       "quantity": 5000,
       "order_type": "limit",
-      "price": 26.80,
+      "price": 26.8,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 5000,
       "fix_messages": [],
       "created_at": "2026-03-28T10:45:00",
@@ -237,7 +251,11 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["algo_child", "unconfirmed_fills", "luld_halt"],
+      "flags": [
+        "algo_child",
+        "unconfirmed_fills",
+        "luld_halt"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T11:28:00",
@@ -258,7 +276,11 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["algo_child", "unconfirmed_fills", "luld_halt"],
+      "flags": [
+        "algo_child",
+        "unconfirmed_fills",
+        "luld_halt"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T11:30:00",
@@ -272,14 +294,18 @@
       "side": "buy",
       "quantity": 5000,
       "order_type": "limit",
-      "price": 26.90,
+      "price": 26.9,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["algo_child", "unconfirmed_fills", "luld_halt"],
+      "flags": [
+        "algo_child",
+        "unconfirmed_fills",
+        "luld_halt"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T11:31:30",
@@ -293,7 +319,7 @@
       "side": "buy",
       "quantity": 100,
       "order_type": "limit",
-      "price": 875.00,
+      "price": 875.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Firm Prop Desk",
@@ -306,5 +332,97 @@
       "created_at": "2026-03-28T11:30:00",
       "updated_at": "2026-03-28T11:30:00"
     }
+  ],
+  "title": "VWAP Over-Participation Crisis",
+  "severity": "critical",
+  "estimated_minutes": 25,
+  "categories": [
+    "algo",
+    "orders",
+    "regulatory"
+  ],
+  "difficulty": "advanced",
+  "runbook": {
+    "narrative": "It's 11:35 AM. Two algo crises: GME is under LULD Level-1 halt since 11:31:44 ET, freezing the 50K GME VWAP (ALGO-012, Sycamore Group) mid-execution with 3 unconfirmed child fills. Separately, a TSLA volume spike 8\u00d7 normal has caused ALGO-011 (200K TSLA VWAP, Maple Capital) to over-participate at 15% vs the 10% POV target \u2014 the operator must pause the TSLA algo to avoid adverse selection and resolve GME unconfirmed fills before the LULD band reopens.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check GME LULD Status",
+        "narrative": "Verify GME is halted and confirm the VWAP algo is frozen.",
+        "tool": "check_algo_status",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-012"
+        },
+        "expected": "GME VWAP halted, 3 unconfirmed child fills"
+      },
+      {
+        "step": 2,
+        "title": "Pause TSLA VWAP",
+        "narrative": "TSLA VWAP is over-participating at 15% vs 10% target. Pause it immediately to stop adverse selection.",
+        "tool": "modify_algo",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-011",
+          "action": "pause"
+        },
+        "expected": "TSLA VWAP paused, participation rate drops to 0%"
+      },
+      {
+        "step": 3,
+        "title": "Reduce TSLA POV Rate",
+        "narrative": "Modify the TSLA VWAP POV rate from 0.15 to 0.08 before resuming.",
+        "tool": "modify_algo",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-011",
+          "action": "update_pov_rate",
+          "pov_rate": 0.08
+        },
+        "expected": "TSLA VWAP POV rate reduced to 8%"
+      },
+      {
+        "step": 4,
+        "title": "Resume TSLA VWAP",
+        "narrative": "Resume TSLA VWAP at the corrected POV rate.",
+        "tool": "modify_algo",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-011",
+          "action": "resume"
+        },
+        "expected": "TSLA VWAP resumed at 8% POV"
+      },
+      {
+        "step": 5,
+        "title": "Resolve GME Unconfirmed Fills",
+        "narrative": "Check the 3 unconfirmed child fills on GME VWAP. Reconcile before LULD band reopens.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "GME"
+        },
+        "expected": "3 unconfirmed fills reconciled or flagged"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "GME LULD halt freezes VWAP algo with 3 unconfirmed child fills",
+      "TSLA VWAP over-participating at 15% vs 10% target \u2014 causing adverse selection",
+      "Both algos need intervention \u2014 pause TSLA first to stop further damage"
+    ],
+    "flag_meanings": {
+      "over_participation": "Algo is consuming more than its target percentage of market volume. Creates adverse selection.",
+      "unconfirmed_fills": "Execution reports received but not fully reconciled with OMS state.",
+      "luld_halt": "Symbol is halted. Algo pauses automatically but unconfirmed child fills need resolution."
+    },
+    "diagnosis_path": "Pause the over-participating TSLA algo immediately \u2014 that is causing ongoing damage. Then resolve GME unconfirmed fills while waiting for LULD band to reopen.",
+    "common_mistakes": [
+      "Not pausing TSLA before reducing POV rate \u2014 continued participation at 15% while adjusting wastes time.",
+      "Canceling the GME VWAP instead of resolving unconfirmed fills \u2014 the order may partially fill when LULD reopens.",
+      "Reducing TSLA POV rate too much \u2014 8% is appropriate, going too low risks completing behind schedule."
+    ]
+  },
+  "success_criteria": [
+    "TSLA VWAP resumed at 8% POV rate (not 15%)",
+    "No orders have over_participation flag",
+    "GME unconfirmed fills reconciled",
+    "GME VWAP ready to resume when LULD band reopens"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "preopen_auction_0900",
-  "description": "9:02 AM pre-open: 6 institutional MOO orders for NVDA ($18.2M notional) submitting into an unverified opening imbalance — NYSE published a 2.1M-share sell imbalance at 08:55 ET but the IEX imbalance feed has been stale since 08:45 (last update 08:44:51); 4 orders carry TimeInForce=GTC flagged wrong_time_in_force — intent is opening auction, not resting day order; NYSE and BATS healthy; ARCA healthy; IEX session healthy but imbalance feed degraded.",
-  "simulated_time": "2026-03-28T09:02:00",
+  "description": "9:02 AM pre-open: 6 institutional MOO orders for NVDA ($18.2M notional) submitting into an unverified opening imbalance \u2014 NYSE published a 2.1M-share sell imbalance at 08:55 ET but the IEX imbalance feed has been stale since 08:45 (last update 08:44:51); 4 orders carry TimeInForce=GTC flagged wrong_time_in_force \u2014 intent is opening auction, not resting day order; NYSE and BATS healthy; ARCA healthy; IEX session healthy but imbalance feed degraded.",
+  "simulated_time": "09:02 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -68,7 +68,7 @@
       "latency_ms": 6,
       "host": "iex-gateway.prod.internal",
       "port": 4004,
-      "error": "Imbalance publication feed stale since 08:44:51 ET — opening cross data unavailable; order acceptance unaffected",
+      "error": "Imbalance publication feed stale since 08:44:51 ET \u2014 opening cross data unavailable; order acceptance unaffected",
       "connected_since": "2026-03-28T08:00:02"
     }
   ],
@@ -88,7 +88,9 @@
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["moo_imbalance_risk"],
+      "flags": [
+        "moo_imbalance_risk"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:45:00",
@@ -109,7 +111,9 @@
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["moo_imbalance_risk"],
+      "flags": [
+        "moo_imbalance_risk"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:47:00",
@@ -130,7 +134,10 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["moo_imbalance_risk", "iex_feed_stale"],
+      "flags": [
+        "moo_imbalance_risk",
+        "iex_feed_stale"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:50:00",
@@ -151,7 +158,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["moo_imbalance_risk"],
+      "flags": [
+        "moo_imbalance_risk"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:52:00",
@@ -172,7 +181,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["moo_imbalance_risk"],
+      "flags": [
+        "moo_imbalance_risk"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:54:00",
@@ -193,7 +204,10 @@
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["moo_imbalance_risk", "iex_feed_stale"],
+      "flags": [
+        "moo_imbalance_risk",
+        "iex_feed_stale"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:56:00",
@@ -214,7 +228,9 @@
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["wrong_time_in_force"],
+      "flags": [
+        "wrong_time_in_force"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:40:00",
@@ -228,14 +244,16 @@
       "side": "buy",
       "quantity": 1500,
       "order_type": "limit",
-      "price": 420.00,
+      "price": 420.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["wrong_time_in_force"],
+      "flags": [
+        "wrong_time_in_force"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:42:00",
@@ -249,14 +267,16 @@
       "side": "sell",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 176.00,
+      "price": 176.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["wrong_time_in_force"],
+      "flags": [
+        "wrong_time_in_force"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:43:00",
@@ -277,7 +297,10 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["wrong_time_in_force", "iex_feed_stale"],
+      "flags": [
+        "wrong_time_in_force",
+        "iex_feed_stale"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T08:44:00",
@@ -291,7 +314,7 @@
       "side": "sell",
       "quantity": 3000,
       "order_type": "limit",
-      "price": 875.00,
+      "price": 875.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
@@ -312,7 +335,7 @@
       "side": "sell",
       "quantity": 1500,
       "order_type": "limit",
-      "price": 878.00,
+      "price": 878.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Cedar Trading",
@@ -333,7 +356,7 @@
       "side": "buy",
       "quantity": 800,
       "order_type": "limit",
-      "price": 870.00,
+      "price": 870.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Elm Securities",
@@ -354,7 +377,7 @@
       "side": "sell",
       "quantity": 2000,
       "order_type": "limit",
-      "price": 880.00,
+      "price": 880.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Firm Prop Desk",
@@ -375,7 +398,7 @@
       "side": "sell",
       "quantity": 400,
       "order_type": "limit",
-      "price": 214.00,
+      "price": 214.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Aspen Asset Management",
@@ -396,7 +419,7 @@
       "side": "buy",
       "quantity": 600,
       "order_type": "limit",
-      "price": 419.00,
+      "price": 419.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
@@ -438,7 +461,7 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 580.00,
+      "price": 580.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Elm Securities",
@@ -451,5 +474,75 @@
       "created_at": "2026-03-28T08:55:00",
       "updated_at": "2026-03-28T08:55:00"
     }
+  ],
+  "title": "Pre-Open Auction \u2014 Imbalance Crisis",
+  "severity": "high",
+  "estimated_minutes": 20,
+  "categories": [
+    "orders",
+    "market_data",
+    "regulatory"
+  ],
+  "difficulty": "intermediate",
+  "runbook": {
+    "narrative": "It's 09:02 AM. The opening cross is in 28 minutes. 6 institutional MOO orders for NVDA worth $18.2M are submitting into an unverified opening imbalance. NYSE published a 2.1M-share sell imbalance but the IEX imbalance feed has been stale since 08:45. On top of that, 4 orders carry TimeInForce=GTC instead of the required opening auction TIF \u2014 they will rest as day orders instead of participating in the cross.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check IEX Feeds",
+        "narrative": "IEX is degraded \u2014 verify if the imbalance feed is stale and when it last updated.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "IEX shows degraded with stale feed"
+      },
+      {
+        "step": 2,
+        "title": "Review MOO Orders",
+        "narrative": "Find all MOO orders and identify which ones carry the wrong TimeInForce flag.",
+        "tool": "query_orders",
+        "tool_args": {},
+        "expected": "6 MOO orders found, 4 carrying wrong_time_in_force"
+      },
+      {
+        "step": 3,
+        "title": "Fix Wrong TimeInForce Orders",
+        "narrative": "Identify GTC orders that should be MOO for the opening cross. These need to be modified before 09:30.",
+        "tool": "validate_orders",
+        "tool_args": {},
+        "expected": "4 orders identified with wrong_time_in_force flag"
+      },
+      {
+        "step": 4,
+        "title": "Verify Imbalance Reconciliation",
+        "narrative": "After checking sessions, confirm NYSE and IEX imbalance feeds are reconciled before the open.",
+        "tool": "run_premarket_check",
+        "tool_args": {},
+        "expected": "Imbalance feeds reconciled or flagged for manual review"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "6 institutional MOO orders for NVDA entering unverified opening imbalance",
+      "IEX feed stale since 08:45 \u2014 imbalance data may be wrong",
+      "4 orders flagged wrong_time_in_force \u2014 GTC instead of auction participation"
+    ],
+    "flag_meanings": {
+      "moo_imbalance_risk": "Order entering opening cross with unverified imbalance data \u2014 may get unfavorable fill price.",
+      "wrong_time_in_force": "Order has wrong TimeInForce \u2014 GTC when it should be MOO/IOC for auction. Must be corrected before open.",
+      "iex_feed_stale": "IEX market data feed has not updated. Quotes and imbalance data may be outdated."
+    },
+    "diagnosis_path": "Check all sessions first to confirm IEX degraded status. Then review all orders to find wrong_time_in_force. Fix those before 09:30 open.",
+    "common_mistakes": [
+      "Missing the 4 wrong_time_in_force orders \u2014 they will rest as day orders instead of participating in the cross.",
+      "Not checking IEX feed staleness before the open \u2014 stale imbalance data leads to bad execution.",
+      "Trying to fix IEX feed manually \u2014 this is a data center issue, not something the operator can fix."
+    ]
+  },
+  "success_criteria": [
+    "No orders have wrong_time_in_force flag",
+    "IEX feed status is active (not stale)",
+    "All MOO orders have correct TimeInForce for opening auction",
+    "Imbalance data reconciled between NYSE and IEX"
   ]
 }

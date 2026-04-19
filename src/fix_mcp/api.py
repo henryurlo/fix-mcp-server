@@ -87,6 +87,55 @@ def _available_scenarios() -> list[str]:
     return sorted(p.stem for p in config_dir.glob("*.json"))
 
 
+def _scenario_metadata() -> list[dict]:
+    """Return a list of enriched scenario metadata dicts.
+
+    Reads the runbook-level fields (title, severity, estimated_minutes,
+    categories, difficulty, description, hints, success_criteria) from each
+    scenario JSON.  This allows the UI and copilot to display rich context
+    rather than just a bare slug name.
+    """
+    config_dir = Path(server.engine.config_dir) / "scenarios"
+    if not config_dir.exists():
+        return []
+    result = []
+    for path in sorted(config_dir.glob("*.json")):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except Exception:
+            continue
+
+        result.append({
+            "name": data.get("name", path.stem),
+            "title": data.get("title", data.get("name", path.stem)),
+            "description": data.get("description", ""),
+            "severity": data.get("severity", "medium"),
+            "estimated_minutes": data.get("estimated_minutes", 0),
+            "categories": data.get("categories", []),
+            "difficulty": data.get("difficulty", "intermediate"),
+            "simulated_time": data.get("simulated_time", ""),
+            "is_algo": _is_algo_scenario(data.get("name", path.stem)),
+            "success_criteria_count": len(data.get("success_criteria", [])),
+            "runbook_step_count": len(data.get("runbook", {}).get("steps", [])),
+        })
+    return result
+
+
+def _scenario_context(name: str) -> dict | None:
+    """Return the full scenario dict including runbook, hints, and
+    success_criteria — used by the copilot to enrich its system prompt."""
+    config_dir = Path(server.engine.config_dir) / "scenarios"
+    path = config_dir / f"{name}.json"
+    if not path.exists():
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
 _ALGO_SCENARIO_KEYWORDS = ("twap", "vwap", "is_dark", "algo", "pov")
 
 
@@ -300,7 +349,7 @@ class APIHandler(BaseHTTPRequestHandler):
             self._send_json({
                 "scenario": server.SCENARIO,
                 "is_algo_scenario": _is_algo_scenario(server.SCENARIO),
-                "available_scenarios": _available_scenarios(),
+                "available_scenarios": _scenario_metadata(),
                 "sessions": {
                     "total": len(sessions),
                     "active": sum(1 for s in sessions if s.status == "active"),
@@ -332,15 +381,16 @@ class APIHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/api/scenarios":
-            names = _available_scenarios()
-            self._send_json([
-                {
-                    "name": n,
-                    "context": SCENARIO_PROMPTS.get(n, ""),
-                    "is_algo": _is_algo_scenario(n),
-                }
-                for n in names
-            ])
+            self._send_json(_scenario_metadata())
+            return
+
+        if self.path.startswith("/api/scenario/"):
+            name = self.path[len("/api/scenario/"):]
+            ctx = _scenario_context(name)
+            if ctx is None:
+                self._send_json({"error": f"Scenario '{name}' not found"}, HTTPStatus.NOT_FOUND)
+            else:
+                self._send_json(ctx)
             return
 
         if self.path == "/api/detail":

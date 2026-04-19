@@ -1,7 +1,7 @@
 {
   "name": "afterhours_dark_1630",
-  "description": "4:32 PM after-hours dark pool crisis: NYSE and ARCA logged out (market closed 16:00 ET); BATS extended-hours session active (16:00-20:00 ET); IEX dark ATS active but dark-pool routing sub-component error — Liquidnet FIX session rejected with SessionStatus=8 Service Unavailable — 1 block trade (200K NVDA, ~$175M notional) from Birch Funds blocked (dark_pool_unavailable); 4 additional dark pool orders blocked; 5 day orders not canceled at close (day_order_cleanup — OMS cleanup job failed); 4 extended-hours orders healthy on BATS/IEX.",
-  "simulated_time": "2026-03-28T16:32:00",
+  "description": "4:32 PM after-hours dark pool crisis: NYSE and ARCA logged out (market closed 16:00 ET); BATS extended-hours session active (16:00-20:00 ET); IEX dark ATS active but dark-pool routing sub-component error \u2014 Liquidnet FIX session rejected with SessionStatus=8 Service Unavailable \u2014 1 block trade (200K NVDA, ~$175M notional) from Birch Funds blocked (dark_pool_unavailable); 4 additional dark pool orders blocked; 5 day orders not canceled at close (day_order_cleanup \u2014 OMS cleanup job failed); 4 extended-hours orders healthy on BATS/IEX.",
+  "simulated_time": "16:32 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -17,7 +17,7 @@
       "latency_ms": 0,
       "host": "nyse-gateway.prod.internal",
       "port": 4001,
-      "error": "Session closed at 16:00:00 ET — market closed; reconnect at 04:00 ET",
+      "error": "Session closed at 16:00:00 ET \u2014 market closed; reconnect at 04:00 ET",
       "connected_since": null
     },
     {
@@ -34,7 +34,7 @@
       "latency_ms": 0,
       "host": "arca-gateway.prod.internal",
       "port": 4002,
-      "error": "Session closed at 16:00:00 ET — market closed; reconnect at 04:00 ET",
+      "error": "Session closed at 16:00:00 ET \u2014 market closed; reconnect at 04:00 ET",
       "connected_since": null
     },
     {
@@ -68,7 +68,7 @@
       "latency_ms": 9,
       "host": "iex-gateway.prod.internal",
       "port": 4004,
-      "error": "Dark pool routing sub-component offline — Liquidnet FIX connectivity rejected with SessionStatus=8 (Service Unavailable); lit ATS order acceptance unaffected; dark order routing suspended",
+      "error": "Dark pool routing sub-component offline \u2014 Liquidnet FIX connectivity rejected with SessionStatus=8 (Service Unavailable); lit ATS order acceptance unaffected; dark order routing suspended",
       "connected_since": "2026-03-28T04:00:07"
     }
   ],
@@ -88,7 +88,10 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "stuck",
-      "flags": ["dark_pool_unavailable", "block_trade"],
+      "flags": [
+        "dark_pool_unavailable",
+        "block_trade"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:15:00",
@@ -102,14 +105,16 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 211.00,
+      "price": 211.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_cleanup"],
+      "flags": [
+        "day_order_cleanup"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T14:00:00",
@@ -123,14 +128,16 @@
       "side": "sell",
       "quantity": 300,
       "order_type": "limit",
-      "price": 420.00,
+      "price": 420.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_cleanup"],
+      "flags": [
+        "day_order_cleanup"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:30:00",
@@ -144,14 +151,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 172.00,
+      "price": 172.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_cleanup"],
+      "flags": [
+        "day_order_cleanup"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T14:30:00",
@@ -165,14 +174,16 @@
       "side": "sell",
       "quantity": 100,
       "order_type": "limit",
-      "price": 580.00,
+      "price": 580.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_cleanup"],
+      "flags": [
+        "day_order_cleanup"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:00:00",
@@ -186,14 +197,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 42.50,
+      "price": 42.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Firm Prop Desk",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_cleanup"],
+      "flags": [
+        "day_order_cleanup"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:15:00",
@@ -207,14 +220,16 @@
       "side": "buy",
       "quantity": 100,
       "order_type": "limit",
-      "price": 212.50,
+      "price": 212.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["extended_hours"],
+      "flags": [
+        "extended_hours"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:05:00",
@@ -228,14 +243,16 @@
       "side": "sell",
       "quantity": 150,
       "order_type": "limit",
-      "price": 421.00,
+      "price": 421.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["extended_hours"],
+      "flags": [
+        "extended_hours"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:10:00",
@@ -249,14 +266,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 530.00,
+      "price": 530.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Firm Prop Desk",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["extended_hours"],
+      "flags": [
+        "extended_hours"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:20:00",
@@ -270,14 +289,16 @@
       "side": "sell",
       "quantity": 100,
       "order_type": "limit",
-      "price": 451.00,
+      "price": 451.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["extended_hours"],
+      "flags": [
+        "extended_hours"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:25:00",
@@ -291,14 +312,16 @@
       "side": "sell",
       "quantity": 50000,
       "order_type": "limit",
-      "price": 875.00,
+      "price": 875.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "stuck",
-      "flags": ["dark_pool_unavailable"],
+      "flags": [
+        "dark_pool_unavailable"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:10:00",
@@ -312,14 +335,16 @@
       "side": "sell",
       "quantity": 30000,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["dark_pool_unavailable"],
+      "flags": [
+        "dark_pool_unavailable"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:12:00",
@@ -333,14 +358,16 @@
       "side": "buy",
       "quantity": 20000,
       "order_type": "limit",
-      "price": 419.00,
+      "price": 419.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["dark_pool_unavailable"],
+      "flags": [
+        "dark_pool_unavailable"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:14:00",
@@ -361,11 +388,88 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "stuck",
-      "flags": ["dark_pool_unavailable"],
+      "flags": [
+        "dark_pool_unavailable"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T16:16:00",
       "updated_at": "2026-03-28T16:16:03"
     }
+  ],
+  "title": "After-Hours Dark Pool Crisis",
+  "severity": "medium",
+  "estimated_minutes": 15,
+  "categories": [
+    "session",
+    "orders"
+  ],
+  "difficulty": "intermediate",
+  "runbook": {
+    "narrative": "It's 4:32 PM. Market is closed. NYSE and ARCA are logged out. BATS is active for extended hours (16:00-20:00 ET). IEX dark ATS is active but Liquidnet FIX session was rejected with SessionStatus=8 (Service Unavailable). A 200K NVDA block trade from Birch Funds worth ~$175M is blocked. Additionally, 5 day orders were not canceled at close because the OMS cleanup job failed.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check All Sessions",
+        "narrative": "Confirm NYSE/ARCA logged out (expected), BATS active, IEX degraded.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "BATS active, IEX degraded, NYSE/ARCA logged out"
+      },
+      {
+        "step": 2,
+        "title": "Check Blocked Dark Pool Orders",
+        "narrative": "Find the blocked NVDA block trade and 4 additional dark pool orders.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "NVDA"
+        },
+        "expected": "200K NVDA block trade blocked, 4 additional dark pool orders"
+      },
+      {
+        "step": 3,
+        "title": "Attempt Liquidnet Reconnection",
+        "narrative": "Try to reconnect the Liquidnet session.",
+        "tool": "fix_session_issue",
+        "tool_args": {
+          "venue": "IEX",
+          "action": "reconnect"
+        },
+        "expected": "Liquidnet reconnects or fails \u2014 if fails, escalate for overnight resolution"
+      },
+      {
+        "step": 4,
+        "title": "Handle Day Order Cleanup",
+        "narrative": "5 day orders were not canceled at close. Cancel them now manually.",
+        "tool": "query_orders",
+        "tool_args": {},
+        "expected": "5 day orders identified and canceled"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "Liquidnet dark pool offline \u2014 200K NVDA block trade ($175M) blocked",
+      "4 additional dark pool orders affected",
+      "5 day orders not canceled at close \u2014 OMS cleanup job failed"
+    ],
+    "flag_meanings": {
+      "dark_pool_unavailable": "Dark pool FIX session is down. Block trades cannot execute.",
+      "block_trade": "Large block order that requires dark pool execution for minimal market impact.",
+      "extended_hours": "Order is valid for extended-hours trading session.",
+      "day_order_cleanup": "Day order should have been canceled at market close but OMS cleanup job failed."
+    },
+    "diagnosis_path": "Check all sessions first. The Liquidnet reconnection is the primary fix. If it cannot be restored overnight, the block trade will need to be resubmitted at the next dark pool session. Handle the day order cleanup as a secondary task.",
+    "common_mistakes": [
+      "Not separating dark pool unavailability from IEX session \u2014 they are different components.",
+      "Ignoring the day order cleanup failure \u2014 uncanceled day orders will attempt to execute at the next open.",
+      "Assuming Liquidnet will be back by market open \u2014 it may not recover until 07:00 ET next day."
+    ]
+  },
+  "success_criteria": [
+    "Liquidnet reconnected or escalation logged for overnight resolution",
+    "5 day orders canceled",
+    "No remaining dark_pool_unavailable orders",
+    "No remaining day_order_cleanup orders"
   ]
 }

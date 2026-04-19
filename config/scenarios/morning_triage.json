@@ -1,7 +1,7 @@
 {
   "name": "morning_triage",
-  "description": "Pre-market morning triage scenario: ARCA FIX session down from Saturday maintenance failover, 12 orders stuck including 3 institutional with SLA timers running; 23 orders on ACME symbol affected by ticker change corporate action (ACME→ACMX effective today); 2 orders on ZEPH pending IPO symbol not yet loaded; 10 healthy orders across active venues.",
-  "simulated_time": "2026-03-28T06:15:00",
+  "description": "Pre-market morning triage scenario: ARCA FIX session down from Saturday maintenance failover, 12 orders stuck including 3 institutional with SLA timers running; 23 orders on ACME symbol affected by ticker change corporate action (ACME\u2192ACMX effective today); 2 orders on ZEPH pending IPO symbol not yet loaded; 10 healthy orders across active venues.",
+  "simulated_time": "06:15 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -34,7 +34,7 @@
       "latency_ms": 0,
       "host": "arca-gateway.prod.internal",
       "port": 4002,
-      "error": "Sequence number gap — incomplete failover recovery from Saturday maintenance",
+      "error": "Sequence number gap \u2014 incomplete failover recovery from Saturday maintenance",
       "connected_since": null
     },
     {
@@ -81,14 +81,16 @@
       "side": "buy",
       "quantity": 2000,
       "order_type": "limit",
-      "price": 420.50,
+      "price": 420.5,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:45:00",
@@ -109,7 +111,9 @@
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:50:00",
@@ -123,14 +127,16 @@
       "side": "buy",
       "quantity": 3000,
       "order_type": "limit",
-      "price": 175.00,
+      "price": 175.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:55:00",
@@ -144,14 +150,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 185.00,
+      "price": 185.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:46:00",
@@ -172,7 +180,9 @@
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:47:00",
@@ -186,14 +196,16 @@
       "side": "buy",
       "quantity": 800,
       "order_type": "limit",
-      "price": 172.50,
+      "price": 172.5,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:48:00",
@@ -214,7 +226,9 @@
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:49:00",
@@ -228,14 +242,16 @@
       "side": "buy",
       "quantity": 300,
       "order_type": "limit",
-      "price": 625.00,
+      "price": 625.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:51:00",
@@ -249,14 +265,16 @@
       "side": "sell",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 285.00,
+      "price": 285.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:52:00",
@@ -270,14 +288,16 @@
       "side": "buy",
       "quantity": 3000,
       "order_type": "limit",
-      "price": 42.50,
+      "price": 42.5,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:53:00",
@@ -298,7 +318,9 @@
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:54:00",
@@ -312,14 +334,16 @@
       "side": "buy",
       "quantity": 600,
       "order_type": "limit",
-      "price": 115.00,
+      "price": 115.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "stuck",
-      "flags": ["venue_down"],
+      "flags": [
+        "venue_down"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:56:00",
@@ -333,14 +357,16 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 48.50,
+      "price": 48.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:30:00",
@@ -361,7 +387,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:31:00",
@@ -375,14 +403,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 49.00,
+      "price": 49.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:32:00",
@@ -396,14 +426,16 @@
       "side": "buy",
       "quantity": 1500,
       "order_type": "limit",
-      "price": 48.00,
+      "price": 48.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:33:00",
@@ -424,7 +456,9 @@
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:34:00",
@@ -438,14 +472,16 @@
       "side": "buy",
       "quantity": 1200,
       "order_type": "limit",
-      "price": 47.50,
+      "price": 47.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:35:00",
@@ -459,14 +495,16 @@
       "side": "buy",
       "quantity": 300,
       "order_type": "limit",
-      "price": 50.00,
+      "price": 50.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:36:00",
@@ -480,14 +518,16 @@
       "side": "buy",
       "quantity": 100,
       "order_type": "limit",
-      "price": 51.00,
+      "price": 51.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:37:00",
@@ -508,7 +548,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:38:00",
@@ -522,14 +564,16 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 49.50,
+      "price": 49.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:39:00",
@@ -543,14 +587,16 @@
       "side": "buy",
       "quantity": 700,
       "order_type": "limit",
-      "price": 52.50,
+      "price": 52.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:40:00",
@@ -564,14 +610,16 @@
       "side": "buy",
       "quantity": 900,
       "order_type": "limit",
-      "price": 46.50,
+      "price": 46.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:41:00",
@@ -585,14 +633,17 @@
       "side": "buy",
       "quantity": 1100,
       "order_type": "stop",
-      "price": 45.00,
-      "stop_px": 43.00,
+      "price": 45.0,
+      "stop_px": 43.0,
       "venue": "NYSE",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["stale_ticker", "manual_review_required"],
+      "flags": [
+        "stale_ticker",
+        "manual_review_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:42:00",
@@ -606,14 +657,17 @@
       "side": "sell",
       "quantity": 750,
       "order_type": "stop",
-      "price": 46.00,
-      "stop_px": 44.00,
+      "price": 46.0,
+      "stop_px": 44.0,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["stale_ticker", "manual_review_required"],
+      "flags": [
+        "stale_ticker",
+        "manual_review_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:43:00",
@@ -627,14 +681,16 @@
       "side": "sell",
       "quantity": 500,
       "order_type": "limit",
-      "price": 51.50,
+      "price": 51.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:44:00",
@@ -648,14 +704,16 @@
       "side": "sell",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 50.50,
+      "price": 50.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:45:30",
@@ -676,7 +734,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:46:30",
@@ -697,7 +757,9 @@
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:47:30",
@@ -711,14 +773,16 @@
       "side": "sell",
       "quantity": 300,
       "order_type": "limit",
-      "price": 47.00,
+      "price": 47.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:48:30",
@@ -732,14 +796,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 46.00,
+      "price": 46.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:49:30",
@@ -760,7 +826,9 @@
       "is_institutional": false,
       "sla_minutes": 60,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:50:30",
@@ -774,14 +842,16 @@
       "side": "sell",
       "quantity": 400,
       "order_type": "limit",
-      "price": 52.00,
+      "price": 52.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:51:30",
@@ -802,7 +872,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T05:52:30",
@@ -823,7 +895,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["symbol_not_loaded"],
+      "flags": [
+        "symbol_not_loaded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T06:00:00",
@@ -837,14 +911,16 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 24.50,
+      "price": 24.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["symbol_not_loaded"],
+      "flags": [
+        "symbol_not_loaded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T06:05:00",
@@ -858,7 +934,7 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
@@ -879,7 +955,7 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 419.00,
+      "price": 419.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
@@ -900,7 +976,7 @@
       "side": "sell",
       "quantity": 200,
       "order_type": "limit",
-      "price": 176.50,
+      "price": 176.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Willow Investments",
@@ -942,7 +1018,7 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 183.50,
+      "price": 183.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Rowan Partners",
@@ -984,7 +1060,7 @@
       "side": "sell",
       "quantity": 750,
       "order_type": "limit",
-      "price": 422.00,
+      "price": 422.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
@@ -1047,7 +1123,7 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 875.50,
+      "price": 875.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Aspen Asset Management",
@@ -1060,5 +1136,106 @@
       "created_at": "2026-03-28T06:11:00",
       "updated_at": "2026-03-28T06:11:00"
     }
+  ],
+  "title": "Morning Triage \u2014 Pre-Market Health Sweep",
+  "severity": "critical",
+  "estimated_minutes": 25,
+  "categories": [
+    "session",
+    "orders",
+    "reference_data"
+  ],
+  "difficulty": "beginner",
+  "runbook": {
+    "narrative": "It's 06:15 ET. The trading desk opens in 2 hours. ARCA is completely down from a Saturday maintenance failover. 12 orders are stuck on it, 3 of them institutional with SLA clocks ticking. On top of that, ACME has a ticker rename to ACMX effective today, and there are unknown ZEPH IPO orders. You need to fix everything before the 09:30 bell.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check All FIX Sessions",
+        "narrative": "Get a full view of every exchange connection. Confirm ARCA is down and other venues are healthy.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "ARCA shows down, NYSE/BATS/IEX show active"
+      },
+      {
+        "step": 2,
+        "title": "Identify Stuck ARCA Orders",
+        "narrative": "Find all orders with venue_down flag from ARCA. The institutional ones with SLA timers are your priority.",
+        "tool": "query_orders",
+        "tool_args": {
+          "venue": "ARCA"
+        },
+        "expected": "12 stuck orders found, 3+ institutional with SLA risk"
+      },
+      {
+        "step": 3,
+        "title": "Attempt ARCA Reconnection",
+        "narrative": "Try to reconnect the ARCA session before resorting to workarounds.",
+        "tool": "fix_session_issue",
+        "tool_args": {
+          "venue": "ARCA",
+          "action": "reconnect"
+        },
+        "expected": "ARCA reconnects or reconnection fails requiring escalation"
+      },
+      {
+        "step": 4,
+        "title": "Check Reference Data \u2014 ACME Ticker Rename",
+        "narrative": "Verify the ACME to ACMX corporate action is properly configured in the reference store.",
+        "tool": "check_ticker",
+        "tool_args": {
+          "symbol": "ACME"
+        },
+        "expected": "ACME shows pending rename to ACMX effective today"
+      },
+      {
+        "step": 5,
+        "title": "Load Missing ZEPH Symbol",
+        "narrative": "The IPO symbol ZEPH is not in the reference store. Load it so pending orders can proceed.",
+        "tool": "load_ticker",
+        "tool_args": {
+          "symbol": "ZEPH",
+          "cusip": "987456123",
+          "name": "Zephyr Corp",
+          "listing_exchange": "NASDAQ"
+        },
+        "expected": "ZEPH loaded, 2 pending orders released"
+      },
+      {
+        "step": 6,
+        "title": "Run Pre-Market Health Check",
+        "narrative": "Final sweep to confirm all systems go before the opening bell.",
+        "tool": "run_premarket_check",
+        "tool_args": {},
+        "expected": "All green, ready for 09:30 open"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "ARCA FIX session is down from Saturday maintenance \u2014 12 orders stuck, 3 institutional with active SLA timers",
+      "23 orders on ACME symbol have stale_ticker flag \u2014 corporate action ACME\u2192ACMX effective today",
+      "2 orders on ZEPH IPO symbol fail because symbol is not loaded in reference store"
+    ],
+    "flag_meanings": {
+      "venue_down": "Session is disconnected. Orders queued here will not reach the exchange. Try reconnecting first, then release stuck orders.",
+      "stale_ticker": "Symbol has pending rename. Orders with stale symbol will be rejected at the exchange. Check corporate actions and update.",
+      "symbol_not_loaded": "Symbol is not in the reference store. Use load_ticker to add it.",
+      "manual_review_required": "Order needs human judgment \u2014 likely a special case or complex dependency."
+    },
+    "diagnosis_path": "Start by checking all FIX sessions to confirm the scope. ARCA down is the critical blocker. Then check reference data for the ACME rename and missing ZEPH symbol.",
+    "common_mistakes": [
+      "Trying to reroute ARCA orders to another venue \u2014 this bypasses the root cause. Reconnect first.",
+      "Missing the ACME corporate action \u2014 stale tickers cause silent rejections at the exchange.",
+      "Ignoring the ZEPH symbol_not_loaded orders \u2014 they are blocked until the symbol is added."
+    ]
+  },
+  "success_criteria": [
+    "All FIX sessions show active status",
+    "No orders have venue_down flag",
+    "ACME ticker has been renamed to ACMX via update_ticker",
+    "ZEPH symbol is loaded in reference store",
+    "No orders have symbol_not_loaded or stale_ticker flags",
+    "Premarket check returns all green"
   ]
 }

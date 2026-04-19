@@ -5,6 +5,7 @@ import { useSystem, useChat } from '@/store';
 import { useAuth } from '@/store/auth';
 import { useTelemetry } from '@/store/telemetry';
 import dynamic from 'next/dynamic';
+import type { ScenarioContext, RunbookStep } from '@/store';
 import {
   Activity,
   Terminal,
@@ -43,243 +44,67 @@ const TABS: { id: TabId; label: string; icon: any }[] = [
   { id: 'scenario-creator', label: 'Scenario Creator', icon: PlusCircle },
 ];
 
-// ── Runbook types ──────────────────────────────────────────────────
+// ── Runbook types (aliased from store for convenience) ─────────────
 
-interface RunbookStep {
-  step: number;
-  title: string;          // Short label
-  narrative: string;      // Plain English explanation
-  cli: string;            // Exact terminal command
-  tool: string;           // MCP tool name for button
-  toolArgs: Record<string, unknown>; // Args for the tool
-  expected: string;       // What success looks like
-}
-
+// Derive a RunbookDef from ScenarioContext for UI rendering
 interface RunbookDef {
   title: string;
-  narrative: string;       // Scene-setter
+  narrative: string;
   steps: RunbookStep[];
   tools: string[];
-}
-
-// ── Scenario runbooks ──────────────────────────────────────────────
-
-const SCENARIO_RUNBOOKS: Record<string, RunbookDef> = {
-  morning_triage: {
-    title: 'MORNING TRIAGE — Market Open Prep',
-    narrative:
-      "It's 7:30 AM. The trading desk opens in 2 hours. Your job is to verify every system is healthy before the opening bell. A single missed issue here means millions in failed trades.",
-    steps: [
-      {
-        step: 1,
-        title: 'Check FIX Session Health',
-        narrative:
-          'First, verify all exchange connections are alive. Each venue (NYSE, ARCA, BATS, NASDAQ) runs a FIX 4.2 session with heartbeats every 30 seconds. If any session is down, traders can\'t send orders to that venue.',
-        cli: 'show sessions',
-        tool: 'check_fix_sessions',
-        toolArgs: {},
-        expected: 'All venues show ACTIVE with latency <10ms',
-      },
-      {
-        step: 2,
-        title: 'Review Overnight Orders',
-        narrative:
-          'Check for orders that were left open overnight. Stale orders from after-hours could trigger unwanted fills at market open, causing P&L damage.',
-        cli: 'show orders --open',
-        tool: 'query_orders',
-        toolArgs: { status: 'open' },
-        expected: 'No stale orders, or identify ones to cancel',
-      },
-      {
-        step: 3,
-        title: 'Validate Reference Data',
-        narrative:
-          'Ensure symbol mappings are current. A corporate action overnight (stock split, ticker change) could cause orders to route to wrong symbols.',
-        cli: 'show sessions',
-        tool: 'validate_orders',
-        toolArgs: {},
-        expected: 'All symbols resolve correctly, no stale cusips',
-      },
-      {
-        step: 4,
-        title: 'Run Pre-Market Health Check',
-        narrative:
-          'Final sweep: check order routing rules, risk limits, and FX rates. This is your go/no-go decision.',
-        cli: 'status',
-        tool: 'run_premarket_check',
-        toolArgs: {},
-        expected: 'All green. Ready for 09:30 bell.',
-      },
-      {
-        step: 5,
-        title: 'Clear Stuck Orders',
-        narrative:
-          'If any orders are stuck in queue, release them now. After 09:30, stuck orders could block new flow.',
-        cli: 'release stuck',
-        tool: 'release_stuck_orders',
-        toolArgs: {},
-        expected: 'Queue clean: 0 stuck orders',
-      },
-    ],
-    tools: ['check_fix_sessions', 'query_orders', 'validate_orders', 'run_premarket_check', 'release_stuck_orders'],
-  },
-
-  venue_degradation_1030: {
-    title: 'VENUE DEGRADATION — NYSE Latency Crisis',
-    narrative:
-      "It's 10:32 AM. NYSE latency just spiked from 3ms to 180ms — a route flap on the core Mahwah switch (NOC ticket #44827). 14 orders are stuck in the NYSE queue unacknowledged ($4.1M notional), including 3 institutional clients with SLA timers running. The SOR auto-diverted 10 orders to BATS, but 2 orders carry listing-venue-required mandates and CANNOT be rerouted. ARCA and IEX are healthy.",
-    steps: [
-      {
-        step: 1,
-        title: 'Confirm the Problem',
-        narrative:
-          'Check NYSE session health. The alert says 180ms latency and a sequence gap. Verify the FIX session state and heartbeat status.',
-        cli: 'heartbeat NYSE',
-        tool: 'session_heartbeat',
-        toolArgs: { venue: 'NYSE' },
-        expected: 'NYSE latency 180ms, status degraded, heartbeat delayed',
-      },
-      {
-        step: 2,
-        title: 'Assess Order Damage',
-        narrative:
-          'How many orders are stuck at NYSE? Check for institutional orders with SLA timers — those are the priority.',
-        cli: 'show orders --venue NYSE',
-        tool: 'query_orders',
-        toolArgs: { venue: 'NYSE' },
-        expected: '14 stuck orders, 3+ institutional with SLA breach risk',
-      },
-      {
-        step: 3,
-        title: 'Full Session Diagnostic',
-        narrative:
-          'Get the complete picture: sequence numbers (look for gaps), message counts, error details. The Mahwah switch issue may have caused seq gaps.',
-        cli: 'dump NYSE',
-        tool: 'dump_session_state',
-        toolArgs: { venue: 'NYSE' },
-        expected: 'Sequence gap detected, elevated error count, 180ms RTT',
-      },
-      {
-        step: 4,
-        title: 'Attempt Session Fix',
-        narrative:
-          'Try reconnecting the NYSE session. If the route flap is resolved, a fresh logon may restore normal latency. If not, we need to mark it degraded for the SOR.',
-        cli: 'fix NYSE',
-        tool: 'fix_session_issue',
-        toolArgs: { venue: 'NYSE', action: 'reconnect' },
-        expected: 'NYSE reconnects with lower latency, or fails and needs escalation',
-      },
-      {
-        step: 5,
-        title: 'Release Stuck Orders',
-        narrative:
-          'After fixing the session, release the 14 stuck orders. Watch the listing-venue-required orders — they must stay on NYSE.',
-        cli: 'release stuck',
-        tool: 'release_stuck_orders',
-        toolArgs: {},
-        expected: 'Stuck orders released, SLA timers cleared',
-      },
-      {
-        step: 6,
-        title: 'Verify Recovery',
-        narrative:
-          'Check that NYSE is back to normal. Latency should be <10ms, no sequence gaps, orders flowing.',
-        cli: 'heartbeat NYSE',
-        tool: 'session_heartbeat',
-        toolArgs: { venue: 'NYSE' },
-        expected: 'NYSE latency <10ms, status active, orders flowing',
-      },
-    ],
-    tools: ['session_heartbeat', 'query_orders', 'dump_session_state', 'fix_session_issue', 'release_stuck_orders'],
-  },
-
-  open_volatility_0930: {
-    title: 'OPENING VOLATILITY — Bell Surge',
-    narrative:
-      "It's 09:30 AM — the bell just rang. Volume surged 10x in the first 30 seconds. Algo orders (TWAP, VWAP) are slicing aggressively but fills are coming back with 2-3% slippage. Two institutional clients have SLAs that breach at 1.5% slippage. If you don't intervene, the firm faces SLA penalties and client escalations.",
-    steps: [
-      {
-        step: 1,
-        title: 'Check All Venue Fill Rates',
-        narrative:
-          'Which venues are handling the volume? Which ones are rejecting orders?',
-        cli: 'show sessions',
-        tool: 'check_fix_sessions',
-        toolArgs: {},
-        expected: 'Identify the most congested venues',
-      },
-      {
-        step: 2,
-        title: 'Review Open Orders',
-        narrative:
-          'Check which orders have significant slippage or are stuck waiting for fills.',
-        cli: 'show orders --open',
-        tool: 'query_orders',
-        toolArgs: { status: 'open' },
-        expected: 'Flag orders with >1% slippage',
-      },
-      {
-        step: 3,
-        title: 'Check SLA-Critical Orders',
-        narrative:
-          'Find the institutional orders that are close to breaching SLA thresholds.',
-        cli: 'show orders --status partial',
-        tool: 'validate_orders',
-        toolArgs: {},
-        expected: 'Identify orders at risk of SLA breach',
-      },
-      {
-        step: 4,
-        title: 'Reroute if Needed',
-        narrative:
-          'If one venue is overwhelmed, shift algo orders to less congested venues.',
-        cli: 'fix NYSE',
-        tool: 'update_venue_status',
-        toolArgs: { venue: 'NYSE', status: 'degraded' },
-        expected: 'NYSE deprioritized, orders rerouting to ARCA/BATS',
-      },
-    ],
-    tools: ['check_fix_sessions', 'query_orders', 'validate_orders', 'update_venue_status'],
-  },
-};
-
-// Generate a generic runbook for scenarios without a specific one
-function getRunbook(scenarioName: string): RunbookDef {
-  if (SCENARIO_RUNBOOKS[scenarioName]) return SCENARIO_RUNBOOKS[scenarioName];
-  return {
-    title: scenarioName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    narrative: `Scenario: ${scenarioName} — The SRE Copilot will guide you through diagnosis and resolution.`,
-    steps: [
-      {
-        step: 1, title: 'Review system state', narrative: 'Understand the baseline.',
-        cli: 'show sessions', tool: 'check_fix_sessions', toolArgs: {}, expected: 'Establish a baseline.',
-      },
-      {
-        step: 2, title: 'Identify anomalies', narrative: 'Find what changed.',
-        cli: 'show orders', tool: 'query_orders', toolArgs: {}, expected: 'Locate the problem area.',
-      },
-      {
-        step: 3, title: 'Diagnose root cause', narrative: 'Isolate the failing component.',
-        cli: 'status', tool: 'validate_orders', toolArgs: {}, expected: 'Root cause identified.',
-      },
-      {
-        step: 4, title: 'Apply fix', narrative: 'Resolve the issue. Run a health check to identify the affected venue.',
-        cli: 'show sessions', tool: 'run_premarket_check', toolArgs: {}, expected: 'Issue identified and resolved.',
-      },
-      {
-        step: 5, title: 'Verify recovery', narrative: 'Confirm system is healthy.',
-        cli: 'show sessions', tool: 'check_fix_sessions', toolArgs: {}, expected: 'System healthy.',
-      },
-    ],
-    tools: ['check_fix_sessions', 'query_orders', 'run_premarket_check'],
+  successCriteria?: string[];
+  hints?: {
+    keyProblems: string[];
+    diagnosisPath: string;
+    flagMeanings: Record<string, string>;
+    commonMistakes: string[];
   };
 }
 
+// Build RunbookDef from loaded scenario context
+function buildRunbook(ctx: ScenarioContext | null): RunbookDef | null {
+  if (!ctx) return null;
+  return {
+    title: ctx.title.toUpperCase(),
+    narrative: ctx.runbook?.narrative || ctx.description,
+    steps: ctx.runbook?.steps || [],
+    tools: ctx.runbook?.steps?.map((s) => s.tool) || [],
+    successCriteria: ctx.success_criteria || [],
+    hints: ctx.hints ? {
+      keyProblems: ctx.hints.key_problems || [],
+      diagnosisPath: ctx.hints.diagnosis_path || '',
+      flagMeanings: ctx.hints.flag_meanings || {},
+      commonMistakes: ctx.hints.common_mistakes || [],
+    } : undefined,
+  };
+}
+
+const SEVERITY_COLORS: Record<string, string> = {
+  low: 'var(--green)',
+  medium: 'var(--amber)',
+  high: 'var(--red)',
+  critical: 'var(--purple)',
+};
+
+const DIFFICULTY_LABELS: Record<string, string> = {
+  beginner: '●',
+  intermediate: '●●',
+  advanced: '●●●',
+};
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>('mission-control');
-  const { scenario, available_scenarios: available, loading, startScenario, refresh, sessions, events, error, connected } = useSystem();
+  const { scenario, scenarioContext, available_scenarios: available, loading, startScenario, refresh, sessions, events, error, connected } = useSystem();
   const { isOpen, toggleOpen } = useChat();
   const { isAuthenticated, user, logout } = useAuth();
+  const runbook = buildRunbook(scenarioContext);
+
+  // Display rich title when available, fallback to formatted name
+  const scenarioDisplay = scenarioContext
+    ? scenarioContext.title
+    : scenario
+      ? scenario.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      : '';
   const telemetry = useTelemetry();
 
   useEffect(() => { refresh(); telemetry.refresh(); }, []);
@@ -301,16 +126,22 @@ export default function Home() {
             <span className="text-sm font-bold tracking-wider">FIX-MCP</span>
             <span className="text-[9px] text-[var(--text-muted)] font-mono ml-2">Mission Control</span>
           </div>
-          {scenario && (
+          {scenarioContext && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
+              <Radio size={10} className="text-[var(--cyan)] animate-pulse" />
+              <span className="text-[11px] font-mono font-semibold text-[var(--cyan)]">{scenarioDisplay}</span>
+            </div>
+          )}
+          {!scenarioContext && scenario && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
               <Radio size={10} className="text-[var(--cyan)] animate-pulse" />
               <span className="text-[11px] font-mono font-semibold text-[var(--cyan)]">{scenario}</span>
             </div>
           )}
-          {activeFaults > 0 && (
+          {runbook && runbook.hints && runbook.hints.keyProblems.length > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--red-dim)] border border-[var(--red)]/30">
               <AlertTriangle size={11} className="text-[var(--red)]" />
-              <span className="text-[10px] font-mono font-semibold text-[var(--red)]">{activeFaults} FAULT{activeFaults > 1 ? 'S' : ''}</span>
+              <span className="text-[10px] font-mono font-semibold text-[var(--red)]">{runbook.hints.keyProblems.length} ISSUES</span>
             </div>
           )}
         </div>
@@ -341,7 +172,11 @@ export default function Home() {
           <select value={scenario || ''} onChange={(e) => e.target.value && startScenario(e.target.value)}
             className="input-base !w-auto !py-1 !px-2.5 !text-[10px] !font-mono !rounded-lg max-w-[160px]">
             <option value="">Launch Scenario…</option>
-            {available?.map((s: any) => <option key={s.name} value={s.name}>{s.name}{s.is_algo ? ' ⚡' : ''}</option>)}
+            {available?.map((s: any) => (
+              <option key={s.name} value={s.name}>
+                [{s.severity?.toUpperCase() || 'MEDIUM'}] {s.title || s.name}{s.is_algo ? ' ⚡' : ''} ({s.estimated_minutes || '?'}m)
+              </option>
+            ))}
           </select>
 
           <button onClick={toggleOpen}
@@ -375,22 +210,24 @@ export default function Home() {
   );
 }
 
-// ── MISSION CONTROL (new split layout with Audit Log) ───────────────
+// ── MISSION CONTROL (dynamic runbooks from scenario JSON) ─────────────
 
 function MissionControlTab() {
-  const { scenario, available_scenarios: available, startScenario, sessions, callTool } = useSystem();
+  const { scenario, scenarioContext, available_scenarios: available, startScenario, sessions, callTool } = useSystem();
   const { isOpen, toggleOpen, send } = useChat();
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<number>(0);
   const [stepResults, setStepResults] = useState<Record<number, string>>({});
 
   const activeScenarioName = scenario || selectedScenario;
-  const runbook = activeScenarioName ? getRunbook(activeScenarioName) : null;
+  const activeContext = scenarioContext || null;
+  const runbook = buildRunbook(activeContext);
+  const runbook = buildRunbook(activeScenarioName ? ctx : null);
 
   const handleRunStep = async (step: RunbookStep) => {
     try {
       setStepResults((prev) => ({ ...prev, [step.step]: 'Running…' }));
-      const result = await callTool(step.tool, step.toolArgs);
+      const result = await callTool(step.tool, step.tool_args);
       setStepResults((prev) => ({ ...prev, [step.step]: result || 'Done ✓' }));
     } catch (err: any) {
       setStepResults((prev) => ({ ...prev, [step.step]: `Error: ${err.message}` }));
@@ -410,6 +247,11 @@ function MissionControlTab() {
   const handleVenueClick = (_venue: string) => {
     // For now — informational only, HeartbeatPanel handles display
   };
+
+  // Check which success criteria are met (heuristic: no errors in step results)
+  const completedSteps = Object.keys(stepResults).length;
+  const totalSteps = runbook?.steps.length || 0;
+  const allStepsComplete = runbook && completedSteps === totalSteps && runbook.steps.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
@@ -442,26 +284,37 @@ function MissionControlTab() {
               <span className="text-[8px] font-mono text-[var(--text-dim)]">{available?.length || 0}</span>
             </div>
             <div className="space-y-1">
-              {available?.map((s: any) => (
-                <button
-                  key={s.name}
-                  onClick={() => handleStartScenario(s.name)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-all ${
-                    scenario === s.name
-                      ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/30'
-                      : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
-                  }`}
-                >
-                  {scenario === s.name
-                    ? <Radio size={9} className="text-[var(--cyan)] animate-pulse shrink-0" />
-                    : <Play size={9} className="text-[var(--text-dim)] shrink-0" />
-                  }
-                  <span className="text-[10px] font-mono font-semibold truncate">{s.name}</span>
-                  {s.is_algo && (
-                    <span className="text-[8px] px-1 py-px rounded bg-[var(--purple-dim)] text-[var(--purple)] font-mono ml-auto shrink-0">⚡</span>
-                  )}
-                </button>
-              ))}
+              {available?.map((s: any) => {
+                const sevColor = SEVERITY_COLORS[s.severity] || SEVERITY_COLORS.medium;
+                return (
+                  <button
+                    key={s.name}
+                    onClick={() => handleStartScenario(s.name)}
+                    className={`w-full flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-md text-left transition-all ${
+                      scenario === s.name
+                        ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/30'
+                        : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 w-full">
+                      {scenario === s.name
+                        ? <Radio size={9} className="text-[var(--cyan)] animate-pulse shrink-0" />
+                        : <Play size={9} className="text-[var(--text-dim)] shrink-0" />
+                      }
+                      <span className="text-[10px] font-mono font-semibold truncate flex-1">{s.title || s.name}</span>
+                      <span
+                        className="text-[7px] font-bold px-1 py-px rounded shrink-0"
+                        style={{ backgroundColor: sevColor, color: '#0a0b0e' }}
+                      >
+                        {s.severity?.toUpperCase()}
+                      </span>
+                    </div>
+                    {s.description && (
+                      <span className="text-[8px] text-[var(--text-muted)] truncate pl-3.5">{s.description.slice(0, 80)}…</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -485,8 +338,31 @@ function MissionControlTab() {
                   <span className="text-[9px] font-bold text-[var(--cyan)] uppercase tracking-wider">
                     {scenario ? 'Active' : 'Preview'}
                   </span>
+                  {allStepsComplete && runbook.successCriteria && runbook.successCriteria.length > 0 && (
+                    <span className="text-[9px] font-bold text-[var(--green)] uppercase tracking-wider flex items-center gap-0.5">
+                      ✓ RESOLVED
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-[11px] font-bold mt-0.5">{runbook.title}</h3>
+                {scenarioContext && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[8px] font-mono text-[var(--text-muted)]">
+                      {scenarioContext.simulated_time}
+                    </span>
+                    <span className="text-[8px] font-mono text-[var(--text-dim)]">
+                      {scenarioContext.estimated_minutes}m
+                    </span>
+                    <span className="text-[8px] font-mono text-[var(--text-dim)]">
+                      {DIFFICULTY_LABELS[scenarioContext.difficulty] || ''} {scenarioContext.difficulty}
+                    </span>
+                    {scenarioContext.categories?.slice(0, 3).map((cat: string) => (
+                      <span key={cat} className="text-[7px] px-1 py-px rounded bg-[var(--bg-void)] text-[var(--text-dim)] font-mono">
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className="text-[9px] text-[var(--text-secondary)] mt-1 leading-relaxed">{runbook.narrative}</p>
               </div>
 
@@ -516,7 +392,7 @@ function MissionControlTab() {
                       {/* CLI command */}
                       <div className="bg-[var(--bg-void)] rounded px-2 py-1 mb-1.5">
                         <code className="text-[9px] font-mono text-[var(--green)]">
-                          fix-cli&gt; {step.cli}
+                          fix-cli&gt; {step.tool}{Object.keys(step.tool_args || {}).length ? ` ${JSON.stringify(step.tool_args)}` : ''}
                         </code>
                       </div>
 
@@ -543,9 +419,35 @@ function MissionControlTab() {
                       )}
 
                       {/* Expected */}
-                      <div className="text-[8px] text-[var(--text-dim)] mt-1">
+                    <p className="text-[8px] text-[var(--text-dim)] mt-1">
                         Expected: {step.expected}
+                      </p>
+                    </div>
+                  ))}
+
+                  {/* Success Criteria */}
+                  {runbook.successCriteria && runbook.successCriteria.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[var(--border-dim)]">
+                      <div className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        ✓ Success Criteria ({completedSteps}/{runbook.successCriteria.length} complete)
                       </div>
+                      <div className="space-y-1">
+                        {Object.keys(stepResults).length > 0 && (
+                          runbook.successCriteria.map((c, i) => {
+                            const isComplete = i < completedSteps;
+                            return (
+                              <div key={i} className={`text-[8px] font-mono flex items-start gap-1 ${
+                                isComplete ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'
+                              }`}>
+                                <span>{isComplete ? '✓' : '○'}</span>
+                                <span>{c}</span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                     </div>
                   ))}
                 </div>

@@ -15,28 +15,30 @@ const QUICK_PROMPTS = [
   { icon: '🔗', label: 'Interlist check', prompt: 'Verify interlisted symbol resolution. Are all cross-venue mappings working correctly?' },
 ];
 
-const SCENARIO_PROMPTS: Record<string, Array<{ icon: string; label: string; prompt: string }>> = {
-  market_data_delay: [
-    { icon: '📡', label: 'Which feed is delayed?', prompt: 'Identify which market data feed is delayed and by how much. Is it affecting order fills?' },
-    { icon: '🔧', label: 'Reset stale feed', prompt: 'Reset the delayed market data feed and verify quotes are fresh again.' },
+// Scenario-specific quick prompts -- now sourced from the loaded scenario JSON hints
+// (key_problems, diagnosis_path, common_mistakes). This map provides fallback
+// prompts if a scenario JSON is not yet loaded.
+const SCENARIO_QUICK_ACTION: Record<string, Array<{ icon: string; label: string; prompt: string }>> = {
+  morning_triage: [
+    { icon: '🔍', label: 'Check ARCA', prompt: 'Check ARCA session -- it should be down. Attempt reconnection.' },
+    { icon: '📋', label: 'Stale tickers', prompt: 'Check for ACME→ACMX ticker rename and verify all affected orders.' },
+    { icon: '🆕', label: 'Load ZEPH', prompt: 'Load the ZEPH IPO symbol so pending orders can proceed.' },
   ],
-  fx_feed_corruption: [
-    { icon: '💱', label: 'Check FX rates', prompt: 'Check all FX rates. Identify which pair has a corrupt rate and what the correct value should be.' },
-    { icon: '🔧', label: 'Fix FX feed', prompt: 'Reset the corrupted FX feed to restore correct rates.' },
+  venue_degradation_1030: [
+    { icon: '📡', label: 'NYSE latency', prompt: 'Check NYSE latency -- it should be ~180ms. Dump session state.' },
+    { icon: '📊', label: 'Stuck orders', prompt: 'Query all NYSE orders -- identify stuck and listing-venue-required.' },
+    { icon: '🔧', label: 'Reconnect', prompt: 'Attempt NYSE reconnection. Check if latency improves.' },
   ],
-  exchange_session_drop: [
-    { icon: '🔌', label: 'Which exchange dropped?', prompt: 'Identify which exchange FIX session dropped. Are orders queuing up?' },
-    { icon: '🔧', label: 'Reconnect session', prompt: 'Attempt to reconnect the dropped FIX session and verify order flow resumes.' },
-  ],
-  interlisted_name_mismatch: [
-    { icon: '🔗', label: 'Name mismatch details', prompt: 'Which interlisted symbols have routing failures? Show the mismatch details.' },
-    { icon: '🔧', label: 'Fix routing', prompt: 'Correct the interlisted name resolution and retry failed orders.' },
+  ssr_and_split_1130: [
+    { icon: '⚖️', label: 'RIDE SSR', prompt: 'Check RIDE SSR status and rejected short orders.' },
+    { icon: '✂️', label: 'AAPL split', prompt: 'Find all AAPL orders that need 4:1 split adjustment before 12:00 ET.' },
   ],
 };
 
+
 export function ChatPanel() {
   const { messages, isOpen, isTyping, openRouterKey, toggleOpen, send, setKey, clear } = useChat();
-  const { mode, scenario } = useSystem();
+  const { mode, scenario, scenarioContext } = useSystem();
   const [input, setInput] = useState('');
   const [keyInput, setKeyInput] = useState('');
   const [showKeyModal, setShowKeyModal] = useState(false);
@@ -62,8 +64,16 @@ export function ChatPanel() {
     }
   };
 
-  // Context-aware prompts
-  const scenarioPrompts = scenario ? (SCENARIO_PROMPTS[scenario] || []) : [];
+  // Context-aware prompts: prefer runbook steps from loaded scenarioContext,
+  // fall back to the hardcoded SCENARIO_QUICK_ACTION map, then general prompts.
+  const runbookPrompts = scenarioContext?.runbook?.steps?.map((s) => ({
+    icon: '⚡',
+    label: `Step ${s.step}: ${s.title}`,
+    prompt: `Run runbook step ${s.step}: ${s.title}. ${s.narrative}`,
+  })) || [];
+
+  const fallbackPrompts = scenario ? (SCENARIO_QUICK_ACTION[scenario] || []) : [];
+  const scenarioPrompts = runbookPrompts.length > 0 ? runbookPrompts : fallbackPrompts;
   const allPrompts = [...scenarioPrompts, ...QUICK_PROMPTS];
 
   return (
@@ -114,7 +124,9 @@ export function ChatPanel() {
             <Terminal size={24} className="text-[var(--text-dim)] mx-auto mb-3" />
             <p className="text-[11px] text-[var(--text-muted)] mb-1">SRE Copilot Ready</p>
             <p className="text-[9px] text-[var(--text-dim)]">
-              {scenario
+              {scenarioContext
+                ? `Scenario: ${scenarioContext.title}. ${scenarioContext.runbook?.steps?.length || 0} runbook steps. Ask me to diagnose or fix issues.`
+                : scenario
                 ? `Active scenario: ${scenario}. Ask me to diagnose or fix issues.`
                 : 'No active scenario. Use quick prompts below or ask a question.'}
             </p>

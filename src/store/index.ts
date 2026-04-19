@@ -49,14 +49,58 @@ export interface EventEntry {
   summary: string;
 }
 
-type ScenarioDef = { name: string; context: string; is_algo: boolean };
-type StatusResponse = {
-  scenario: string;
-  available_scenarios: string[];  // API returns string array, not objects
-  sessions: { detail: { venue: string; status: string; latency_ms?: number; session_id?: string }[] };
-  orders: { open: number; stuck: number };
-};
-type ModeResponse = { mode: string };
+export type Severity = 'low' | 'medium' | 'high' | 'critical';
+export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
+
+export interface ScenarioSummary {
+  name: string;
+  title: string;
+  description: string;
+  severity: Severity;
+  estimated_minutes: number;
+  categories: string[];
+  difficulty: Difficulty;
+  simulated_time: string;
+  is_algo: boolean;
+  success_criteria_count: number;
+  runbook_step_count: number;
+  context: string;  // kept for backward compat
+}
+
+export interface RunbookStep {
+  step: number;
+  title: string;
+  narrative: string;
+  tool: string;
+  tool_args: Record<string, unknown>;
+  expected: string;
+}
+
+export interface ScenarioContext {
+  name: string;
+  title: string;
+  description: string;
+  severity: Severity;
+  estimated_minutes: number;
+  categories: string[];
+  difficulty: Difficulty;
+  simulated_time: string;
+  runbook: {
+    narrative: string;
+    steps: RunbookStep[];
+  };
+  hints: {
+    key_problems: string[];
+    flag_meanings: Record<string, string>;
+    diagnosis_path: string;
+    common_mistakes: string[];
+  };
+  success_criteria: string[];
+  sessions: unknown[];
+  orders: unknown[];
+}
+
+type ScenarioDef = ScenarioSummary;  // backward compat alias
 
 interface SystemState {
   sessions: SessionInfo[];
@@ -64,6 +108,7 @@ interface SystemState {
   events: EventEntry[];
   scenario: string | null;
   available_scenarios: ScenarioDef[];
+  scenarioContext: ScenarioContext | null;  // Full scenario data for active scenario
   mode: 'human' | 'agent' | 'mixed';
   loading: boolean;
   connected: boolean;
@@ -82,6 +127,7 @@ export const useSystem = create<SystemState>((set, get) => ({
   events: [],
   scenario: null,
   available_scenarios: [],
+  scenarioContext: null,
   mode: 'human',
   loading: false,
   connected: false,
@@ -92,10 +138,10 @@ export const useSystem = create<SystemState>((set, get) => ({
   refresh: async () => {
     try {
       const [statusRes, ordersRes, eventsRes, modeRes] = await Promise.all([
-        jsonFetch<StatusResponse>('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),  
+        jsonFetch('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),
         jsonFetch<OrderInfo[]>('/api/orders').catch(e => { console.error('/api/orders failed:', e); return null; }),
         jsonFetch<EventEntry[]>('/api/events').catch(e => { console.error('/api/events failed:', e); return null; }),
-        jsonFetch<ModeResponse>('/api/mode').catch(e => { console.error('/api/mode failed:', e); return null; }),
+        jsonFetch('/api/mode').catch(e => { console.error('/api/mode failed:', e); return null; }),
       ]);
 
       if (!statusRes) { set({ connected: false, error: '/api/status failed', loading: false }); return; }
@@ -112,11 +158,8 @@ export const useSystem = create<SystemState>((set, get) => ({
         orders: ordersRes ?? [],
         events: (eventsRes ?? []).slice(0, 50),
         scenario: statusRes.scenario,
-        available_scenarios: (statusRes.available_scenarios || []).map((name: string) => ({
-          name,
-          context: '',
-          is_algo: false,
-        })),
+        available_scenarios: statusRes.available_scenarios || [],
+        scenarioContext: null,  // will be fetched when a scenario is loaded
         mode: (modeRes?.mode as SystemState['mode']) || 'human',
         open_count: statusRes.orders?.open || 0,
         stuck_count: statusRes.orders?.stuck || 0,
@@ -134,6 +177,13 @@ export const useSystem = create<SystemState>((set, get) => ({
     try {
       await jsonPost('/api/reset', { scenario: name });
       await get().refresh();
+      // Fetch full scenario context from the backend
+      try {
+        const ctx = await jsonFetch<ScenarioContext>(`/api/scenario/${name}`);
+        set({ scenarioContext: ctx });
+      } catch {
+        set({ scenarioContext: null });
+      }
     } catch (err: unknown) {
       set({ loading: false, error: (err as Error).message });
     }
@@ -205,8 +255,9 @@ export const useChat = create<ChatState>((set, get) => ({
     set((s) => ({ messages: [...s.messages, userMsg], isTyping: true }));
 
     try {
-      const status = await jsonFetch<StatusResponse>('/api/status');
+      const status = await jsonFetch('/api/status');
       const events = await jsonFetch<EventEntry[]>('/api/events');
+      const { scenarioContext } = useSystem.getState();
 
       const contextHint = [
         `Active scenario: ${status.scenario}`,
@@ -215,11 +266,24 @@ export const useChat = create<ChatState>((set, get) => ({
         `Recent events: ${JSON.stringify(events.slice(0, 5))}`,
       ].join('\n');
 
-      const scenarioOverlay = status.scenario ? SCENARIO_OVERLAYS[status.scenario] : undefined;
+      // Build rich scenario context from the loaded scenario JSON
+      let scenarioContextMsg = '';
+      if (scenarioContext) {
+        const ctx = scenarioContext;
+        scenarioContextMsg = [
+          `## Active Scenario: ${ctx.title}`,
+          ctx.runbook?.narrative ? `### Situation\n${ctx.runbook.narrative}` : '',
+          `### Key Problems\n${ctx.hints?.key_problems?.join('\n') || 'None listed'}`,
+          `### Diagnosis Path\n${ctx.hints?.diagnosis_path || 'Start by checking session health.'}`,
+          `### Flag Meanings\n${Object.entries(ctx.hints?.flag_meanings || {}).map(([k, v]) => `- ${k}: ${v}`).join('\n') || 'N/A'}`,
+          `### Common Mistakes to Avoid\n${ctx.hints?.common_mistakes?.join('\n') || 'None listed'}`,
+          `### Success Criteria (scenario is resolved when ALL are met)\n${ctx.success_criteria?.map((c, i) => `${i + 1}. ${c}`).join('\n') || 'None defined'}`,
+        ].filter(Boolean).join('\n\n');
+      }
 
       const msgs = [
         { role: 'system', content: SYSTEM_PROMPT },
-        ...(scenarioOverlay ? [{ role: 'system', content: `Active scenario context:\n${scenarioOverlay}` }] : []),
+        ...(scenarioContextMsg ? [{ role: 'system', content: scenarioContextMsg }] : []),
         { role: 'system', content: `Current system state:\n${contextHint}` },
         ...get().messages.filter((m) => m.role !== 'system').slice(-12).map((m) => ({ role: m.role, content: m.content })),
         { role: 'user', content },

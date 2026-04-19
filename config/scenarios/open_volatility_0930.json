@@ -1,7 +1,7 @@
 {
   "name": "open_volatility_0930",
-  "description": "9:35 AM market open: GME LULD Level-1 circuit-breaker halt triggered at 09:31:44 ET (GME dropped 22% in first 90 seconds) — 4 orders totaling $1.2M blocked; BATS experiencing intermittent packet loss (latency 450ms vs 5ms SLA, east-spine congestion NOC ticket #44823) — 5 orders unacknowledged; 3 orders rejected by NYSE with OrdStatus=Rejected (39=8) Text='Outside LULD price band'; duplicate NewOrderSingle detected for AAPL CLO-413 submitted twice by algo failsafe — one must be canceled; 2 healthy fills completed.",
-  "simulated_time": "2026-03-28T09:35:00",
+  "description": "9:35 AM market open: GME LULD Level-1 circuit-breaker halt triggered at 09:31:44 ET (GME dropped 22% in first 90 seconds) \u2014 4 orders totaling $1.2M blocked; BATS experiencing intermittent packet loss (latency 450ms vs 5ms SLA, east-spine congestion NOC ticket #44823) \u2014 5 orders unacknowledged; 3 orders rejected by NYSE with OrdStatus=Rejected (39=8) Text='Outside LULD price band'; duplicate NewOrderSingle detected for AAPL CLO-413 submitted twice by algo failsafe \u2014 one must be canceled; 2 healthy fills completed.",
+  "simulated_time": "09:35 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -51,7 +51,7 @@
       "latency_ms": 450,
       "host": "bats-gateway.prod.internal",
       "port": 4003,
-      "error": "Intermittent packet loss — east spine congestion; NOC ticket #44823; MsgSeqNum gaps detected; HeartBtInt breaches occurring",
+      "error": "Intermittent packet loss \u2014 east spine congestion; NOC ticket #44823; MsgSeqNum gaps detected; HeartBtInt breaches occurring",
       "connected_since": "2026-03-28T04:00:03"
     },
     {
@@ -88,7 +88,9 @@
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "stuck",
-      "flags": ["luld_halt"],
+      "flags": [
+        "luld_halt"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:28:00",
@@ -102,14 +104,16 @@
       "side": "sell",
       "quantity": 1500,
       "order_type": "limit",
-      "price": 42.00,
+      "price": 42.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["luld_halt"],
+      "flags": [
+        "luld_halt"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:29:00",
@@ -123,14 +127,17 @@
       "side": "buy",
       "quantity": 3000,
       "order_type": "limit",
-      "price": 38.50,
+      "price": 38.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Firm Prop Desk",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["luld_halt", "venue_degraded"],
+      "flags": [
+        "luld_halt",
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:29:30",
@@ -151,7 +158,9 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["luld_halt"],
+      "flags": [
+        "luld_halt"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:00",
@@ -165,14 +174,16 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 212.50,
+      "price": 212.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "stuck",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:05",
@@ -186,14 +197,16 @@
       "side": "sell",
       "quantity": 800,
       "order_type": "limit",
-      "price": 421.00,
+      "price": 421.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "stuck",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:10",
@@ -207,14 +220,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 876.00,
+      "price": 876.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:15",
@@ -235,7 +250,9 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:20",
@@ -249,14 +266,16 @@
       "side": "buy",
       "quantity": 300,
       "order_type": "limit",
-      "price": 185.00,
+      "price": 185.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:25",
@@ -270,14 +289,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 195.00,
+      "price": 195.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "rejected",
-      "flags": ["outside_price_band"],
+      "flags": [
+        "outside_price_band"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:31:00",
@@ -291,14 +312,16 @@
       "side": "sell",
       "quantity": 2000,
       "order_type": "limit",
-      "price": 35.00,
+      "price": 35.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "rejected",
-      "flags": ["outside_price_band"],
+      "flags": [
+        "outside_price_band"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:31:15",
@@ -312,14 +335,16 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 108.00,
+      "price": 108.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Firm Prop Desk",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "rejected",
-      "flags": ["outside_price_band"],
+      "flags": [
+        "outside_price_band"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:31:30",
@@ -333,14 +358,16 @@
       "side": "buy",
       "quantity": 750,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["dup_order"],
+      "flags": [
+        "dup_order"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:32:00",
@@ -354,14 +381,16 @@
       "side": "buy",
       "quantity": 750,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["dup_order"],
+      "flags": [
+        "dup_order"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:32:01",
@@ -375,7 +404,7 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 175.00,
+      "price": 175.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
@@ -396,7 +425,7 @@
       "side": "sell",
       "quantity": 400,
       "order_type": "limit",
-      "price": 197.50,
+      "price": 197.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Aspen Asset Management",
@@ -409,5 +438,94 @@
       "created_at": "2026-03-28T09:30:35",
       "updated_at": "2026-03-28T09:31:45"
     }
+  ],
+  "title": "Opening Volatility \u2014 LULD Circuit Breaker",
+  "severity": "high",
+  "estimated_minutes": 20,
+  "categories": [
+    "orders",
+    "regulatory",
+    "session"
+  ],
+  "difficulty": "intermediate",
+  "runbook": {
+    "narrative": "It's 09:35 AM \u2014 the bell just rang 5 minutes ago. GME dropped 22% in the first 90 seconds and triggered a LULD Level-1 circuit breaker at 09:31:44 ET. 4 orders totaling $1.2M are blocked on GME. BATS is experiencing packet loss at 450ms latency (east-spine congestion, NoC ticket #44823). 3 orders rejected by NYSE with 'Outside LULD price band'. A duplicate AAPL order was submitted by an algo failsafe \u2014 one must be canceled.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check All Venue Health",
+        "narrative": "Verify session states. BATS is degraded, NYSE/ARCA/IEX are active. Confirm the scope.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "BATS degraded, NYSE/ARCA/IEX active"
+      },
+      {
+        "step": 2,
+        "title": "Review GME LULD-Halted Orders",
+        "narrative": "Find all orders blocked by the LULD halt. They carry luld_halt flag.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "GME"
+        },
+        "expected": "4 blocked GME orders with luld_halt flag"
+      },
+      {
+        "step": 3,
+        "title": "Check BATS Degraded Orders",
+        "narrative": "Find orders stuck due to BATS packet loss. venue_degraded flag.",
+        "tool": "query_orders",
+        "tool_args": {
+          "venue": "BATS"
+        },
+        "expected": "5 unacknowledged orders on BATS"
+      },
+      {
+        "step": 4,
+        "title": "Handle Duplicate AAPL Order",
+        "narrative": "Query orders for AAPL to find the duplicate CLO-413 submission. Cancel one.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "AAPL"
+        },
+        "expected": "Duplicate AAPL order identified, one canceled"
+      },
+      {
+        "step": 5,
+        "title": "Mark NYSE as Degraded",
+        "narrative": "If BATS congestion is spilling over to NYSE with price-band rejections, flag NYSE as degraded to slow algorithmic flow.",
+        "tool": "update_venue_status",
+        "tool_args": {
+          "venue": "NYSE",
+          "status": "degraded"
+        },
+        "expected": "NYSE marked degraded, algo flow slows"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "GME LULD Level-1 circuit breaker halts all trading \u2014 4 orders blocked until band reopens",
+      "BATS packet loss at 450ms from east-spine congestion \u2014 5 orders unacknowledged",
+      "Duplicate AAPL order from algo failsafe \u2014 creates risk of double execution"
+    ],
+    "flag_meanings": {
+      "luld_halt": "Symbol is halted due to Limit Up-Limit Down circuit breaker. Orders will not execute until the band reopens. Do NOT cancel \u2014 they will fill when trading resumes.",
+      "venue_degraded": "Venue is experiencing packet loss or elevated latency. Orders may be delayed.",
+      "outside_price_band": "Order price is outside the LULD price band. Will be rejected until band recalibrates.",
+      "dup_order": "Duplicate order detected from algo failsafe. One must be canceled to prevent double execution."
+    },
+    "diagnosis_path": "Check session health globally. The GME halt requires no intervention \u2014 orders are paused, not stuck. Focus on BATS degraded orders and the duplicate AAPL order.",
+    "common_mistakes": [
+      "Canceling LULD-halted orders \u2014 they will fill when trading resumes, canceling costs the client their position.",
+      "Not resolving the duplicate order \u2014 could result in double the intended position.",
+      "Ignoring BATS degradation \u2014 orders sitting unacknowledged for minutes risk SLA breaches."
+    ]
+  },
+  "success_criteria": [
+    "BATS session restored to active status",
+    "Duplicate AAPL order canceled",
+    "No orders have dup_order flag",
+    "LULD-halted GME orders remain open (not canceled) \u2014 this is correct behavior",
+    "No SLA breaches on institutional orders"
   ]
 }

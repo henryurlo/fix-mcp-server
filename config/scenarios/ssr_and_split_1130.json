@@ -1,7 +1,7 @@
 {
   "name": "ssr_and_split_1130",
-  "description": "11:34 AM dual regulatory/CA crisis: RIDE SSR triggered at 10:45 ET (stock -12.4% on DOJ news) — 5 short orders rejected OrdStatus=Rejected (39=8) Text='SSR in effect — short exempt required'; 1 prop desk RIDE short pending locate (locate_required); AAPL 4-for-1 split effective 12:00 ET in 26 minutes — 8 live AAPL orders need quantity×4 / price÷4 ratio adjustment (split_adjustment_pending) before split takes effect or fills will be economically wrong; 6 healthy orders on other symbols.",
-  "simulated_time": "2026-03-28T11:34:00",
+  "description": "11:34 AM dual regulatory/CA crisis: RIDE SSR triggered at 10:45 ET (stock -12.4% on DOJ news) \u2014 5 short orders rejected OrdStatus=Rejected (39=8) Text='SSR in effect \u2014 short exempt required'; 1 prop desk RIDE short pending locate (locate_required); AAPL 4-for-1 split effective 12:00 ET in 26 minutes \u2014 8 live AAPL orders need quantity\u00d74 / price\u00f74 ratio adjustment (split_adjustment_pending) before split takes effect or fills will be economically wrong; 6 healthy orders on other symbols.",
+  "simulated_time": "11:34 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -81,14 +81,16 @@
       "side": "sell",
       "quantity": 5000,
       "order_type": "limit",
-      "price": 18.50,
+      "price": 18.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Firm Prop Desk",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "rejected",
-      "flags": ["ssr_active"],
+      "flags": [
+        "ssr_active"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:50:00",
@@ -109,7 +111,9 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "rejected",
-      "flags": ["ssr_active"],
+      "flags": [
+        "ssr_active"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:51:00",
@@ -123,14 +127,16 @@
       "side": "sell",
       "quantity": 2000,
       "order_type": "limit",
-      "price": 19.00,
+      "price": 19.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "rejected",
-      "flags": ["ssr_active"],
+      "flags": [
+        "ssr_active"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:52:00",
@@ -144,14 +150,16 @@
       "side": "sell",
       "quantity": 8000,
       "order_type": "limit",
-      "price": 18.00,
+      "price": 18.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "rejected",
-      "flags": ["ssr_active"],
+      "flags": [
+        "ssr_active"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:53:00",
@@ -165,14 +173,16 @@
       "side": "sell",
       "quantity": 1500,
       "order_type": "limit",
-      "price": 19.50,
+      "price": 19.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "rejected",
-      "flags": ["ssr_active"],
+      "flags": [
+        "ssr_active"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:54:00",
@@ -186,14 +196,17 @@
       "side": "sell",
       "quantity": 10000,
       "order_type": "limit",
-      "price": 17.50,
+      "price": 17.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Firm Prop Desk",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["locate_required", "ssr_active"],
+      "flags": [
+        "locate_required",
+        "ssr_active"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:55:00",
@@ -207,14 +220,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 848.00,
+      "price": 848.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:00",
@@ -228,14 +243,16 @@
       "side": "sell",
       "quantity": 200,
       "order_type": "limit",
-      "price": 852.00,
+      "price": 852.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:32:00",
@@ -256,7 +273,9 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:35:00",
@@ -270,14 +289,16 @@
       "side": "sell",
       "quantity": 150,
       "order_type": "limit",
-      "price": 855.00,
+      "price": 855.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:40:00",
@@ -291,14 +312,16 @@
       "side": "buy",
       "quantity": 250,
       "order_type": "limit",
-      "price": 845.00,
+      "price": 845.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:45:00",
@@ -312,14 +335,16 @@
       "side": "sell",
       "quantity": 100,
       "order_type": "limit",
-      "price": 858.00,
+      "price": 858.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:00:00",
@@ -333,14 +358,16 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 843.00,
+      "price": 843.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:15:00",
@@ -361,7 +388,9 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["split_adjustment_pending"],
+      "flags": [
+        "split_adjustment_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:30:00",
@@ -375,7 +404,7 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 419.00,
+      "price": 419.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
@@ -396,7 +425,7 @@
       "side": "sell",
       "quantity": 600,
       "order_type": "limit",
-      "price": 176.00,
+      "price": 176.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Aspen Asset Management",
@@ -417,7 +446,7 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 876.50,
+      "price": 876.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Birch Funds",
@@ -459,7 +488,7 @@
       "side": "buy",
       "quantity": 800,
       "order_type": "limit",
-      "price": 172.00,
+      "price": 172.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
@@ -480,7 +509,7 @@
       "side": "sell",
       "quantity": 200,
       "order_type": "limit",
-      "price": 581.00,
+      "price": 581.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Rowan Partners",
@@ -493,5 +522,93 @@
       "created_at": "2026-03-28T11:30:00",
       "updated_at": "2026-03-28T11:30:00"
     }
+  ],
+  "title": "SSR + Stock Split Crisis",
+  "severity": "critical",
+  "estimated_minutes": 35,
+  "categories": [
+    "orders",
+    "regulatory",
+    "reference_data"
+  ],
+  "difficulty": "advanced",
+  "runbook": {
+    "narrative": "It's 11:34 AM. A dual crisis: RIDE (Lordstown Motors) triggered SSR at 10:45 ET after a 12.4% drop on DOJ news \u2014 5 short orders rejected with 'SSR in effect \u2014 short exempt required'. Simultaneously, AAPL has a 4-for-1 split effective in 26 minutes at 12:00 ET. 8 live AAPL limit sell orders need quantity\u00d74 / price\u00f74 adjustment or they will fill at economically wrong prices. 1 prop desk RIDE short is pending locate.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check All Sessions",
+        "narrative": "Confirm all 4 venues are healthy. This is a regulatory/data problem, not a session problem.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "All sessions active \u2014 venues are not the issue"
+      },
+      {
+        "step": 2,
+        "title": "Find SSR-Rejected RIDE Orders",
+        "narrative": "Query orders for RIDE. The 5 rejected short orders need short-exempt flag. 1 prop desk order needs locate.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "RIDE"
+        },
+        "expected": "5 rejected RIDE shorts with ssr_active, 1 with locate_required"
+      },
+      {
+        "step": 3,
+        "title": "Find AAPL Split-Adjustment Orders",
+        "narrative": "Query AAPL orders to find the 8 that need split_adjustment_pending correction before 12:00.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "AAPL"
+        },
+        "expected": "8 AAPL orders with split_adjustment_pending flag"
+      },
+      {
+        "step": 4,
+        "title": "Apply AAPL Split Adjustments",
+        "narrative": "For each AAPL order: quantity \u00d7 4, price \u00f7 4. Remove split_adjustment_pending flag.",
+        "tool": "validate_orders",
+        "tool_args": {
+          "symbol": "AAPL"
+        },
+        "expected": "8 AAPL orders adjusted \u2014 quantities and prices corrected"
+      },
+      {
+        "step": 5,
+        "title": "Resolve RIDE SSR Orders",
+        "narrative": "Re-submit rejected RIDE shorts with short-exempt flag, or cancel if locate cannot be obtained.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "RIDE",
+          "status": "rejected"
+        },
+        "expected": "5 RIDE orders corrected with short-exempt or canceled"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "RIDE SSR in effect \u2014 5 short orders rejected, 1 needs locate",
+      "AAPL 4-for-1 split in 26 minutes \u2014 8 orders need quantity\u00d74 / price\u00f74 adjustment",
+      "If split adjustment is not done by 12:00 ET, fills will be at wrong prices causing economic damage"
+    ],
+    "flag_meanings": {
+      "ssr_active": "Short Sale Restriction is in effect. Short orders must be at or above NBBO or carry short-exempt flag.",
+      "locate_required": "Prop desk short order needs a locate from the broker-dealer before it can be submitted.",
+      "split_adjustment_pending": "Order needs price/quantity adjustment for a pending stock split. Must be corrected before split effective time."
+    },
+    "diagnosis_path": "Start with RIDE SSR orders \u2014 those are immediately actionable. Then move to AAPL split adjustment \u2014 the 26-minute deadline is critical.",
+    "common_mistakes": [
+      "Adjusting AAPL orders incorrectly \u2014 it is quantity \u00d74 and price \u00f74, not the other way around.",
+      "Missing the AAPL 12:00 ET deadline \u2014 orders not adjusted before the split will fill at wrong prices.",
+      "Not securing a locate for the prop desk RIDE order before attempting to re-submit."
+    ]
+  },
+  "success_criteria": [
+    "All RIDE SSR orders re-submitted with short-exempt or canceled",
+    "All 8 AAPL orders have quantity adjusted by 4\u00d7",
+    "All 8 AAPL orders have price adjusted by \u00f74",
+    "No orders have ssr_active, locate_required, or split_adjustment_pending flags",
+    "Prop desk locate obtained for pending RIDE short"
   ]
 }

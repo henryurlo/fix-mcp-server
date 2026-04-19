@@ -1,7 +1,7 @@
 {
   "name": "is_dark_failure_1415",
-  "description": "2:15 PM dual algo crisis: MSFT IS 100K (Willow Investments) shortfall at 66.8bps vs 30bps limit — spread widened from 3bps to 22bps since arrival at 14:00, avg_px 421.80 vs arrival 419.00, 60K remaining with 15min to window close; NVDA dark aggregator 150K (Birch Funds) forced to lit fallback — Liquidnet offline + IEX dark degraded, 110K unexecuted in dark, routing via BATS lit now but VWAP benchmark leaking.",
-  "simulated_time": "2026-03-28T14:15:00",
+  "description": "2:15 PM dual algo crisis: MSFT IS 100K (Willow Investments) shortfall at 66.8bps vs 30bps limit \u2014 spread widened from 3bps to 22bps since arrival at 14:00, avg_px 421.80 vs arrival 419.00, 60K remaining with 15min to window close; NVDA dark aggregator 150K (Birch Funds) forced to lit fallback \u2014 Liquidnet offline + IEX dark degraded, 110K unexecuted in dark, routing via BATS lit now but VWAP benchmark leaking.",
+  "simulated_time": "14:15 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -68,7 +68,7 @@
       "latency_ms": 38,
       "host": "iex-gateway.prod.internal",
       "port": 4004,
-      "error": "Dark pool sub-component still recovering — Liquidnet FIX connectivity rejected; lit ATS accepting orders; dark order routing suspended",
+      "error": "Dark pool sub-component still recovering \u2014 Liquidnet FIX connectivity rejected; lit ATS accepting orders; dark order routing suspended",
       "connected_since": "2026-03-28T04:00:07"
     }
   ],
@@ -87,13 +87,16 @@
       "total_slices": 6,
       "completed_slices": 4,
       "executed_qty": 40000,
-      "avg_px": 421.80,
-      "arrival_px": 419.00,
-      "benchmark_px": 419.00,
+      "avg_px": 421.8,
+      "arrival_px": 419.0,
+      "benchmark_px": 419.0,
       "schedule_pct": 50.0,
       "execution_pct": 40.0,
       "status": "running",
-      "flags": ["high_is_shortfall", "spread_widened"],
+      "flags": [
+        "high_is_shortfall",
+        "spread_widened"
+      ],
       "child_order_ids": [
         "ORD-20260328-1401",
         "ORD-20260328-1402",
@@ -104,7 +107,7 @@
       "venue": "NYSE",
       "is_institutional": true,
       "sla_minutes": 20,
-      "notes": "IS shortfall 66.8bps vs 30bps limit. Bid-ask spread widened from 3bps at arrival to 22bps now — post-Fed minutes release. Options: (1) pause and wait for spread to tighten, (2) accelerate to complete before close, (3) accept slippage and document."
+      "notes": "IS shortfall 66.8bps vs 30bps limit. Bid-ask spread widened from 3bps at arrival to 22bps now \u2014 post-Fed minutes release. Options: (1) pause and wait for spread to tighten, (2) accelerate to complete before close, (3) accept slippage and document."
     },
     {
       "algo_id": "ALGO-20260328-022",
@@ -120,13 +123,16 @@
       "total_slices": 8,
       "completed_slices": 2,
       "executed_qty": 40000,
-      "avg_px": 875.20,
-      "arrival_px": 873.50,
-      "benchmark_px": 874.40,
+      "avg_px": 875.2,
+      "arrival_px": 873.5,
+      "benchmark_px": 874.4,
       "schedule_pct": 0.0,
       "execution_pct": 26.7,
       "status": "running",
-      "flags": ["venue_fallback", "no_dark_fill"],
+      "flags": [
+        "venue_fallback",
+        "no_dark_fill"
+      ],
       "child_order_ids": [
         "ORD-20260328-1406",
         "ORD-20260328-1407",
@@ -135,7 +141,7 @@
       "venue": "BATS",
       "is_institutional": true,
       "sla_minutes": 30,
-      "notes": "Dark aggregator routing: Liquidnet FIX SessionStatus=8 (offline); IEX dark suspended. All 8 dark IOC slices rejected. Fell back to BATS lit (40K executed). 110K remaining — VWAP benchmark now leaking due to lit participation. Consider pausing until IEX dark restored or client approval for full lit execution."
+      "notes": "Dark aggregator routing: Liquidnet FIX SessionStatus=8 (offline); IEX dark suspended. All 8 dark IOC slices rejected. Fell back to BATS lit (40K executed). 110K remaining \u2014 VWAP benchmark now leaking due to lit participation. Consider pausing until IEX dark restored or client approval for full lit execution."
     }
   ],
   "orders": [
@@ -147,14 +153,16 @@
       "side": "buy",
       "quantity": 10000,
       "order_type": "limit",
-      "price": 419.50,
+      "price": 419.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 10000,
       "fix_messages": [],
       "created_at": "2026-03-28T14:00:30",
@@ -168,14 +176,16 @@
       "side": "buy",
       "quantity": 10000,
       "order_type": "limit",
-      "price": 420.00,
+      "price": 420.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 10000,
       "fix_messages": [],
       "created_at": "2026-03-28T14:03:00",
@@ -189,14 +199,16 @@
       "side": "buy",
       "quantity": 10000,
       "order_type": "limit",
-      "price": 421.00,
+      "price": 421.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 10000,
       "fix_messages": [],
       "created_at": "2026-03-28T14:07:00",
@@ -210,14 +222,16 @@
       "side": "buy",
       "quantity": 10000,
       "order_type": "limit",
-      "price": 422.00,
+      "price": 422.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 10000,
       "fix_messages": [],
       "created_at": "2026-03-28T14:10:00",
@@ -231,14 +245,17 @@
       "side": "buy",
       "quantity": 15000,
       "order_type": "limit",
-      "price": 422.50,
+      "price": 422.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["algo_child", "spread_widened"],
+      "flags": [
+        "algo_child",
+        "spread_widened"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T14:13:00",
@@ -252,14 +269,17 @@
       "side": "buy",
       "quantity": 40000,
       "order_type": "limit",
-      "price": 875.00,
+      "price": 875.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "filled",
-      "flags": ["algo_child", "venue_fallback"],
+      "flags": [
+        "algo_child",
+        "venue_fallback"
+      ],
       "filled_quantity": 40000,
       "fix_messages": [],
       "created_at": "2026-03-28T13:50:00",
@@ -273,14 +293,18 @@
       "side": "buy",
       "quantity": 40000,
       "order_type": "limit",
-      "price": 875.50,
+      "price": 875.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["algo_child", "venue_fallback", "no_dark_fill"],
+      "flags": [
+        "algo_child",
+        "venue_fallback",
+        "no_dark_fill"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T14:12:00",
@@ -294,7 +318,7 @@
       "side": "sell",
       "quantity": 100,
       "order_type": "limit",
-      "price": 452.00,
+      "price": 452.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Firm Prop Desk",
@@ -307,5 +331,95 @@
       "created_at": "2026-03-28T14:10:00",
       "updated_at": "2026-03-28T14:10:00"
     }
+  ],
+  "title": "Dark Pool Failure + IS Shortfall",
+  "severity": "high",
+  "estimated_minutes": 25,
+  "categories": [
+    "algo",
+    "session",
+    "orders"
+  ],
+  "difficulty": "advanced",
+  "runbook": {
+    "narrative": "It's 2:15 PM. Dual algo crisis: MSFT IS 100K (Willow Investments) has a 66.8bps shortfall vs the 30bps limit \u2014 spread widened from 3bps to 22bps since arrival at 14:00, average execution is $421.80 vs arrival $419.00, with 60K remaining and 15 minutes to window close. The NVDA dark aggregator 150K has been forced to lit fallback because Liquidnet is offline and IEX dark is degraded \u2014 110K unexecuted in dark, now routing via BATS lit but VWAP benchmark is leaking.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check MSFT IS Status",
+        "narrative": "Get the MSFT IS algo details \u2014 shortfall, remaining quantity, time remaining.",
+        "tool": "check_algo_status",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-005"
+        },
+        "expected": "MSFT IS 66.8bps shortfall, 60K remaining, 15 min to close"
+      },
+      {
+        "step": 2,
+        "title": "Check NVDA Dark Aggregator Status",
+        "narrative": "Get the NVDA dark aggregator details \u2014 dark fill rate, lit fallback activity.",
+        "tool": "check_algo_status",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-006"
+        },
+        "expected": "NVDA dark agg zero dark fills, 110K unexecuted, routing via BATS lit"
+      },
+      {
+        "step": 3,
+        "title": "Switch NVDA Dark to Lit TWAP",
+        "narrative": "Dark venues are illiquid for NVDA at current size. Cancel the dark algo and re-submit as TWAP on lit venues.",
+        "tool": "cancel_algo",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-006"
+        },
+        "expected": "NVDA dark aggregator canceled, orders released"
+      },
+      {
+        "step": 4,
+        "title": "Investigate MSFT IS Spread Widening",
+        "narrative": "Check MSFT session and market conditions. Spread is 22bps vs normal 3bps.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "MSFT"
+        },
+        "expected": "MSFT spread widening confirmed, assess if IS can complete within 30bps"
+      },
+      {
+        "step": 5,
+        "title": "Adjust MSFT IS Parameters",
+        "narrative": "If the shortfall exceeds the 30bps limit and cannot recover, escalate or pause the IS to prevent further damage.",
+        "tool": "modify_algo",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-005",
+          "action": "pause"
+        },
+        "expected": "MSFT IS paused pending decision \u2014 escalate to desk head"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "MSFT IS shortfall 66.8bps vs 30bps limit \u2014 spread widened to 22bps, 60K remaining",
+      "NVDA dark aggregator has zero dark fills, needs to switch to lit venue TWAP",
+      "Both algos need intervention \u2014 NVDA can be switched to lit TWAP, MSFT may need escalation"
+    ],
+    "flag_meanings": {
+      "high_is_shortfall": "Implementation Shortfall algo is performing worse than the acceptable limit. May need pause/escalation.",
+      "no_dark_fill": "Dark aggregator received zero fills from dark venues. May need to switch to lit venue.",
+      "venue_fallback": "Algo has fallen back from primary dark venue to lit venue due to dark venue failure.",
+      "spread_widened": "Market spread has widened significantly from normal levels, impacting IS performance."
+    },
+    "diagnosis_path": "Check both algos. NVDA dark to lit switch is straightforward. MSFT IS needs careful analysis \u2014 if spread cannot normalize within 15 minutes, escalating is better than blowing through the 30bp limit.",
+    "common_mistakes": [
+      "Letting MSFT IS continue with 66.8bps shortfall \u2014 each additional fill at this spread worsens the benchmark.",
+      "Not canceling the NVDA dark aggregator \u2014 it is sending orders to illiquid dark venues when lit is the only option.",
+      "Confusing dark aggregator with IS \u2014 they are different algo types requiring different responses."
+    ]
+  },
+  "success_criteria": [
+    "NVDA dark aggregator canceled and re-submitted as lit TWAP",
+    "MSFT IS paused to prevent further shortfall",
+    "Escalation logged for MSFT IS 66.8bps shortfall",
+    "NVDA orders executing via lit venue with acceptable slippage"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "predawn_adrs_0430",
-  "description": "4:35 AM pre-dawn: London open revealed Shell ADR rebranding (RDSA→SHEL effective today) — 4 orders carrying stale symbol RDSA will reject at exchange; ARCA elevated latency 220ms (NJ data-center hub failover, NOC ticket #44821) threatening 5 queued institutional orders; 3 FX-linked stop orders on BP, HSBC, BCS have stale stop prices after GBP/USD moved +180bps overnight to 1.2840; NYSE, BATS, IEX healthy.",
-  "simulated_time": "2026-03-28T04:35:00",
+  "description": "4:35 AM pre-dawn: London open revealed Shell ADR rebranding (RDSA\u2192SHEL effective today) \u2014 4 orders carrying stale symbol RDSA will reject at exchange; ARCA elevated latency 220ms (NJ data-center hub failover, NOC ticket #44821) threatening 5 queued institutional orders; 3 FX-linked stop orders on BP, HSBC, BCS have stale stop prices after GBP/USD moved +180bps overnight to 1.2840; NYSE, BATS, IEX healthy.",
+  "simulated_time": "04:35 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -34,7 +34,7 @@
       "latency_ms": 220,
       "host": "arca-gateway.prod.internal",
       "port": 4002,
-      "error": "Elevated latency 220ms — NJ hub failover in progress; NOC ticket #44821 open; SLA threshold 10ms; HeartBtInt acks delayed",
+      "error": "Elevated latency 220ms \u2014 NJ hub failover in progress; NOC ticket #44821 open; SLA threshold 10ms; HeartBtInt acks delayed",
       "connected_since": "2026-03-28T04:00:05"
     },
     {
@@ -81,14 +81,16 @@
       "side": "buy",
       "quantity": 2000,
       "order_type": "limit",
-      "price": 62.50,
+      "price": 62.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-27T17:30:00",
@@ -102,14 +104,16 @@
       "side": "sell",
       "quantity": 1500,
       "order_type": "limit",
-      "price": 63.00,
+      "price": 63.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-27T17:35:00",
@@ -130,7 +134,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-27T17:40:00",
@@ -144,14 +150,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 62.00,
+      "price": 62.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["stale_ticker"],
+      "flags": [
+        "stale_ticker"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-27T17:45:00",
@@ -165,14 +173,16 @@
       "side": "buy",
       "quantity": 5000,
       "order_type": "stop",
-      "price": 40.50,
-      "stop_px": 39.00,
+      "price": 40.5,
+      "stop_px": 39.0,
       "venue": "NYSE",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["fx_stop_stale"],
+      "flags": [
+        "fx_stop_stale"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-27T16:00:00",
@@ -186,14 +196,16 @@
       "side": "sell",
       "quantity": 3000,
       "order_type": "stop",
-      "price": 43.00,
-      "stop_px": 41.50,
+      "price": 43.0,
+      "stop_px": 41.5,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["fx_stop_stale"],
+      "flags": [
+        "fx_stop_stale"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-27T16:05:00",
@@ -214,7 +226,9 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["fx_stop_stale"],
+      "flags": [
+        "fx_stop_stale"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-27T16:10:00",
@@ -228,14 +242,16 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T04:00:00",
@@ -249,14 +265,16 @@
       "side": "sell",
       "quantity": 800,
       "order_type": "limit",
-      "price": 420.00,
+      "price": 420.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T04:05:00",
@@ -277,7 +295,9 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T04:10:00",
@@ -291,14 +311,16 @@
       "side": "sell",
       "quantity": 600,
       "order_type": "limit",
-      "price": 175.00,
+      "price": 175.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T04:15:00",
@@ -312,14 +334,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 580.00,
+      "price": 580.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T04:20:00",
@@ -333,7 +357,7 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 490.00,
+      "price": 490.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
@@ -354,7 +378,7 @@
       "side": "sell",
       "quantity": 250,
       "order_type": "limit",
-      "price": 198.00,
+      "price": 198.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Aspen Asset Management",
@@ -367,5 +391,91 @@
       "created_at": "2026-03-28T04:28:00",
       "updated_at": "2026-03-28T04:28:00"
     }
+  ],
+  "title": "Predawn ADR Pricing Crisis",
+  "severity": "medium",
+  "estimated_minutes": 15,
+  "categories": [
+    "session",
+    "orders",
+    "reference_data"
+  ],
+  "difficulty": "intermediate",
+  "runbook": {
+    "narrative": "It's 4:35 AM. London open revealed the Shell ADR rebranding \u2014 RDSA symbol has been renamed to SHEL effective today. 4 orders carrying stale symbol RDSA will reject at the exchange. ARCA has elevated latency at 220ms from a NJ data-center hub failover (NoC ticket #44821). Additionally, 3 FX-linked stop orders on BP, HSBC, BCS have stale stop prices after GBP/USD moved +180bps overnight to 1.2840.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check All Sessions",
+        "narrative": "Confirm ARCA is degraded at 220ms, other venues healthy.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "ARCA degraded, NYSE/BATS/IEX active"
+      },
+      {
+        "step": 2,
+        "title": "Check RDSA Ticker Status",
+        "narrative": "Verify RDSA has pending rename to SHEL effective today.",
+        "tool": "check_ticker",
+        "tool_args": {
+          "symbol": "RDSA"
+        },
+        "expected": "RDSA shows stale_ticker, pending rename to SHEL"
+      },
+      {
+        "step": 3,
+        "title": "Update RDSA to SHEL",
+        "narrative": "Rename RDSA to SHEL and update all open orders.",
+        "tool": "update_ticker",
+        "tool_args": {
+          "old_symbol": "RDSA",
+          "new_symbol": "SHEL",
+          "reason": "corporate_action"
+        },
+        "expected": "RDSA renamed to SHEL, 4 orders updated"
+      },
+      {
+        "step": 4,
+        "title": "Check FX-Linked Stop Orders",
+        "narrative": "Query orders for BP, HSBC, BCS \u2014 verify stop prices are stale after GBP/USD moved +180bps.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "BP"
+        },
+        "expected": "3 orders with fx_stop_stale flag identified"
+      },
+      {
+        "step": 5,
+        "title": "Adjust Stale FX Stop Prices",
+        "narrative": "Update stop prices on BP, HSBC, BCS orders using new FX rate 1.2840.",
+        "tool": "validate_orders",
+        "tool_args": {},
+        "expected": "Stop prices adjusted to reflect current FX rate"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "RDSA renamed to SHEL \u2014 4 orders carrying stale symbol will reject at exchange",
+      "ARCA latency 220ms from NJ hub failover",
+      "3 FX-linked stop orders on BP/HSBC/BCS need price adjustment after GBP/USD +180bps move"
+    ],
+    "flag_meanings": {
+      "stale_ticker": "Symbol has pending rename. Use update_ticker to correct all open orders.",
+      "venue_degraded": "ARCA latency elevated at 220ms. Orders may be delayed.",
+      "fx_stop_stale": "Stop price calculated using outdated FX rate. Must be recalculated with current rate."
+    },
+    "diagnosis_path": "Start with the RDSA->SHEL rename \u2014 orders with stale symbols will fail at the exchange immediately. Then address the 3 FX-linked stop orders.",
+    "common_mistakes": [
+      "Not updating RDSA before the 09:30 open \u2014 stale symbol orders will reject at the exchange.",
+      "Recalculating FX stop prices without the correct current rate \u2014 use GBP/USD 1.2840.",
+      "Ignoring the ARCA degradation \u2014 it affects 5 queued institutional orders."
+    ]
+  },
+  "success_criteria": [
+    "RDSA renamed to SHEL in reference store",
+    "No orders carry stale_ticker flag",
+    "FX stop prices updated on BP, HSBC, BCS orders",
+    "ARCA latency resolved or orders rerouted to healthy venues"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "iex_recovery_1400",
-  "description": "2:03 PM IEX session recovery: session was down 13:00-14:00 ET (TCP keepalive failure, HeartBtInt timeout after 3 consecutive missed heartbeats) — recovered at 14:00:12 ET; ResendRequest (35=2) sent for seq gap 8938-8940 — acknowledged; 10 orders were diverted during outage: 6 to BATS, 4 to NYSE (iex_rerouted flag); 4 diverted orders have partial fills — do NOT reroute; 4 orders carry D-Limit order type that only executes on IEX (iex_dlimit_required) — must be rerouted back; NYSE and BATS healthy.",
-  "simulated_time": "2026-03-28T14:03:00",
+  "description": "2:03 PM IEX session recovery: session was down 13:00-14:00 ET (TCP keepalive failure, HeartBtInt timeout after 3 consecutive missed heartbeats) \u2014 recovered at 14:00:12 ET; ResendRequest (35=2) sent for seq gap 8938-8940 \u2014 acknowledged; 10 orders were diverted during outage: 6 to BATS, 4 to NYSE (iex_rerouted flag); 4 diverted orders have partial fills \u2014 do NOT reroute; 4 orders carry D-Limit order type that only executes on IEX (iex_dlimit_required) \u2014 must be rerouted back; NYSE and BATS healthy.",
+  "simulated_time": "14:03 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -81,14 +81,16 @@
       "side": "buy",
       "quantity": 800,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["iex_rerouted"],
+      "flags": [
+        "iex_rerouted"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:05:00",
@@ -102,14 +104,16 @@
       "side": "sell",
       "quantity": 600,
       "order_type": "limit",
-      "price": 420.00,
+      "price": 420.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["iex_rerouted"],
+      "flags": [
+        "iex_rerouted"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:10:00",
@@ -123,14 +127,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 876.00,
+      "price": 876.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["iex_rerouted"],
+      "flags": [
+        "iex_rerouted"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:15:00",
@@ -144,14 +150,16 @@
       "side": "sell",
       "quantity": 400,
       "order_type": "limit",
-      "price": 175.50,
+      "price": 175.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["iex_rerouted"],
+      "flags": [
+        "iex_rerouted"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:20:00",
@@ -172,7 +180,9 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["iex_rerouted"],
+      "flags": [
+        "iex_rerouted"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:25:00",
@@ -186,14 +196,16 @@
       "side": "sell",
       "quantity": 500,
       "order_type": "limit",
-      "price": 579.50,
+      "price": 579.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["iex_rerouted"],
+      "flags": [
+        "iex_rerouted"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:30:00",
@@ -207,14 +219,17 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 172.50,
+      "price": 172.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Aspen Asset Management",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "partially_filled",
-      "flags": ["iex_rerouted", "partial_fill_do_not_move"],
+      "flags": [
+        "iex_rerouted",
+        "partial_fill_do_not_move"
+      ],
       "filled_quantity": 400,
       "fix_messages": [],
       "created_at": "2026-03-28T13:10:00",
@@ -228,14 +243,17 @@
       "side": "sell",
       "quantity": 600,
       "order_type": "limit",
-      "price": 213.00,
+      "price": 213.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "partially_filled",
-      "flags": ["iex_rerouted", "partial_fill_do_not_move"],
+      "flags": [
+        "iex_rerouted",
+        "partial_fill_do_not_move"
+      ],
       "filled_quantity": 200,
       "fix_messages": [],
       "created_at": "2026-03-28T13:15:00",
@@ -249,14 +267,17 @@
       "side": "buy",
       "quantity": 2000,
       "order_type": "limit",
-      "price": 42.50,
+      "price": 42.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "partially_filled",
-      "flags": ["iex_rerouted", "partial_fill_do_not_move"],
+      "flags": [
+        "iex_rerouted",
+        "partial_fill_do_not_move"
+      ],
       "filled_quantity": 750,
       "fix_messages": [],
       "created_at": "2026-03-28T13:20:00",
@@ -277,7 +298,10 @@
       "is_institutional": false,
       "sla_minutes": null,
       "status": "partially_filled",
-      "flags": ["iex_rerouted", "partial_fill_do_not_move"],
+      "flags": [
+        "iex_rerouted",
+        "partial_fill_do_not_move"
+      ],
       "filled_quantity": 150,
       "fix_messages": [],
       "created_at": "2026-03-28T13:25:00",
@@ -291,14 +315,17 @@
       "side": "buy",
       "quantity": 300,
       "order_type": "limit",
-      "price": 875.00,
+      "price": 875.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["iex_rerouted", "iex_dlimit_required"],
+      "flags": [
+        "iex_rerouted",
+        "iex_dlimit_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:10:00",
@@ -312,14 +339,17 @@
       "side": "sell",
       "quantity": 200,
       "order_type": "limit",
-      "price": 176.00,
+      "price": 176.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["iex_rerouted", "iex_dlimit_required"],
+      "flags": [
+        "iex_rerouted",
+        "iex_dlimit_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:20:00",
@@ -333,14 +363,17 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "limit",
-      "price": 211.50,
+      "price": 211.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Sycamore Group",
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["iex_rerouted", "iex_dlimit_required"],
+      "flags": [
+        "iex_rerouted",
+        "iex_dlimit_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:30:00",
@@ -354,14 +387,17 @@
       "side": "sell",
       "quantity": 800,
       "order_type": "limit",
-      "price": 173.00,
+      "price": 173.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Willow Investments",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["iex_rerouted", "iex_dlimit_required"],
+      "flags": [
+        "iex_rerouted",
+        "iex_dlimit_required"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:40:00",
@@ -375,7 +411,7 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 184.50,
+      "price": 184.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Aspen Asset Management",
@@ -417,7 +453,7 @@
       "side": "buy",
       "quantity": 3000,
       "order_type": "limit",
-      "price": 38.50,
+      "price": 38.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
@@ -438,7 +474,7 @@
       "side": "sell",
       "quantity": 200,
       "order_type": "limit",
-      "price": 490.00,
+      "price": 490.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
@@ -459,7 +495,7 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 531.00,
+      "price": 531.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Willow Investments",
@@ -480,7 +516,7 @@
       "side": "sell",
       "quantity": 500,
       "order_type": "limit",
-      "price": 452.00,
+      "price": 452.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Firm Prop Desk",
@@ -493,5 +529,86 @@
       "created_at": "2026-03-28T14:02:30",
       "updated_at": "2026-03-28T14:02:30"
     }
+  ],
+  "title": "IEX Session Recovery",
+  "severity": "medium",
+  "estimated_minutes": 15,
+  "categories": [
+    "session",
+    "orders"
+  ],
+  "difficulty": "beginner",
+  "runbook": {
+    "narrative": "It's 2:03 PM. IEX session has just recovered from a 47-minute outage (13:00-14:00 ET, TCP keepalive failure, HeartBtInt timeout after 3 consecutive missed heartbeats). A ResendRequest (35=2) was sent for sequence gap 8938-8940 and acknowledged. 10 orders were diverted during the outage: 6 to BATS, 4 to NYSE. 4 diverted orders have partial fills and must NOT be rerouted back to IEX. 4 orders carry D-Limit order type that only executes on IEX \u2014 these MUST be rerouted back to IEX.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Confirm IEX Recovery",
+        "narrative": "Heartbeat IEX to confirm it has recovered from the outage.",
+        "tool": "session_heartbeat",
+        "tool_args": {
+          "venue": "IEX"
+        },
+        "expected": "IEX recovered, session active"
+      },
+      {
+        "step": 2,
+        "title": "Dump IEX Session State",
+        "narrative": "Check sequence numbers \u2014 ResendRequest was sent for gap 8938-8940.",
+        "tool": "dump_session_state",
+        "tool_args": {
+          "venue": "IEX"
+        },
+        "expected": "Gap 8938-8940 acknowledged, no further gaps"
+      },
+      {
+        "step": 3,
+        "title": "Review Diverted Orders",
+        "narrative": "Find the 10 orders diverted during outage. Identify which have partial fills (do not reroute) vs D-Limit (must reroute).",
+        "tool": "query_orders",
+        "tool_args": {},
+        "expected": "10 diverted orders: 6 partial_fill_do_not_move, 4 iex_dlimit_required"
+      },
+      {
+        "step": 4,
+        "title": "Reroute D-Limit Orders Back to IEX",
+        "narrative": "The 4 iex_dlimit_required orders must go back to IEX since they only execute on IEX.",
+        "tool": "validate_orders",
+        "tool_args": {},
+        "expected": "4 D-Limit orders rerouted back to IEX"
+      },
+      {
+        "step": 5,
+        "title": "Verify Full Recovery",
+        "narrative": "Confirm all orders are in proper state and IEX session is flowing normally.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "All sessions active, all orders in correct state"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "IEX just recovered from 47-minute outage \u2014 sequence gap 8938-8940 was sent via ResendRequest",
+      "10 orders diverted during outage: 6 to BATS, 4 to NYSE",
+      "4 orders have partial fills \u2014 do NOT reroute. 4 carry D-Limit type \u2014 must reroute back to IEX"
+    ],
+    "flag_meanings": {
+      "iex_rerouted": "Order was rerouted away from IEX during the outage.",
+      "partial_fill_do_not_move": "Order has partial fills \u2014 rerouting would cause duplicate or lost fills.",
+      "iex_dlimit_required": "D-Limit order type that only executes on IEX. Must be rerouted back to IEX when recovered."
+    },
+    "diagnosis_path": "Confirm IEX is recovered. Review diverted orders carefully \u2014 partial fills stay where they are, D-Limit orders must go back to IEX.",
+    "common_mistakes": [
+      "Rerouting partially-filled orders \u2014 this can cause duplicate fills or lost executions.",
+      "Not returning D-Limit orders to IEX \u2014 they will not execute on other venues.",
+      "Not verifying the sequence gap 8938-8940 was properly acknowledged."
+    ]
+  },
+  "success_criteria": [
+    "IEX session active with no sequence gaps",
+    "4 D-Limit orders rerouted back to IEX",
+    "Partially-filled orders remain on their current venue",
+    "All orders have correct venue assignment"
   ]
 }

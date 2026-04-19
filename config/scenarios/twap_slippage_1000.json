@@ -1,7 +1,7 @@
 {
   "name": "twap_slippage_1000",
-  "description": "10:05 AM TWAP slippage alert: NVDA 500K TWAP (Maple Capital, $437.5M) is 5.2 ppts behind schedule — 24% executed vs 29.2% time elapsed — BATS degraded at 85ms causing slice rejections since 09:52; AAPL 50K TWAP (Rowan Partners) running 4 ppts behind but within tolerance; 2 rejected NVDA slices require reroute to NYSE or IEX.",
-  "simulated_time": "2026-03-28T10:05:00",
+  "description": "10:05 AM TWAP slippage alert: NVDA 500K TWAP (Maple Capital, $437.5M) is 5.2 ppts behind schedule \u2014 24% executed vs 29.2% time elapsed \u2014 BATS degraded at 85ms causing slice rejections since 09:52; AAPL 50K TWAP (Rowan Partners) running 4 ppts behind but within tolerance; 2 rejected NVDA slices require reroute to NYSE or IEX.",
+  "simulated_time": "10:05 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -51,7 +51,7 @@
       "latency_ms": 85,
       "host": "bats-gateway.prod.internal",
       "port": 4003,
-      "error": "Elevated latency 85ms — Mahwah network flap; algo slice rejections since 09:52 ET",
+      "error": "Elevated latency 85ms \u2014 Mahwah network flap; algo slice rejections since 09:52 ET",
       "connected_since": "2026-03-28T04:00:03"
     },
     {
@@ -87,13 +87,16 @@
       "total_slices": 10,
       "completed_slices": 4,
       "executed_qty": 120000,
-      "avg_px": 874.00,
-      "arrival_px": 871.50,
-      "benchmark_px": 872.80,
+      "avg_px": 874.0,
+      "arrival_px": 871.5,
+      "benchmark_px": 872.8,
       "schedule_pct": 29.2,
       "execution_pct": 24.0,
       "status": "stuck",
-      "flags": ["algo_behind_schedule", "slice_rejected"],
+      "flags": [
+        "algo_behind_schedule",
+        "slice_rejected"
+      ],
       "child_order_ids": [
         "ORD-20260328-1001",
         "ORD-20260328-1002",
@@ -121,13 +124,15 @@
       "total_slices": 6,
       "completed_slices": 3,
       "executed_qty": 25000,
-      "avg_px": 211.80,
-      "arrival_px": 211.20,
+      "avg_px": 211.8,
+      "arrival_px": 211.2,
       "benchmark_px": 211.55,
       "schedule_pct": 58.3,
       "execution_pct": 50.0,
       "status": "running",
-      "flags": ["algo_behind_schedule"],
+      "flags": [
+        "algo_behind_schedule"
+      ],
       "child_order_ids": [
         "ORD-20260328-1007",
         "ORD-20260328-1008"
@@ -147,14 +152,16 @@
       "side": "buy",
       "quantity": 30000,
       "order_type": "limit",
-      "price": 873.50,
+      "price": 873.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 30000,
       "fix_messages": [],
       "created_at": "2026-03-28T09:31:00",
@@ -168,14 +175,16 @@
       "side": "buy",
       "quantity": 30000,
       "order_type": "limit",
-      "price": 874.00,
+      "price": 874.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 30000,
       "fix_messages": [],
       "created_at": "2026-03-28T09:43:00",
@@ -196,7 +205,9 @@
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 30000,
       "fix_messages": [],
       "created_at": "2026-03-28T09:55:00",
@@ -210,14 +221,16 @@
       "side": "buy",
       "quantity": 30000,
       "order_type": "limit",
-      "price": 874.50,
+      "price": 874.5,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 30000,
       "fix_messages": [],
       "created_at": "2026-03-28T09:55:30",
@@ -231,14 +244,17 @@
       "side": "buy",
       "quantity": 50000,
       "order_type": "limit",
-      "price": 875.00,
+      "price": 875.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "stuck",
-      "flags": ["algo_child", "slice_rejected"],
+      "flags": [
+        "algo_child",
+        "slice_rejected"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:52:00",
@@ -252,14 +268,17 @@
       "side": "buy",
       "quantity": 50000,
       "order_type": "limit",
-      "price": 875.00,
+      "price": 875.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Maple Capital",
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "stuck",
-      "flags": ["algo_child", "slice_rejected"],
+      "flags": [
+        "algo_child",
+        "slice_rejected"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:04:00",
@@ -273,14 +292,16 @@
       "side": "buy",
       "quantity": 12500,
       "order_type": "limit",
-      "price": 211.50,
+      "price": 211.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "filled",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 12500,
       "fix_messages": [],
       "created_at": "2026-03-28T09:40:00",
@@ -294,14 +315,16 @@
       "side": "buy",
       "quantity": 12500,
       "order_type": "limit",
-      "price": 212.00,
+      "price": 212.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:02:00",
@@ -315,14 +338,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 531.00,
+      "price": 531.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Firm Prop Desk",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "stuck",
-      "flags": ["venue_degraded"],
+      "flags": [
+        "venue_degraded"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:01:00",
@@ -336,7 +361,7 @@
       "side": "sell",
       "quantity": 100,
       "order_type": "limit",
-      "price": 420.00,
+      "price": 420.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
@@ -349,5 +374,96 @@
       "created_at": "2026-03-28T10:03:00",
       "updated_at": "2026-03-28T10:03:00"
     }
+  ],
+  "title": "TWAP Slippage Alert",
+  "severity": "high",
+  "estimated_minutes": 20,
+  "categories": [
+    "algo",
+    "session",
+    "orders"
+  ],
+  "difficulty": "intermediate",
+  "runbook": {
+    "narrative": "It's 10:05 AM. The NVDA 500K TWAP for Maple Capital is 5.2 percentage points behind schedule \u2014 24% executed vs 29.2% time elapsed. BATS degradation at 85ms is causing slice rejections since 09:52 ET. 2 rejected NVDA child slices need rerouting to NYSE or IEX. The AAPL 50K TWAP is 4 points behind but within tolerance.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check BATS Session Health",
+        "narrative": "Confirm BATS is degraded and causing the NVDA slice rejections.",
+        "tool": "session_heartbeat",
+        "tool_args": {
+          "venue": "BATS"
+        },
+        "expected": "BATS degraded at 85ms latency"
+      },
+      {
+        "step": 2,
+        "title": "Check NVDA TWAP Status",
+        "narrative": "Get the NVDA algorithm order details \u2014 schedule percentage vs execution percentage.",
+        "tool": "check_algo_status",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-001"
+        },
+        "expected": "NVDA TWAP 24% executed vs 29.2% schedule, 2 rejected child slices"
+      },
+      {
+        "step": 3,
+        "title": "Pause NVDA TWAP",
+        "narrative": "Pause the NVDA TWAP to prevent further slice rejections while BATS is degraded.",
+        "tool": "modify_algo",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-001",
+          "action": "pause"
+        },
+        "expected": "NVDA TWAP paused, no new slices sent to BATS"
+      },
+      {
+        "step": 4,
+        "title": "Reroute Rejected Slices",
+        "narrative": "Re-submit the 2 rejected NVDA child slices to NYSE or IEX where sessions are healthy.",
+        "tool": "update_venue_status",
+        "tool_args": {
+          "venue": "BATS",
+          "status": "degraded"
+        },
+        "expected": "Rejected slices rerouted to NYSE or IEX"
+      },
+      {
+        "step": 5,
+        "title": "Resume NVDA TWAP",
+        "narrative": "Once BATS recovers or alternative routing is confirmed, resume the TWAP and monitor catch-up rate.",
+        "tool": "modify_algo",
+        "tool_args": {
+          "algo_id": "ALGO-20260328-001",
+          "action": "resume"
+        },
+        "expected": "NVDA TWAP resumed, tracking toward schedule"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "NVDA TWAP is 5.2% behind schedule due to BATS slice rejections",
+      "2 child slices rejected by BATS need manual rerouting",
+      "AAPL TWAP is within tolerance but should be monitored for catch-up"
+    ],
+    "flag_meanings": {
+      "slice_rejected": "Algo child slice was rejected by the venue. Usually due to session degradation or price band.",
+      "algo_behind_schedule": "Algo execution rate is below the scheduled pace. Risk of missing completion deadline.",
+      "venue_degraded": "Session is degraded \u2014 orders may be rejected or delayed. Mark venue degraded to deprioritize routing."
+    },
+    "diagnosis_path": "Start by checking BATS health \u2014 that is the root cause. Pause the NVDA TWAP to stop further rejections. Then reroute rejected slices and resume.",
+    "common_mistakes": [
+      "Not pausing the TWAP before rerouting \u2014 continued slicing will generate more rejections.",
+      "Rerouting to BATS again without confirming recovery.",
+      "Ignoring the AAPL TWAP \u2014 it is within tolerance now but may drift further."
+    ]
+  },
+  "success_criteria": [
+    "NVDA TWAP execution percentage is within 2% of schedule",
+    "No rejected child slices remain",
+    "NVDA TWAP resumed and proceeding toward completion",
+    "AAPL TWAP remains within tolerance"
   ]
 }

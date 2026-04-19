@@ -1,7 +1,7 @@
 {
   "name": "eod_moc_1530",
-  "description": "3:31 PM MOC crunch: ARCA MOC cutoff passed at 15:28 ET — 2 orders missed cutoff (moc_cutoff_missed); NYSE MOC cutoff in 14 minutes at 15:45 ET — 6 pending MOC orders; Maple Capital 500,000-share AAPL MOC order ($106M notional) flagged large_moc_regulatory_review — may represent >5% of expected closing volume and requires pre-submission compliance check; 6 day orders auto-cancel at 16:00:00 ET (day_order_eod_cancel); 5 Birch Funds GTC orders confirmed good-till-canceled — do not cancel; all 4 sessions healthy.",
-  "simulated_time": "2026-03-28T15:31:00",
+  "description": "3:31 PM MOC crunch: ARCA MOC cutoff passed at 15:28 ET \u2014 2 orders missed cutoff (moc_cutoff_missed); NYSE MOC cutoff in 14 minutes at 15:45 ET \u2014 6 pending MOC orders; Maple Capital 500,000-share AAPL MOC order ($106M notional) flagged large_moc_regulatory_review \u2014 may represent >5% of expected closing volume and requires pre-submission compliance check; 6 day orders auto-cancel at 16:00:00 ET (day_order_eod_cancel); 5 Birch Funds GTC orders confirmed good-till-canceled \u2014 do not cancel; all 4 sessions healthy.",
+  "simulated_time": "15:31 ET",
   "sessions": [
     {
       "venue": "NYSE",
@@ -88,7 +88,10 @@
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["large_moc_regulatory_review", "moc_pending"],
+      "flags": [
+        "large_moc_regulatory_review",
+        "moc_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:25:00",
@@ -109,7 +112,9 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "stuck",
-      "flags": ["moc_cutoff_missed"],
+      "flags": [
+        "moc_cutoff_missed"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:27:00",
@@ -130,7 +135,9 @@
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "stuck",
-      "flags": ["moc_cutoff_missed"],
+      "flags": [
+        "moc_cutoff_missed"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:27:30",
@@ -151,7 +158,9 @@
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["moc_pending"],
+      "flags": [
+        "moc_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:28:00",
@@ -172,7 +181,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["moc_pending"],
+      "flags": [
+        "moc_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:28:30",
@@ -193,7 +204,9 @@
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["moc_pending"],
+      "flags": [
+        "moc_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:29:00",
@@ -214,7 +227,9 @@
       "is_institutional": true,
       "sla_minutes": 20,
       "status": "new",
-      "flags": ["moc_pending"],
+      "flags": [
+        "moc_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:29:30",
@@ -235,7 +250,9 @@
       "is_institutional": true,
       "sla_minutes": 25,
       "status": "new",
-      "flags": ["moc_pending"],
+      "flags": [
+        "moc_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:30:00",
@@ -256,7 +273,9 @@
       "is_institutional": true,
       "sla_minutes": 15,
       "status": "new",
-      "flags": ["moc_pending"],
+      "flags": [
+        "moc_pending"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T15:30:30",
@@ -270,14 +289,16 @@
       "side": "buy",
       "quantity": 300,
       "order_type": "limit",
-      "price": 211.00,
+      "price": 211.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_eod_cancel"],
+      "flags": [
+        "day_order_eod_cancel"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:35:00",
@@ -291,14 +312,16 @@
       "side": "sell",
       "quantity": 200,
       "order_type": "limit",
-      "price": 421.50,
+      "price": 421.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_eod_cancel"],
+      "flags": [
+        "day_order_eod_cancel"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:00:00",
@@ -312,14 +335,16 @@
       "side": "buy",
       "quantity": 150,
       "order_type": "limit",
-      "price": 578.00,
+      "price": 578.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_eod_cancel"],
+      "flags": [
+        "day_order_eod_cancel"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:30:00",
@@ -333,14 +358,16 @@
       "side": "sell",
       "quantity": 800,
       "order_type": "limit",
-      "price": 43.00,
+      "price": 43.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "partially_filled",
-      "flags": ["day_order_eod_cancel"],
+      "flags": [
+        "day_order_eod_cancel"
+      ],
       "filled_quantity": 300,
       "fix_messages": [],
       "created_at": "2026-03-28T11:00:00",
@@ -354,14 +381,16 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 171.00,
+      "price": 171.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Cedar Trading",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_eod_cancel"],
+      "flags": [
+        "day_order_eod_cancel"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T11:30:00",
@@ -375,14 +404,16 @@
       "side": "sell",
       "quantity": 100,
       "order_type": "limit",
-      "price": 878.00,
+      "price": 878.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Elm Securities",
       "is_institutional": false,
       "sla_minutes": null,
       "status": "new",
-      "flags": ["day_order_eod_cancel"],
+      "flags": [
+        "day_order_eod_cancel"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T12:00:00",
@@ -396,14 +427,16 @@
       "side": "buy",
       "quantity": 1000,
       "order_type": "limit",
-      "price": 208.00,
+      "price": 208.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["gtc_preserve"],
+      "flags": [
+        "gtc_preserve"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T09:30:00",
@@ -417,14 +450,16 @@
       "side": "sell",
       "quantity": 800,
       "order_type": "limit",
-      "price": 425.00,
+      "price": 425.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["gtc_preserve"],
+      "flags": [
+        "gtc_preserve"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T10:00:00",
@@ -438,14 +473,16 @@
       "side": "buy",
       "quantity": 400,
       "order_type": "limit",
-      "price": 173.00,
+      "price": 173.0,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["gtc_preserve"],
+      "flags": [
+        "gtc_preserve"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T11:00:00",
@@ -459,14 +496,16 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 870.00,
+      "price": 870.0,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["gtc_preserve"],
+      "flags": [
+        "gtc_preserve"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T12:00:00",
@@ -480,14 +519,16 @@
       "side": "sell",
       "quantity": 600,
       "order_type": "limit",
-      "price": 186.00,
+      "price": 186.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Birch Funds",
       "is_institutional": true,
       "sla_minutes": 30,
       "status": "new",
-      "flags": ["gtc_preserve"],
+      "flags": [
+        "gtc_preserve"
+      ],
       "filled_quantity": 0,
       "fix_messages": [],
       "created_at": "2026-03-28T13:00:00",
@@ -501,7 +542,7 @@
       "side": "sell",
       "quantity": 500,
       "order_type": "limit",
-      "price": 213.50,
+      "price": 213.5,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Aspen Asset Management",
@@ -522,7 +563,7 @@
       "side": "buy",
       "quantity": 300,
       "order_type": "limit",
-      "price": 874.00,
+      "price": 874.0,
       "stop_px": null,
       "venue": "BATS",
       "client_name": "Willow Investments",
@@ -543,7 +584,7 @@
       "side": "sell",
       "quantity": 600,
       "order_type": "limit",
-      "price": 419.50,
+      "price": 419.5,
       "stop_px": null,
       "venue": "IEX",
       "client_name": "Maple Capital",
@@ -564,7 +605,7 @@
       "side": "buy",
       "quantity": 200,
       "order_type": "limit",
-      "price": 172.50,
+      "price": 172.5,
       "stop_px": null,
       "venue": "ARCA",
       "client_name": "Sycamore Group",
@@ -585,7 +626,7 @@
       "side": "sell",
       "quantity": 300,
       "order_type": "limit",
-      "price": 580.00,
+      "price": 580.0,
       "stop_px": null,
       "venue": "NYSE",
       "client_name": "Rowan Partners",
@@ -598,5 +639,88 @@
       "created_at": "2026-03-28T15:15:00",
       "updated_at": "2026-03-28T15:15:00"
     }
+  ],
+  "title": "EOD MOC Crunch",
+  "severity": "high",
+  "estimated_minutes": 20,
+  "categories": [
+    "orders",
+    "regulatory",
+    "reference_data"
+  ],
+  "difficulty": "intermediate",
+  "runbook": {
+    "narrative": "It's 3:31 PM. The MOC cutoff is in 14 minutes at 15:45 ET. 6 pending MOC orders need to be reviewed and submitted. The Maple Capital 500K AAPL MOC order ($106M notional) is flagged large_moc_regulatory_review \u2014 it may represent over 5% of expected closing volume and requires pre-submission compliance check. 2 ARCA MOC orders missed the 15:28 ET cutoff. At 16:00 ET, 6 day orders will auto-cancel and 5 Birch Funds GTC orders must be preserved.",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Check All Sessions",
+        "narrative": "Confirm all 4 venues are active and healthy before the EOD rush.",
+        "tool": "check_fix_sessions",
+        "tool_args": {},
+        "expected": "All sessions active \u2014 venues are healthy"
+      },
+      {
+        "step": 2,
+        "title": "Review MOC Pending Orders",
+        "narrative": "Find all MOC orders. Check for moc_cutoff_missed and moc_pending flags.",
+        "tool": "query_orders",
+        "tool_args": {},
+        "expected": "6 pending MOC orders, 2 with moc_cutoff_missed"
+      },
+      {
+        "step": 3,
+        "title": "Handle Large MOC Review",
+        "narrative": "The Maple Capital 500K AAPL MOC order ($106M) needs compliance review before submission.",
+        "tool": "query_orders",
+        "tool_args": {
+          "symbol": "AAPL"
+        },
+        "expected": "500K AAPL MOC order identified for large_moc_regulatory_review"
+      },
+      {
+        "step": 4,
+        "title": "Submit MOC Orders",
+        "narrative": "Submit all MOC orders that are within cutoff and pass compliance review before 15:45 ET.",
+        "tool": "validate_orders",
+        "tool_args": {},
+        "expected": "MOC orders submitted, cutoff orders escalated"
+      },
+      {
+        "step": 5,
+        "title": "Preserve GTC Orders",
+        "narrative": "Confirm 5 Birch Funds GTC orders are flagged gtc_preserve \u2014 do NOT cancel at 16:00 ET.",
+        "tool": "query_orders",
+        "tool_args": {},
+        "expected": "5 GTC orders confirmed with gtc_preserve flag"
+      }
+    ]
+  },
+  "hints": {
+    "key_problems": [
+      "6 pending MOC orders, 2 already missed cutoff at 15:28 ET",
+      "Maple Capital 500K AAPL MOC order ($106M) needs compliance review",
+      "At 16:00 ET: 6 day orders auto-cancel, 5 Birch Funds GTC must be preserved"
+    ],
+    "flag_meanings": {
+      "moc_cutoff_missed": "MOC order submitted after the published cutoff \u2014 exchange will reject. Escalate to desk.",
+      "moc_pending": "MOC order awaiting submission before cutoff deadline.",
+      "large_moc_regulatory_review": "MOC order size is large relative to expected closing volume. Requires compliance review before submission.",
+      "day_order_eod_cancel": "Day order will be auto-canceled at 16:00 ET end-of-day purge.",
+      "gtc_preserve": "Good-Till-Canceled order must survive the EOD purge. Do NOT cancel."
+    },
+    "diagnosis_path": "Check sessions first. Then review all MOC orders \u2014 identify cutoff misses and the large MOC that needs compliance. Focus on submitting what you can before 15:45 ET.",
+    "common_mistakes": [
+      "Submitting MOC orders that missed cutoff \u2014 exchange will reject and create confusion.",
+      "Missing the large MOC compliance review \u2014 regulatory risk if a $106M order goes through unchecked.",
+      "Canceling GTC orders at EOD \u2014 Birch Funds GTC orders must be preserved."
+    ]
+  },
+  "success_criteria": [
+    "All eligible MOC orders submitted before 15:45 ET cutoff",
+    "2 cutoff-missed MOC orders escalated to desk",
+    "Large MOC regulatory review completed",
+    "5 Birch Funds GTC orders preserved with gtc_preserve flag",
+    "No orders incorrectly canceled at EOD purge"
   ]
 }
