@@ -2,11 +2,12 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import ReactFlow, {
+  Handle,
+  Position,
   Background,
   Controls,
   Node,
   Edge,
-  Position,
   MarkerType,
   Panel,
 } from 'reactflow';
@@ -38,6 +39,7 @@ function ExchangeNode({ data }: { data: any }) {
       textAlign: 'center',
       boxShadow: sc.glow,
     }}>
+      <Handle type="source" position={Position.Bottom} id="source" style={{ width: 6, height: 6, background: sc.border, border: 'none' }} />
       <div style={{ fontSize: 9, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 2, letterSpacing: '0.08em' }}>
         EXCHANGE
       </div>
@@ -72,6 +74,7 @@ function BrokerNode({ data }: { data: any }) {
       boxShadow: '0 0 20px #3b82f620, 0 0 40px #3b82f610',
       minWidth: 160,
     }}>
+      <Handle type="target" position={Position.Top} id="target-top" style={{ width: 6, height: 6, background: '#3b82f6', border: 'none' }} />
       <div style={{ fontSize: 9, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 2, letterSpacing: '0.08em' }}>
         BROKER HOST
       </div>
@@ -81,6 +84,8 @@ function BrokerNode({ data }: { data: any }) {
       <div style={{ fontSize: 10, color: '#8b92b0', marginTop: 3 }}>
         {data.sub}
       </div>
+      <Handle type="source" position={Position.Right} id="source-right" style={{ width: 6, height: 6, background: '#00d4ff', border: 'none' }} />
+      <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ width: 6, height: 6, background: '#3b82f6', border: 'none' }} />
     </div>
   );
 }
@@ -96,6 +101,7 @@ function ClientNode({ data }: { data: any }) {
       borderRadius: 10,
       textAlign: 'center',
     }}>
+      <Handle type="target" position={Position.Top} id="target" style={{ width: 6, height: 6, background: sc.border, border: 'none' }} />
       <div style={{ fontSize: 8, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 1, letterSpacing: '0.1em' }}>
         CLIENT
       </div>
@@ -117,7 +123,9 @@ function InfraNode({ data }: { data: any }) {
       border: '1px solid #1a1f35',
       borderRadius: 8,
       textAlign: 'center',
+      position: 'relative',
     }}>
+      <Handle type="target" position={Position.Top} id="target" style={{ width: 6, height: 6, background: '#1a1f35', border: 'none' }} />
       <div style={{ fontSize: 11, color: '#555d7a' }}>{data.icon || '🗄️'}</div>
       <div style={{ fontSize: 10, color: '#8b92b0', marginTop: 2 }}>{data.label}</div>
     </div>
@@ -135,7 +143,9 @@ function MarketDataNode({ data }: { data: any }) {
       borderRadius: 10,
       textAlign: 'center',
       boxShadow: '0 0 12px #00d4ff20',
+      position: 'relative',
     }}>
+      <Handle type="target" position={Position.Left} id="target" style={{ width: 6, height: 6, background: '#00d4ff', border: 'none' }} />
       <div style={{ fontSize: 9, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 2, letterSpacing: '0.08em' }}>
         MARKET DATA
       </div>
@@ -196,7 +206,9 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null) {
     edges.push({
       id: `e-${ex.id}-broker`,
       source: `ex-${ex.id}`,
+      sourceHandle: 'source',
       target: 'broker',
+      targetHandle: 'target-top',
       animated: status !== 'down',
       style: {
         stroke: status === 'down' ? '#ff3366' : status === 'degraded' ? '#f59e0b' : '#252c4a',
@@ -236,7 +248,9 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null) {
   edges.push({
     id: 'e-broker-md',
     source: 'broker',
+    sourceHandle: 'source-right',
     target: 'market-data',
+    targetHandle: 'target',
     animated: true,
     style: { stroke: '#00d4ff40', strokeWidth: 1.5 },
     markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 7, color: '#00d4ff50' },
@@ -270,7 +284,9 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null) {
     edges.push({
       id: `e-broker-${cl.id}`,
       source: 'broker',
+      sourceHandle: 'source-bottom',
       target: `cl-${cl.id}`,
+      targetHandle: 'target',
       animated: true,
       style: { stroke: '#252c4a', strokeWidth: 1.5 },
       markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 7, color: '#3a4470' },
@@ -295,14 +311,18 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null) {
   edges.push({
     id: 'e-broker-pg',
     source: 'broker',
+    sourceHandle: 'source-bottom',
     target: 'postgres',
+    targetHandle: 'target',
     style: { stroke: '#1a1f35', strokeWidth: 1 },
   });
 
   edges.push({
     id: 'e-broker-redis',
     source: 'broker',
+    sourceHandle: 'source-bottom',
     target: 'redis',
+    targetHandle: 'target',
     style: { stroke: '#1a1f35', strokeWidth: 1 },
   });
 
