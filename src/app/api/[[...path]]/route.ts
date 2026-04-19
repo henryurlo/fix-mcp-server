@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-const BACKEND = 'http://127.0.0.1:8000';
+const BACKEND = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
 
 async function handler(request: NextRequest) {
   // pathname is /api/status, /api/orders, etc.

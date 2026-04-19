@@ -68,6 +68,28 @@ services:
     volumes:
       - ./config:/app/config:ro
 
+  # ── Next.js console (Mission Control UI) ────────────────────────────────────
+  console:
+    build:
+      context: .
+      dockerfile: Dockerfile.console
+    container_name: fix-mcp-console
+    restart: on-failure
+    ports:
+      - "3000:3000"
+    environment:
+      - BACKEND_URL=http://api-server:8000
+      - NODE_ENV=production
+    depends_on:
+      api-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000 > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # ── Operational dashboard (WebSocket real-time order/session view) ───────────
   dashboard:
     build: .
