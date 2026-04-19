@@ -213,7 +213,7 @@ export default function Home() {
 // ── MISSION CONTROL (dynamic runbooks from scenario JSON) ─────────────
 
 function MissionControlTab() {
-  const { scenario, scenarioContext, available_scenarios: available, startScenario, sessions, callTool } = useSystem();
+  const { scenario, scenarioContext, scenarioState, completedSteps, available_scenarios: available, startScenario, completeStep, sessions, callTool } = useSystem();
   const { isOpen, toggleOpen, send } = useChat();
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<number>(0);
@@ -222,13 +222,30 @@ function MissionControlTab() {
   const activeScenarioName = scenario || selectedScenario;
   const activeContext = scenarioContext || null;
   const runbook = buildRunbook(activeContext);
-  const runbook = buildRunbook(activeScenarioName ? ctx : null);
+
+  // Derive phase from completed steps + total runbook steps
+  const totalSteps = runbook?.steps.length || 0;
+  const doneCount = completedSteps.length;
+  const pct = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
+  const isResolved = doneCount >= totalSteps && totalSteps > 0;
+
+  // Phase labels for the lifecycle indicator
+  const PHASES = [
+    { key: 'diagnosing', label: 'DIAGNOSE', icon: '🔍' },
+    { key: 'addressing', label: 'ADDRESS', icon: '🔧' },
+    { key: 'validating', label: 'VALIDATE', icon: '✅' },
+    { key: 'resolved', label: 'RESOLVED', icon: '🟢' },
+  ];
+
+  const currentPhaseIdx = isResolved ? 3 : doneCount === 0 ? 0 : doneCount < totalSteps * 0.4 ? 0 : doneCount < totalSteps * 0.8 ? 1 : 2;
+  const currentPhase = PHASES[currentPhaseIdx];
 
   const handleRunStep = async (step: RunbookStep) => {
     try {
       setStepResults((prev) => ({ ...prev, [step.step]: 'Running…' }));
       const result = await callTool(step.tool, step.tool_args);
       setStepResults((prev) => ({ ...prev, [step.step]: result || 'Done ✓' }));
+      completeStep(step.step);
     } catch (err: any) {
       setStepResults((prev) => ({ ...prev, [step.step]: `Error: ${err.message}` }));
     }
@@ -249,9 +266,8 @@ function MissionControlTab() {
   };
 
   // Check which success criteria are met (heuristic: no errors in step results)
-  const completedSteps = Object.keys(stepResults).length;
-  const totalSteps = runbook?.steps.length || 0;
-  const allStepsComplete = runbook && completedSteps === totalSteps && runbook.steps.length > 0;
+  const doneCountLocal = Object.keys(stepResults).length;
+  const allStepsComplete = runbook && doneCountLocal === totalSteps && runbook.steps.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
@@ -268,6 +284,21 @@ function MissionControlTab() {
                   FIX-MCP Mission Control
                 </h2>
                 <p className="text-[9px] text-[var(--text-muted)] font-mono">Pick a scenario ↓</p>
+              </div>
+            )}
+            {runbook && totalSteps > 0 && (
+              <div className="absolute top-1 left-1 right-1 z-10">
+                <div className="flex items-center gap-1 px-2 py-1 bg-[var(--bg-void)]/90 rounded-md backdrop-blur-sm border border-[var(--border-dim)]">
+                  <span className="text-[8px] font-mono">{currentPhase.icon}</span>
+                  {PHASES.map((p, i) => (
+                    <div key={p.key} className="flex-1 flex flex-col items-center">
+                      <div className={`h-1.5 rounded-full w-full ${
+                        i <= currentPhaseIdx ? (isResolved ? 'bg-[var(--green)]' : 'bg-[var(--cyan)]') : 'bg-[var(--border-dim)]'
+                      }`} />
+                    </div>
+                  ))}
+                  <span className="text-[7px] font-mono text-[var(--text-dim)]">{pct}%</span>
+                </div>
               </div>
             )}
           </div>
@@ -419,7 +450,7 @@ function MissionControlTab() {
                       )}
 
                       {/* Expected */}
-                    <p className="text-[8px] text-[var(--text-dim)] mt-1">
+                      <p className="text-[8px] text-[var(--text-dim)] mt-1">
                         Expected: {step.expected}
                       </p>
                     </div>
@@ -448,8 +479,6 @@ function MissionControlTab() {
                       </div>
                     </div>
                   )}
-                    </div>
-                  ))}
                 </div>
               </div>
 

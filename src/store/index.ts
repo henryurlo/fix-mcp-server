@@ -109,6 +109,10 @@ interface SystemState {
   scenario: string | null;
   available_scenarios: ScenarioDef[];
   scenarioContext: ScenarioContext | null;  // Full scenario data for active scenario
+  scenarioState: 'idle' | 'loading' | 'diagnosing' | 'addressing' | 'validating' | 'resolved' | 'failed';
+  completedSteps: number[];  // step numbers completed
+  completeStep: (stepNumber: number) => void;
+  resetScenarioState: () => void;
   mode: 'human' | 'agent' | 'mixed';
   loading: boolean;
   connected: boolean;
@@ -128,6 +132,19 @@ export const useSystem = create<SystemState>((set, get) => ({
   scenario: null,
   available_scenarios: [],
   scenarioContext: null,
+  scenarioState: 'idle',
+  completedSteps: [],
+  completeStep: (stepNumber: number) => {
+    set((s) => {
+      const steps = s.completedSteps.includes(stepNumber)
+        ? s.completedSteps
+        : [...s.completedSteps, stepNumber];
+      return { completedSteps: steps };
+    });
+  },
+  resetScenarioState: () => {
+    set({ scenarioState: 'idle', completedSteps: [] });
+  },
   mode: 'human',
   loading: false,
   connected: false,
@@ -173,19 +190,19 @@ export const useSystem = create<SystemState>((set, get) => ({
   },
 
   startScenario: async (name: string) => {
-    set({ loading: true });
+    set({ loading: true, scenarioState: 'loading', completedSteps: [] });
     try {
       await jsonPost('/api/reset', { scenario: name });
       await get().refresh();
       // Fetch full scenario context from the backend
       try {
         const ctx = await jsonFetch<ScenarioContext>(`/api/scenario/${name}`);
-        set({ scenarioContext: ctx });
+        set({ scenarioContext: ctx, scenarioState: 'diagnosing' });
       } catch {
-        set({ scenarioContext: null });
+        set({ scenarioContext: null, scenarioState: 'diagnosing' });
       }
     } catch (err: unknown) {
-      set({ loading: false, error: (err as Error).message });
+      set({ loading: false, error: (err as Error).message, scenarioState: 'idle' });
     }
   },
 

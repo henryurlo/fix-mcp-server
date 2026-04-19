@@ -173,22 +173,35 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null) {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // ── Exchanges (top row) ──
-  const exchanges = [
-    { id: 'nyse', label: 'NYSE', mic: 'XNYS', port: 9001 },
-    { id: 'nasdaq', label: 'NASDAQ', mic: 'XNAS', port: 9002 },
-    { id: 'tsx', label: 'TSX', mic: 'XTSE', port: 9003 },
-    { id: 'lse', label: 'LSE', mic: 'XLON', port: 9004 },
-  ];
+  // ── Exchanges (top row) — use actual configured venues ──
+  const sessionVenues = sessions.length > 0
+    ? [
+        { id: 'nyse', label: 'NYSE', mic: '' },
+        { id: 'arca', label: 'ARCA', mic: '' },
+        { id: 'bats', label: 'BATS', mic: '' },
+        { id: 'iex', label: 'IEX', mic: '' },
+      ]
+    : [
+        { id: 'nyse', label: 'NYSE', mic: 'XNYS' },
+        { id: 'nasdaq', label: 'NASDAQ', mic: 'XNAS' },
+        { id: 'tsx', label: 'TSX', mic: 'XTSE' },
+        { id: 'lse', label: 'LSE', mic: 'XLON' },
+      ];
 
   const exchangeY = 40;
   const exchangeXStart = 80;
-  const exchangeXGap = 220;
+  const exchangeXGap = sessions.length > 0 ? 200 : 220;
 
-  exchanges.forEach((ex, i) => {
-    // Match session data if available
+  sessionVenues.forEach((ex, i) => {
+    // Match session data
     const session = sessions.find(s => s.venue === ex.label || s.venue === ex.mic);
-    const status = session?.status || 'active';
+    const status = session?.status || 'idle';
+    const statusNum: Record<string, number> = { active: 3, degraded: 1, down: 0, idle: 2 };
+    const worstStatus = sessions.length > 0
+      ? (sessions.filter(s => s.status === 'down').length > 0 ? 'down'
+         : sessions.filter(s => s.status === 'degraded').length > 0 ? 'degraded'
+         : 'active')
+      : 'idle';
 
     nodes.push({
       id: `ex-${ex.id}`,
@@ -196,13 +209,13 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null) {
       position: { x: exchangeXStart + i * exchangeXGap, y: exchangeY },
       data: {
         label: ex.label,
-        sub: `FIX 4.2 • :${ex.port}`,
+        sub: `FIX 4.2`,
         status,
-        latency_ms: (session as any)?.latency_ms ?? (Math.random() * 8 + 1),
+        latency_ms: (session as any)?.latency_ms,
       },
     });
 
-    // Exchange → Broker edge
+    // Edge: exchange -> broker
     edges.push({
       id: `e-${ex.id}-broker`,
       source: `ex-${ex.id}`,
@@ -212,10 +225,10 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null) {
       animated: status !== 'down',
       style: {
         stroke: status === 'down' ? '#ff3366' : status === 'degraded' ? '#f59e0b' : '#252c4a',
-        strokeWidth: status === 'down' ? 3 : 2,
+        strokeWidth: status === 'down' ? 3 : 1.5,
         strokeDasharray: status === 'down' ? '8 4' : undefined,
       },
-      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 8, color: status === 'down' ? '#ff3366' : '#3a4470' },
+      markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 7, color: status === 'down' ? '#ff3366' : '#3a4470' },
     });
   });
 
