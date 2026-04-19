@@ -17,6 +17,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import threading
 from collections import deque
 from datetime import datetime, timezone
@@ -398,7 +399,7 @@ class APIHandler(BaseHTTPRequestHandler):
             self._send_json({"mode": _mode})
             return
 
-                if self.path.startswith("/api/events"):
+        if self.path.startswith("/api/events"):
             with _events_lock:
                 self._send_json(list(_events))
             return
@@ -475,6 +476,22 @@ class APIHandler(BaseHTTPRequestHandler):
             scenario = payload.get("scenario") or None
             active = server.reset_runtime(scenario)
             self._send_json({"output": f"Scenario loaded: {active}", "scenario": active, "ok": True})
+            return
+
+        if self.path == "/api/scenario":
+            payload = self._read_json()
+            name = payload.get("name", "").strip()
+            if not name:
+                self._send_json({"error": "Scenario 'name' is required"}, HTTPStatus.BAD_REQUEST)
+                return
+            # Sanitize name for filename
+            safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", name).lower()
+            config_dir = Path(server.engine.config_dir) / "scenarios"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            filepath = config_dir / f"{safe_name}.json"
+            with open(filepath, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, indent=2)
+            self._send_json({"output": f"Scenario saved: {safe_name}", "name": safe_name, "ok": True})
             return
 
         self.send_error(HTTPStatus.NOT_FOUND)
