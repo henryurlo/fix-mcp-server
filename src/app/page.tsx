@@ -36,12 +36,12 @@ const FixTerminal = dynamic(() => import('@/components/FixTerminal'), { ssr: fal
 const McpAuditLog = dynamic(() => import('@/components/McpAuditLog'), { ssr: false });
 const HeartbeatPanel = dynamic(() => import('@/components/HeartbeatPanel'), { ssr: false });
 
-type TabId = 'mission-control' | 'telemetry' | 'scenario-creator';
+type TabId = 'mission-control' | 'telemetry' | 'scenario-library';
 
 const TABS: { id: TabId; label: string; icon: any }[] = [
   { id: 'mission-control', label: 'Mission Control', icon: Layers },
   { id: 'telemetry', label: 'Telemetry', icon: BarChart3 },
-  { id: 'scenario-creator', label: 'Scenario Creator', icon: PlusCircle },
+  { id: 'scenario-library', label: 'Scenario Library', icon: PlusCircle },
 ];
 
 // ── Runbook types (aliased from store for convenience) ─────────────
@@ -200,7 +200,7 @@ export default function Home() {
         <main className="flex-1 overflow-hidden tab-content-enter">
           {activeTab === 'mission-control' && <MissionControlTab />}
           {activeTab === 'telemetry' && <TelemetryDashboard />}
-          {activeTab === 'scenario-creator' && <ScenarioCreator />}
+          {activeTab === 'scenario-library' && <ScenarioCreator />}
         </main>
         <aside className={`transition-all duration-300 ease-out bg-[var(--bg-base)] border-l border-[var(--border-dim)] ${isOpen ? 'w-[400px]' : 'w-0'} overflow-hidden shrink-0`}>
           <ChatPanel />

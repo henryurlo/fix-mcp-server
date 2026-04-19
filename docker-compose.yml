@@ -1,10 +1,10 @@
 # Production trading system — all services on a single host.
 # Run:  docker compose up -d
 # MCP stdio:  docker compose run --rm mcp-server
-# API:        http://localhost:8000
-# Dashboard:  http://localhost:8787
+# REST API:   http://localhost:8000
+# Web UI:     http://localhost:3000
 #
-# NOTE: API (8000) and Dashboard (8787) are bound to 0.0.0.0 (all interfaces)
+# NOTE: API (8000) and Web UI (3000) are bound to 0.0.0.0 (all interfaces)
 # so they are accessible from the host browser. PostgreSQL and Redis are
 # reachable only on the internal compose network (service names: postgres,
 # redis) — no host port binding. This avoids collisions with a native
@@ -25,156 +25,62 @@ services:
     environment:
       - SCENARIO=${SCENARIO:-morning_triage}
       - FIX_MCP_CONFIG_DIR=/app/config
-      - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
-      - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    stdin_open: true
-    tty: true
+      - OTEL_SERVICE_NAME=fix-mcp-server
     volumes:
       - ./config:/app/config:ro
+      - fix_logs:/opt/fix/logs
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/health\")' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
-  # ── REST API (Claude.ai integrations, dashboards, external OMS hooks) ───────
+  # ── REST API + event dispatcher ─────────────────────────────────────────────
   api-server:
     build: .
     container_name: fix-mcp-api
-    command: ["python", "-m", "fix_mcp.api"]
-    restart: on-failure
-    stdin_open: true
-    tty: true
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
+    command: ["python", "-m", "fix_mcp.api", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - SCENARIO=${SCENARIO:-morning_triage}
       - FIX_MCP_CONFIG_DIR=/app/config
+      - OTEL_SERVICE_NAME=fix-mcp-api
       - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
       - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+    ports:
+      - "8000:8000"
     volumes:
       - ./config:/app/config:ro
+      - fix_logs:/opt/fix/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
-  # ── Next.js console (Mission Control UI) ────────────────────────────────────
+  # ── Next.js Web Console (Mission Control) ───────────────────────────────────
   console:
     build:
       context: .
       dockerfile: Dockerfile.console
     container_name: fix-mcp-console
-    restart: on-failure
-    ports:
-      - "3000:3000"
+    restart: unless-stopped
     environment:
       - BACKEND_URL=http://api-server:8000
-      - NODE_ENV=production
-    depends_on:
-      api-server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000 > /dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # ── Operational dashboard (WebSocket real-time order/session view) ───────────
-  dashboard:
-    build: .
-    container_name: fix-mcp-dashboard
-    command: ["python", "-m", "fix_mcp.dashboard"]
-    restart: on-failure
-    stdin_open: true
-    tty: true
     ports:
-      - "8787:8080"
-    environment:
-      - FIX_MCP_CONFIG_DIR=/app/config
-      - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      api-server:
-        condition: service_healthy
+      - "3000:3000"
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080\")'"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    volumes:
-      - ./config:/app/config:ro
-
-  # ── FIX log generator (VCR-style simulation, writes to fix-logs volume) ────────
-  log-generator:
-    build: .
-    container_name: fix-mcp-loggen
-    command: ["python", "-m", "fix_mcp.log_generator", "--scenario", "${SCENARIO:-morning_triage}", "--output", "/var/log/fix", "--speed", "${LOG_SPEED:-10}"]
-    restart: "no"
-    environment:
-      - SCENARIO=${SCENARIO:-morning_triage}
-      - FIX_MCP_CONFIG_DIR=/app/config
-      - API_URL=http://api-server:8000
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     depends_on:
       - api-server
-    volumes:
-      - fix_logs:/var/log/fix
-      - ./config:/app/config:ro
-    profiles:
-      - simulation
 
-  # ── FIX log monitor (pattern detection + autonomous API calls) ───────────────
-  log-monitor:
-    build: .
-    container_name: fix-mcp-monitor
-    command: ["python", "-m", "fix_mcp.log_monitor", "--watch", "/var/log/fix", "--api", "http://api-server:8000"]
-    restart: on-failure
-    environment:
-      - FIX_MCP_CONFIG_DIR=/app/config
-      - REDIS_URL=redis://redis:6379/0
-      - API_URL=http://api-server:8000
-    depends_on:
-      - api-server
-      - redis
-    volumes:
-      - fix_logs:/var/log/fix
-      - ./config:/app/config:ro
-    profiles:
-      - simulation
-
-  # ── FIX gateway process (real venue connectivity) ────────────────────────────
-  # Configure via FIX_HOST_NYSE, FIX_PORT_NYSE, etc. environment variables.
-  # Uncomment when connecting to real exchange gateways or QuickFIX UAT acceptors.
-  #
-  # fix-gateway:
-  #   build: .
-  #   container_name: fix-mcp-gateway
-  #   command: ["python", "-m", "fix_mcp.gateway"]
-  #   environment:
-  #     - FIX_HOST_NYSE=${FIX_HOST_NYSE:-127.0.0.1}
-  #     - FIX_PORT_NYSE=${FIX_PORT_NYSE:-4001}
-  #     - FIX_HOST_BATS=${FIX_HOST_BATS:-127.0.0.1}
-  #     - FIX_PORT_BATS=${FIX_PORT_BATS:-4003}
-  #     - FIX_SENDER_COMP_ID=${FIX_SENDER_COMP_ID:-FIRM_PROD}
-  #     - FIX_HEARTBEAT_INTERVAL=30
-  #     - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
-  #     - REDIS_URL=redis://redis:6379/0
-  #   depends_on:
-  #     - postgres
-  #     - redis
-
-  # ── PostgreSQL — persistent order store and FIX message log ─────────────────
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: fix-mcp-postgres
@@ -184,14 +90,13 @@ services:
       POSTGRES_DB: trading
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  # ── Redis — real-time pub/sub for fills, session events, algo updates ────────
+  # ── Redis ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: fix-mcp-redis

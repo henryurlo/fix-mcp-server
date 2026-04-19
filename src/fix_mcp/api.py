@@ -35,9 +35,6 @@ _mode: str = "human"          # "human" | "agent" | "mixed"
 _events: deque = deque(maxlen=100)
 _events_lock = threading.Lock()
 
-# Simulation VCR state — read by log_generator via GET /api/simulation
-_sim_state: dict = {"speed": 10.0, "paused": False}
-_sim_lock = threading.Lock()
 
 
 def _publish_event(tool: str, args: dict, result: str, ok: bool, source: str = "dashboard") -> None:
@@ -401,12 +398,7 @@ class APIHandler(BaseHTTPRequestHandler):
             self._send_json({"mode": _mode})
             return
 
-        if self.path == "/api/simulation":
-            with _sim_lock:
-                self._send_json(dict(_sim_state))
-            return
-
-        if self.path.startswith("/api/events"):
+                if self.path.startswith("/api/events"):
             with _events_lock:
                 self._send_json(list(_events))
             return
@@ -476,17 +468,6 @@ class APIHandler(BaseHTTPRequestHandler):
             if new_mode in ("human", "agent", "mixed"):
                 _mode = new_mode
             self._send_json({"mode": _mode, "ok": True})
-            return
-
-        if self.path == "/api/simulation":
-            global _sim_state
-            payload = self._read_json()
-            with _sim_lock:
-                if "speed" in payload:
-                    _sim_state["speed"] = max(0.1, float(payload["speed"]))
-                if "paused" in payload:
-                    _sim_state["paused"] = bool(payload["paused"])
-            self._send_json({**_sim_state, "ok": True})
             return
 
         if self.path == "/api/reset":

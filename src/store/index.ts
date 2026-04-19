@@ -266,19 +266,19 @@ export const useChat = create<ChatState>((set, get) => ({
         `Recent events: ${JSON.stringify(events.slice(0, 5))}`,
       ].join('\n');
 
-      // Build rich scenario context from the loaded scenario JSON
+      // Build focused scenario context from the loaded scenario JSON
+      // Only inject what the LLM needs — no fluff
       let scenarioContextMsg = '';
       if (scenarioContext) {
         const ctx = scenarioContext;
-        scenarioContextMsg = [
+        const parts = [
           `## Active Scenario: ${ctx.title}`,
-          ctx.runbook?.narrative ? `### Situation\n${ctx.runbook.narrative}` : '',
-          `### Key Problems\n${ctx.hints?.key_problems?.join('\n') || 'None listed'}`,
-          `### Diagnosis Path\n${ctx.hints?.diagnosis_path || 'Start by checking session health.'}`,
-          `### Flag Meanings\n${Object.entries(ctx.hints?.flag_meanings || {}).map(([k, v]) => `- ${k}: ${v}`).join('\n') || 'N/A'}`,
-          `### Common Mistakes to Avoid\n${ctx.hints?.common_mistakes?.join('\n') || 'None listed'}`,
-          `### Success Criteria (scenario is resolved when ALL are met)\n${ctx.success_criteria?.map((c, i) => `${i + 1}. ${c}`).join('\n') || 'None defined'}`,
-        ].filter(Boolean).join('\n\n');
+          ctx.runbook?.narrative ? `### Situation\n${ctx.runbook.narrative.slice(0, 200)}` : '',
+          `### Key Problems: ${ctx.hints?.key_problems?.join('; ') || 'None'}`,
+          `### Start: ${ctx.hints?.diagnosis_path || 'Check session health.'}`,
+          `### Success Criteria: ${ctx.success_criteria?.length || 0} conditions`,
+        ].filter(Boolean);
+        scenarioContextMsg = parts.join('\n');
       }
 
       const msgs = [
