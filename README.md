@@ -2,6 +2,8 @@
 
 FIX protocol simulation platform for capital markets operations. AI-powered SRE copilot with real-time diagnostics, incident runbooks, and MCP tool integration for trading infrastructure management.
 
+---
+
 ## Quick Start
 
 ```bash
@@ -10,47 +12,117 @@ cd fix-mcp-server
 docker compose up -d
 ```
 
-Backend API: `http://localhost:8000`
-Frontend dashboard: `http://localhost:3006`
+Open **http://localhost:3000**.
 
-**Login:** `henry` / `henry` (admin) · `admin` / `admin` · or click **Demo Mode**
+**Login:** `henry` / `henry` (admin) · `admin` / `admin` · or click **Demo Mode**.
 
-### Development (without Docker)
+| Service   | URL                    | What it serves                     |
+|-----------|------------------------|------------------------------------|
+| Console   | http://localhost:3000  | Mission Control UI (Next.js)       |
+| REST API  | http://localhost:8000  | MCP tool dispatch, system status   |
+| Dashboard | http://localhost:8787  | Legacy operational dashboard       |
 
-```bash
-# Backend
-cd fix-mcp-server
-pip install -e .
-python -m fix_mcp.server
+No Node or Python on your host — everything runs in containers.
 
-# Frontend
-npm install
-npm run build
-npx next start -p 3006
-```
+---
 
-## What It Does
-
-A simulation environment built on FIX (Financial Information eXchange) Protocol. Real-time monitoring, CLI operations, automated diagnostics, and AI-assisted incident resolution — all in one dashboard.
-
-### Mission Control
+## Architecture
 
 ```
-┌──────────────────┬──────────────────────────────────┐
+                    ┌──────────────────────────────────────────┐
+                    │              Host / Browser              │
+                    │    http://localhost:3000  (Console)      │
+                    └──────────────────┬───────────────────────┘
+                                       │
+          ┌────────────────────────────┴────────────────────────────┐
+          │                  docker compose network                 │
+          │                                                         │
+          │  ┌───────────────┐      ┌──────────────────────────┐    │
+          │  │   console     │      │       api-server         │    │
+          │  │  (Next.js)    │ ───▶ │   REST + MCP dispatch    │    │
+          │  │  port 3000    │      │        port 8000         │    │
+          │  └───────────────┘      └────────────┬─────────────┘    │
+          │                                      │                  │
+          │  ┌───────────────┐                   │                  │
+          │  │  mcp-server   │ ◀── stdio/MCP ───┤                  │
+          │  │  (22 tools)   │                   │                  │
+          │  └───────┬───────┘                   │                  │
+          │          │                           │                  │
+          │          ▼                           ▼                  │
+          │  ┌───────────────────┐    ┌──────────────────────┐      │
+          │  │   FIX Engine      │    │       Postgres       │      │
+          │  │   (simulated)     │    │   order store +      │      │
+          │  │   NYSE·BATS·ARCA  │    │    FIX msg log       │      │
+          │  │   ·IEX sessions   │    └──────────────────────┘      │
+          │  └───────┬───────────┘                                  │
+          │          │                                              │
+          │          ▼                                              │
+          │  ┌───────────────────┐                                  │
+          │  │      Redis        │                                  │
+          │  │  pub/sub fills,   │                                  │
+          │  │  session events   │                                  │
+          │  └───────────────────┘                                  │
+          └─────────────────────────────────────────────────────────┘
+```
+
+### Request flow (incident example)
+
+```
+ Operator  ─┐
+            │ 1. "ARCA session has a sequence gap"
+            ▼
+ ┌──────────────────────┐
+ │  Console (Next.js)   │  2. SRE Copilot receives message + scenario context
+ │  /src/store/chat     │     + full FIX-protocol system prompt (prompts.ts)
+ └──────────┬───────────┘
+            │ 3. Calls OpenRouter LLM → proposes tool call
+            ▼
+ ┌──────────────────────┐
+ │  Proxy route.ts      │  4. /api/tool  {tool: "dump_session_state",
+ │  /api/*              │                 arguments: {venue: "ARCA"}}
+ └──────────┬───────────┘
+            │
+            ▼
+ ┌──────────────────────┐
+ │   api-server         │  5. Dispatches to MCP tool handler
+ │   port 8000          │
+ └──────────┬───────────┘
+            │
+            ▼
+ ┌──────────────────────┐
+ │   FIX Engine         │  6. Reads session state → returns MsgSeqNum
+ │   (exchange_sim)     │     snapshot, CompID pair, last 20 messages
+ └──────────┬───────────┘
+            │
+            ▼
+ ┌──────────────────────┐
+ │   Console UI         │  7. Renders result, audit-log entry,
+ │                      │     copilot proposes next tool in chain
+ └──────────────────────┘
+```
+
+---
+
+## Mission Control (UI)
+
+```
+┌──────────────────┬───────────────────────────────────┐
 │ Topology Graph   │ FIX CLI Terminal                  │
 │ + Heartbeats     │ fix-cli> show sessions            │
 │ + Scenario Picker│ fix-cli> grep 35=D logs/*.log     │
-├──────────────────┼──────────────────────────────────┤
+├──────────────────┼───────────────────────────────────┤
 │ Incident Runbook │ MCP Audit Log                     │
-│ (step-by-step)   │ [16:23] ▶ check_fix_sessions     │
+│ (step-by-step)   │ [16:23] ▶ check_fix_sessions      │
 │                  │ [16:23] ✓ NYSE: ACTIVE (3ms)      │
-└──────────────────┴──────────────────────────────────┘
-         + SRE Copilot (slide-in panel)
+└──────────────────┴───────────────────────────────────┘
+         + SRE Copilot (slide-in panel, FIX-aware)
          + Telemetry tab (sparklines, order book, FX)
          + Scenario Creator tab
 ```
 
-### CLI Terminal
+---
+
+## FIX CLI Terminal
 
 ```bash
 fix-cli> show sessions              # FIX session status
@@ -68,35 +140,89 @@ fix-cli> cd /opt/fix/logs && ls
 fix-cli> scenario load venue_degradation_1030
 ```
 
-## MCP Tools
+---
 
+## MCP Tools (22)
+
+### Diagnostic
 | Tool | Description |
 |------|-------------|
-| `check_fix_sessions` | Check all FIX venue session status |
-| `query_orders` | Query orders with filters (status, venue, symbol) |
-| `send_order` | Submit a new order |
-| `cancel_replace` | Cancel or replace an existing order |
-| `fix_session_issue` | Fix session: reconnect, reset sequence, resend request |
-| `update_venue_status` | Change venue status (active/degraded/down) |
-| `release_stuck_orders` | Release orders stuck in queue |
-| `validate_orders` | Validate order reference data |
 | `run_premarket_check` | Full pre-market health sweep |
-| `session_heartbeat` | Manual heartbeat check for a venue |
-| `reset_sequence` | Reset FIX sequence numbers |
-| `dump_session_state` | Full session diagnostic dump |
+| `check_fix_sessions` | Check all FIX venue session status |
+| `check_ticker` | Validate reference data for a symbol |
+| `query_orders` | Query orders with filters (status, venue, symbol) |
+| `validate_orders` | Validate order reference data |
+| `dump_session_state` | Full MsgSeqNum snapshot + CompID pair verification |
 | `tail_logs` | Tail FIX session log files |
-| `grep_logs` | Search FIX log files by pattern |
+| `grep_logs` | Pattern search across FIX log files |
 
-## Scenarios
+### Session recovery
+| Tool | Description |
+|------|-------------|
+| `fix_session_issue` | Reconnect / reset sequence / resend request |
+| `session_heartbeat` | Manual TestRequest (35=1) to a venue |
+| `reset_sequence` | Reset FIX MsgSeqNum — **irreversible, approval gate** |
+
+### Order actions
+| Tool | Description |
+|------|-------------|
+| `send_order` | Submit a new order (NewOrderSingle 35=D) |
+| `cancel_replace` | Cancel/replace existing order (35=G) |
+| `release_stuck_orders` | Bulk-release post-reconnect |
+
+### Algo suite
+| Tool | Description |
+|------|-------------|
+| `send_algo_order` | Submit an algo parent order (VWAP, TWAP, POV) |
+| `check_algo_status` | Query algo progress + slippage vs benchmark |
+| `modify_algo` | Update algo params mid-flight |
+| `cancel_algo` | Cancel parent algo and child orders |
+
+### Reference data · Venue · Meta
+| Tool | Description |
+|------|-------------|
+| `update_ticker` / `load_ticker` | Edit / reload symbol reference |
+| `update_venue_status` | Change venue state (active / degraded / down) |
+| `list_scenarios` | Enumerate available scenarios |
+
+---
+
+## Scenarios (13)
 
 | Scenario | Description |
 |----------|-------------|
-| `morning_triage` | Pre-market health sweep, overnight stuck orders, reference data validation |
-| `venue_degradation_1030` | NYSE Mahwah switch failure, 180ms latency, 14 stuck orders ($4.1M) |
-| `open_volatility_0930` | Opening bell volume surge, algo slippage, SLA breach risk |
-| + 10 more | Session drops, FX corruption, interlisted routing, dark pool failures |
+| `morning_triage` | Pre-market sweep, overnight stuck orders, reference-data validation |
+| `preopen_auction_0900` | Opening cross imbalance, MOO/LOO flow |
+| `open_volatility_0930` | Opening-bell volume surge, algo slippage, SLA risk |
+| `twap_slippage_1000` | TWAP algo drifting from benchmark |
+| `venue_degradation_1030` | NYSE Mahwah switch failure, 180ms latency, $4.1M stuck |
+| `ssr_and_split_1130` | Short-sale restriction + corporate-action split |
+| `vwap_vol_spike_1130` | VWAP algo vs mid-day volume spike |
+| `iex_recovery_1400` | IEX session recovery after gateway bounce |
+| `is_dark_failure_1415` | Dark-pool interlisted routing failure |
+| `eod_moc_1530` | MOC auction imbalance, close-out flow |
+| `afterhours_dark_1630` | After-hours dark-pool routing |
+| `predawn_adrs_0430` | ADR pricing drift before EU open |
+| `bats_startup_0200` | BATS gateway cold-start session establishment |
 
-## MCP Integration
+---
+
+## AI Copilot
+
+The SRE Copilot is pre-loaded with FIX-protocol domain knowledge:
+
+- Full decision tree for session diagnostics (MsgSeqNum gaps, ResendRequest/SequenceReset, heartbeat failures)
+- Scenario-specific context overlays (e.g., venue_degradation ships with Mahwah switch topology context)
+- All 22 tools documented inline with when-to-use guidance
+- Approval gates for irreversible operations (sequence resets, production order cancellation)
+
+Source: [`src/store/prompts.ts`](src/store/prompts.ts)
+
+Any OpenRouter-compatible model works. Default: `qwen/qwen3.6-plus`.
+
+---
+
+## MCP Integration (external clients)
 
 ```json
 {
@@ -110,26 +236,32 @@ fix-cli> scenario load venue_degradation_1030
 }
 ```
 
-## API
+---
+
+## REST API
 
 All endpoints at `http://localhost:8000/api`:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/status` | GET | System status, venues, scenario, order counts |
-| `/api/orders` | GET | Full order list |
-| `/api/events` | GET | System event log |
-| `/api/tool` | POST | Execute MCP tool `{ "tool": "name", "arguments": {} }` |
-| `/api/reset` | POST | Load scenario `{ "scenario": "name" }` |
+| Endpoint        | Method | Description                                        |
+|-----------------|--------|----------------------------------------------------|
+| `/api/status`   | GET    | System status, venues, scenario, order counts     |
+| `/api/orders`   | GET    | Full order list                                    |
+| `/api/events`   | GET    | System event log                                   |
+| `/api/tool`     | POST   | Execute MCP tool `{ "tool": "name", "arguments": {} }` |
+| `/api/reset`    | POST   | Load scenario `{ "scenario": "name" }`             |
+| `/api/mode`     | GET/POST | Copilot mode: human / agent / mixed              |
+
+---
 
 ## Project Structure
 
 ```
 fix-mcp-server/
-├── docker-compose.yml
-├── Dockerfile
-├── package.json                # Frontend deps (Next.js)
-├── pyproject.toml              # Backend deps (Python)
+├── docker-compose.yml          # Full stack: console + api + mcp + pg + redis
+├── Dockerfile                  # Python backend image
+├── Dockerfile.console          # Next.js frontend image
+├── package.json                # Frontend deps
+├── pyproject.toml              # Backend deps
 ├── src/
 │   ├── fix_mcp/                # Python backend
 │   │   ├── server.py           # MCP server + REST API
@@ -137,29 +269,57 @@ fix-mcp-server/
 │   │       ├── scenarios.py    # Scenario engine
 │   │       ├── exchange_sim.py # FIX exchange simulator
 │   │       ├── broker_host.py  # Smart order router
-│   │       ├── market_data.py  # Market data hub
-│   │       ├── interlist.py    # Interlisted symbol resolver
+│   │       ├── market_data.py  # Market-data hub
+│   │       ├── interlist.py    # Interlisted-symbol resolver
 │   │       └── telemetry.py    # Telemetry collector
 │   ├── app/                    # Next.js frontend
-│   │   └── page.tsx            # Dashboard + runbooks
+│   │   ├── page.tsx            # Dashboard + runbooks
+│   │   └── api/[[...path]]/route.ts  # Backend proxy
 │   ├── components/
 │   │   ├── FixTerminal.tsx     # Interactive CLI
-│   │   ├── McpAuditLog.tsx     # Real-time tool call log
+│   │   ├── McpAuditLog.tsx     # Real-time tool-call log
 │   │   ├── TopologyGraph.tsx   # Network topology
 │   │   ├── HeartbeatPanel.tsx  # Venue heartbeats
 │   │   ├── OrderDashboard.tsx  # Order table
 │   │   ├── TelemetryDashboard.tsx
 │   │   └── ChatPanel.tsx       # SRE Copilot
-│   └── store/                  # Zustand state
+│   └── store/
+│       ├── index.ts            # Zustand system + chat state
+│       ├── prompts.ts          # FIX domain knowledge for LLM
+│       └── audit.ts            # MCP audit log
 └── config/scenarios/           # 13 scenario JSON files
 ```
 
+---
+
 ## Tech Stack
 
-- **Backend:** Python, FastAPI, MCP SDK, asyncio
-- **Frontend:** Next.js 16, React 19, React Flow, Zustand, Tailwind CSS
-- **Protocol:** FIX 4.2/4.4 simulation
-- **AI:** OpenRouter API (configurable model, default `qwen/qwen3.6-plus`)
+- **Backend:** Python 3.11, MCP SDK, asyncio, stdlib `http.server`
+- **Frontend:** Next.js 16, React 19, React Flow, Zustand 5, Tailwind CSS v4
+- **Infra:** PostgreSQL 16 (order store), Redis 7 (pub/sub), Docker Compose
+- **Protocol:** FIX 4.2 / 4.4 simulation
+- **AI:** OpenRouter API (any compatible model; default `qwen/qwen3.6-plus`)
+
+---
+
+## Development
+
+Want to run frontend and backend on the host directly?
+
+```bash
+# Backend (Python)
+pip install -e .
+python -m fix_mcp.server        # MCP stdio
+python -m fix_mcp.api           # REST on :8000
+
+# Frontend (Node)
+npm install
+npm run dev                     # Next.js on :3000
+```
+
+The Next.js route handler (`src/app/api/[[...path]]/route.ts`) reads `BACKEND_URL` — defaults to `http://127.0.0.1:8000` for local dev.
+
+---
 
 ## License
 
