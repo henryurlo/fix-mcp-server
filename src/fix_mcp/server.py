@@ -7,7 +7,7 @@ import json
 import os
 import threading
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -653,6 +653,20 @@ async def list_tools() -> list[Tool]:
                 },
             },
         ),
+        Tool(
+            name="check_pending_acks",
+            description=(
+                "List all orders in pending_ack status with pending age, venue ACK delay, "
+                "and a duplicate-risk flag (true when pending age > 30 s). "
+                "Pass 'venue' to filter to a single venue."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name (optional)"},
+                },
+            },
+        ),
     ]
 
 
@@ -701,6 +715,8 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
         if name == "update_venue_status":  return await _tool_update_venue_status(arguments)
         if name == "check_market_data_staleness":
             return await _tool_check_market_data_staleness(arguments)
+        if name == "check_pending_acks":
+            return await _tool_check_pending_acks(arguments)
         if name == "cancel_order":
             # Alias: cancel_order → cancel_replace with action="cancel"
             args = {**arguments, "action": arguments.get("action", "cancel")}
@@ -2102,6 +2118,59 @@ async def _tool_check_market_data_staleness(args: dict) -> list[TextContent]:
         return _tc(f"ERROR in check_market_data_staleness: {exc}")
     except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR in check_market_data_staleness: {exc!r}")
+
+
+def _pending_since_seconds(iso_ts: str | None) -> float:
+    """Return elapsed seconds since `iso_ts` (ISO 8601). Treats naive timestamps as UTC.
+    Returns 0.0 on None or unparseable input."""
+    if not iso_ts:
+        return 0.0
+    try:
+        dt = datetime.fromisoformat(iso_ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - dt).total_seconds()
+        return max(elapsed, 0.0)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+async def _tool_check_pending_acks(args: dict) -> list[TextContent]:
+    try:
+        venue_filter = args.get("venue")
+        if venue_filter:
+            venue_filter = venue_filter.upper()
+
+        pending = [
+            o for o in oms.orders.values()
+            if o.status == "pending_ack"
+            and (venue_filter is None or o.venue.upper() == venue_filter)
+        ]
+
+        lines = ["PENDING ACKS", "=" * 72]
+        lines.append(
+            f"  {'ORDER ID':<20} {'SYM':<6} {'VENUE':<8} {'FILL/QTY':>10} "
+            f"{'AGE(s)':>8} {'ACK DLY':>8}  FLAG"
+        )
+
+        if not pending:
+            lines.append("  No orders in pending_ack status.")
+            return _tc("\n".join(lines))
+
+        for o in pending:
+            age_s = _pending_since_seconds(o.pending_since)
+            session = session_manager.get_session(o.venue)
+            ack_delay_ms = session.ack_delay_ms if session else 0
+            flag = "[DUP-RISK]" if age_s > 30.0 else "[OK]"
+            fill_qty = f"{o.filled_quantity}/{o.quantity}"
+            lines.append(
+                f"  {o.order_id:<20} {o.symbol:<6} {o.venue:<8} {fill_qty:>10} "
+                f"{age_s:>8.1f} {ack_delay_ms:>8}  {flag}"
+            )
+
+        return _tc("\n".join(lines))
+    except Exception as exc:  # noqa: BLE001
+        return _tc(f"ERROR in check_pending_acks: {exc!r}")
 
 
 async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:

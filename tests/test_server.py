@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import sys
+from datetime import datetime, timezone, timedelta
 
 
 def _load_server():
@@ -185,3 +186,44 @@ def test_check_market_data_staleness_single_symbol() -> None:
     assert "AAPL" in txt
     # The output should not mention other symbols when filtering.
     assert "MSFT" not in txt
+
+
+def test_check_pending_acks_flags_risk_of_duplicate() -> None:
+    from fix_mcp.engine.oms import Order
+
+    server = _load_server()
+
+    pending_ts = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
+    order = Order(
+        order_id="ORD-NYSE-9001",
+        cl_ord_id="CLO-TEST-9001",
+        symbol="IBM",
+        cusip="459200101",
+        side="buy",
+        quantity=100,
+        order_type="limit",
+        venue="NYSE",
+        client_name="Test Client",
+        created_at=pending_ts,
+        updated_at=pending_ts,
+        status="pending_ack",
+        pending_since=pending_ts,
+    )
+    server.oms.orders["ORD-NYSE-9001"] = order
+    server.session_manager.get_session("NYSE").ack_delay_ms = 5000
+
+    result = asyncio.run(server.call_tool("check_pending_acks", {"venue": "NYSE"}))
+    assert result
+    txt = result[0].text
+    assert "ORD-NYSE-9001" in txt
+    assert "[DUP-RISK]" in txt
+    assert "5000" in txt
+    # pending age ~90s should appear (89 or 90)
+    assert "90" in txt or "89" in txt
+
+
+def test_check_pending_acks_no_venue_returns_all() -> None:
+    server = _load_server()
+    result = asyncio.run(server.call_tool("check_pending_acks", {}))
+    assert result
+    assert "PENDING ACKS" in result[0].text
