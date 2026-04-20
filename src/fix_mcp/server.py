@@ -106,13 +106,9 @@ msg_builder = FIXMessageBuilder(
     session_manager=SequenceManager(),
 )
 
-# Market data hub — one process-wide instance. Seed symbols from ref_store
-# (ref_store.symbols is a dict keyed by symbol); fall back to a hardcoded
-# demo set if ref_store has no symbols loaded.
-_md_seed_symbols = {sym: 100.0 for sym in ref_store.symbols.keys()} or {
-    "AAPL": 195.0, "MSFT": 405.0, "SPY": 520.0,
-}
-market_data_hub = MarketDataHub(symbols=_md_seed_symbols, tick_interval_ms=100)
+# Market data hub — one process-wide instance.
+# Pass symbols=None so MarketDataHub uses its own _DEFAULT_SYMBOLS (realistic prices).
+market_data_hub = MarketDataHub(symbols=None, tick_interval_ms=100)
 
 
 def reset_runtime(scenario_name: str | None = None) -> str:
@@ -125,10 +121,7 @@ def reset_runtime(scenario_name: str | None = None) -> str:
 
         oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
         algo_engine = engine.algo_engine
-        _seed = {sym: 100.0 for sym in ref_store.symbols.keys()} or {
-            "AAPL": 195.0, "MSFT": 405.0, "SPY": 520.0,
-        }
-        market_data_hub = MarketDataHub(symbols=_seed, tick_interval_ms=100)
+        market_data_hub = MarketDataHub(symbols=None, tick_interval_ms=100)
         msg_builder = FIXMessageBuilder(
             sender_comp_id="FIRM_PROD",
             target_comp_id="EXCHANGE_GW",
@@ -2082,13 +2075,15 @@ async def _tool_update_venue_status(args: dict) -> list[TextContent]:
 async def _tool_check_market_data_staleness(args: dict) -> list[TextContent]:
     try:
         symbol = args.get("symbol")
+        all_books = market_data_hub.get_all_quotes()
         if symbol:
+            symbol = symbol.upper()
             _assert_symbol(symbol)
-            symbols = [symbol.upper()] if symbol.upper() in market_data_hub._books else []
-            if not symbols:
+            if symbol not in all_books:
                 return _tc(f"Unknown symbol '{symbol}'. No market data tracked.")
+            symbols = [symbol]
         else:
-            symbols = sorted(market_data_hub._books.keys())
+            symbols = sorted(all_books.keys())
 
         if not symbols:
             return _tc("No market data tracked.")
