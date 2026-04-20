@@ -2208,12 +2208,14 @@ async def _tool_clear_market_data_delay(args: dict) -> list[TextContent]:
         market_data_hub.reset_feed(venue_upper)
 
         if previous:
+            header = "MARKET DATA DELAY CLEARED"
             status = "CLEARED"
         else:
-            status = "NOOP (no delay to clear)"
+            header = "MARKET DATA DELAY STATUS"
+            status = "NO DELAY ACTIVE"
 
         lines = [
-            "MARKET DATA DELAY CLEARED",
+            header,
             f"Venue: {venue_upper}",
             f"Previous delay: {int(previous)} ms",
             f"Status: {status}",

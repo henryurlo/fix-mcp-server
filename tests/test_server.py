@@ -268,7 +268,7 @@ def test_clear_market_data_delay_clears_and_reports() -> None:
     assert "BATS" in txt
     assert "600" in txt
     assert "CLEARED" in txt
-    assert "NOOP" not in txt
+    assert "NO DELAY ACTIVE" not in txt
     assert "BATS" not in server.market_data_hub._venue_delays
 
 
@@ -279,7 +279,7 @@ def test_clear_market_data_delay_noop_when_no_delay() -> None:
     txt = result[0].text
     assert "ARCA" in txt
     assert "0 ms" in txt
-    assert "NOOP" in txt
+    assert "NO DELAY ACTIVE" in txt
 
 
 def test_release_stuck_orders_unblocks_when_md_fresh() -> None:
