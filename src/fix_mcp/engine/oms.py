@@ -23,6 +23,8 @@ class Order:
     flags: list[str] = field(default_factory=list)
     is_institutional: bool = False
     sla_minutes: Optional[int] = None
+    pending_since: Optional[str] = None
+    stuck_reason: Optional[str] = None
 
     @property
     def notional_value(self) -> float:
@@ -35,7 +37,7 @@ class Order:
 
 class OMS:
     # Statuses considered "open" (not terminal)
-    _OPEN_STATUSES = {"new", "partially_filled", "stuck", "pending_cancel"}
+    _OPEN_STATUSES = {"new", "partially_filled", "stuck", "pending_cancel", "pending_ack"}
 
     def __init__(self) -> None:
         self.orders: dict[str, Order] = {}
