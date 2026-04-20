@@ -227,3 +227,33 @@ def test_check_pending_acks_no_venue_returns_all() -> None:
     result = asyncio.run(server.call_tool("check_pending_acks", {}))
     assert result
     assert "PENDING ACKS" in result[0].text
+    assert "No orders in pending_ack status." in result[0].text
+
+
+def test_check_pending_acks_unknown_pending_since_flagged() -> None:
+    from fix_mcp.engine.oms import Order
+
+    server = _load_server()
+
+    order = Order(
+        order_id="ORD-NYSE-9002",
+        cl_ord_id="CLO-TEST-9002",
+        symbol="GE",
+        cusip="369604103",
+        side="sell",
+        quantity=50,
+        order_type="market",
+        venue="NYSE",
+        client_name="Test Client",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        status="pending_ack",
+        pending_since=None,
+    )
+    server.oms.orders["ORD-NYSE-9002"] = order
+
+    result = asyncio.run(server.call_tool("check_pending_acks", {}))
+    assert result
+    txt = result[0].text
+    assert "ORD-NYSE-9002" in txt
+    assert "[AGE-UNKNOWN]" in txt

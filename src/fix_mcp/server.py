@@ -14,7 +14,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent, Resource, Prompt
 import mcp.types as types
 from fix_mcp.engine.oms import OMS, Order
-from fix_mcp.engine.fix_sessions import FIXSessionManager, FIXSession
+from fix_mcp.engine.fix_sessions import FIXSessionManager, FIXSession, _age_seconds
 from fix_mcp.engine.reference import ReferenceDataStore, Symbol, CorporateAction, Venue, Client
 from fix_mcp.engine.scenarios import ScenarioEngine
 from fix_mcp.engine.algos import AlgoEngine, AlgoOrder, ALGO_TYPES
@@ -138,6 +138,7 @@ _ORD_TYPE_MAP = {"market": "1", "limit": "2", "stop": "3"}
 _ROUTE_PREFERENCE = ["NYSE", "IEX", "BATS", "ARCA"]
 _TERMINAL_STATUSES = {"filled", "canceled", "rejected"}
 _SLA_WARN_MINUTES = 30
+_PENDING_ACK_DUP_RISK_SECONDS = 30.0
 
 
 def _sla_countdown(order: Order) -> str | None:
@@ -2120,19 +2121,9 @@ async def _tool_check_market_data_staleness(args: dict) -> list[TextContent]:
         return _tc(f"ERROR in check_market_data_staleness: {exc!r}")
 
 
-def _pending_since_seconds(iso_ts: str | None) -> float:
-    """Return elapsed seconds since `iso_ts` (ISO 8601). Treats naive timestamps as UTC.
-    Returns 0.0 on None or unparseable input."""
-    if not iso_ts:
-        return 0.0
-    try:
-        dt = datetime.fromisoformat(iso_ts)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        elapsed = (datetime.now(timezone.utc) - dt).total_seconds()
-        return max(elapsed, 0.0)
-    except (ValueError, TypeError):
-        return 0.0
+def _pending_since_seconds(iso_ts: str | None) -> float | None:
+    """Return elapsed seconds since `iso_ts`, or None if unknown/unparseable."""
+    return _age_seconds(iso_ts)
 
 
 async def _tool_check_pending_acks(args: dict) -> list[TextContent]:
@@ -2150,7 +2141,7 @@ async def _tool_check_pending_acks(args: dict) -> list[TextContent]:
         lines = ["PENDING ACKS", "=" * 72]
         lines.append(
             f"  {'ORDER ID':<20} {'SYM':<6} {'VENUE':<8} {'FILL/QTY':>10} "
-            f"{'AGE(s)':>8} {'ACK DLY':>8}  FLAG"
+            f"{'AGE(s)':>8} {'ACK DLY(ms)':>11}  FLAG"
         )
 
         if not pending:
@@ -2161,11 +2152,19 @@ async def _tool_check_pending_acks(args: dict) -> list[TextContent]:
             age_s = _pending_since_seconds(o.pending_since)
             session = session_manager.get_session(o.venue)
             ack_delay_ms = session.ack_delay_ms if session else 0
-            flag = "[DUP-RISK]" if age_s > 30.0 else "[OK]"
+            if age_s is None:
+                age_col = f"{'?':>8}"
+                flag = "[AGE-UNKNOWN]"
+            elif age_s > _PENDING_ACK_DUP_RISK_SECONDS:
+                age_col = f"{age_s:>8.1f}"
+                flag = "[DUP-RISK]"
+            else:
+                age_col = f"{age_s:>8.1f}"
+                flag = "[OK]"
             fill_qty = f"{o.filled_quantity}/{o.quantity}"
             lines.append(
                 f"  {o.order_id:<20} {o.symbol:<6} {o.venue:<8} {fill_qty:>10} "
-                f"{age_s:>8.1f} {ack_delay_ms:>8}  {flag}"
+                f"{age_col} {ack_delay_ms:>11}  {flag}"
             )
 
         return _tc("\n".join(lines))
