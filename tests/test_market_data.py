@@ -44,3 +44,12 @@ def test_is_stale_false_when_under_threshold() -> None:
 def test_is_stale_unknown_symbol_is_true() -> None:
     hub = MarketDataHub(symbols={"AAPL": 195.0}, tick_interval_ms=100)
     assert hub.is_stale("ZZZZ", threshold_ms=100) is True
+
+
+def test_staleness_ms_unparseable_timestamp_returns_minus_one() -> None:
+    hub = MarketDataHub(symbols={"AAPL": 195.0}, tick_interval_ms=100)
+    book = hub.get_quote("AAPL")
+    assert book is not None
+    book.last_updated = "not-a-date"
+    assert hub.staleness_ms("AAPL") == -1
+    assert hub.is_stale("AAPL", threshold_ms=100) is True

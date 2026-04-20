@@ -192,7 +192,10 @@ class MarketDataHub:
         return max(0, int(delta.total_seconds() * 1000))
 
     def is_stale(self, symbol: str, threshold_ms: int) -> bool:
-        """True if MD for *symbol* is older than *threshold_ms* or unknown."""
+        """True if MD for *symbol* is strictly older than *threshold_ms* (in ms) or unknown.
+
+        A quote whose age equals *threshold_ms* exactly is considered fresh (not stale).
+        """
         ms = self.staleness_ms(symbol)
         if ms < 0:
             return True
