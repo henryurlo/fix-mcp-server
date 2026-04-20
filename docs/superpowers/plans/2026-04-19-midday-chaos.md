@@ -6,6 +6,14 @@
 
 **Architecture:** Additive-only changes to the existing Python engine. Four dataclass fields are added (`pending_ack` state + `pending_since` + `stuck_reason` on `Order`; `md_freshness_gate_ms` on `AlgoOrder`; `ack_delay_ms` on `FIXSession`; `staleness_ms` / `is_stale` methods on `MarketDataHub`). Three new MCP tool handlers and one extended handler are registered in `server.py`. No new scenario injection hooks — the new state fields are declarative in the scenario JSON. The existing `MarketDataHub.reset_feed()` is reused by the new `clear_market_data_delay` tool.
 
+**Engine context (confirmed by Task 0 preflight):**
+- Live scenario loader is **v1 `ScenarioEngine`** in `src/fix_mcp/engine/scenarios.py` (imported at `src/fix_mcp/server.py:19`, instantiated at `src/fix_mcp/server.py:99`). `ScenarioEngineV2` is dead code — do NOT touch it.
+- Scenario dir is `config/scenarios/` (NOT `config/scenarios_v2/`).
+- v1 `load_scenario()` reads JSON key `"algo_orders"` (NOT `"algos"`). v1 ignores any top-level `"injections"` key.
+- v1 `_load_orders`, `_load_algo_orders`, `_load_sessions` construct dataclasses with **explicit kwargs** — the new fields (`pending_since`, `stuck_reason`, `md_freshness_gate_ms`, `ack_delay_ms`) must be threaded through these calls explicitly. They do NOT "flow automatically" via `**kwargs`.
+- **v1 `server.py` has NO `MarketDataHub` instance**. Tasks 5, 7, and 10 require wiring a module-level `market_data_hub` in `server.py` as part of Task 5's first implementation step. Scenario loader (Task 9) then calls `hub.delay_venue(...)` to apply the `injections` block.
+- Pre-existing failure: `test_tool_registry_and_resources` hardcodes `len(tools) == 15`; actual is 22. Task 5 must relax this to `>= 15` (we'll push it to 25 by the end of this plan).
+
 **Tech Stack:** Python 3.11, dataclasses, `pytest`, MCP SDK. Backend only. Tests are `pytest`-based. Frontend / Next.js is out of scope.
 
 ---
@@ -31,8 +39,8 @@ All work implements `docs/superpowers/specs/2026-04-19-midday-chaos-compound-sce
 | `src/fix_mcp/engine/fix_sessions.py` | modify | Add `ack_delay_ms` field to `FIXSession`. |
 | `src/fix_mcp/engine/market_data.py` | modify | Add `staleness_ms(symbol)` and `is_stale(symbol, threshold_ms)` methods to `MarketDataHub`. |
 | `src/fix_mcp/server.py` | modify | Register 3 new tools (`check_market_data_staleness`, `check_pending_acks`, `clear_market_data_delay`); extend `release_stuck_orders` with `reason_filter`. |
-| `src/fix_mcp/engine/scenarios.py` (or `scenario_engine_v2.py` — determined in Task 0) | modify | Loader honors new optional fields and resolves relative timestamps like `"-90s"`. |
-| `config/scenarios_v2/midday_chaos_1205.json` | create | Full scenario definition — sessions, orders, algo, injections, runbook, hints, success criteria. |
+| `src/fix_mcp/engine/scenarios.py` (v1 — confirmed live by Task 0) | modify | Loader honors new optional fields, resolves relative timestamps like `"-90s"`, and applies `injections` (which v1 currently ignores). |
+| `config/scenarios/midday_chaos_1205.json` | create | Full scenario definition — sessions, orders, algo_orders (v1 key name), injections, runbook, hints, success criteria. |
 | `docs/demo-midday-chaos.md` | create | Human-readable demo script following the 6 beats in the spec (Section 5). |
 | `tests/test_oms.py` | modify | Add tests for `pending_ack` state, `pending_since`, `stuck_reason`, `_OPEN_STATUSES`. |
 | `tests/test_fix_sessions.py` | modify | Add test for `ack_delay_ms` field + default. |
@@ -519,50 +527,70 @@ pytest tests/test_server.py -q -k staleness
 
 Expected: FAIL — unknown tool `check_market_data_staleness`.
 
-- [ ] **Step 4: Implement the tool handler**
+- [ ] **Step 4: Wire a `MarketDataHub` singleton into `server.py` (prerequisite for this task and Tasks 7, 9, 10)**
+
+v1 `server.py` does not currently instantiate `MarketDataHub`. Add one alongside the existing `engine.load_scenario()` so tool handlers have a hub to read from. Near line 99-101 (after `engine = ScenarioEngine(CONFIG_DIR)` and `oms, session_manager, ref_store = engine.load_scenario(SCENARIO)`):
+
+```python
+from fix_mcp.engine.market_data import MarketDataHub
+
+# Derive the symbol set from reference data (or hardcode a demo set if ref data is empty).
+_md_symbols = {s.symbol: 100.0 for s in ref_store.list_symbols()} or {
+    "AAPL": 195.0, "MSFT": 405.0, "SPY": 520.0,
+}
+market_data_hub = MarketDataHub(symbols=_md_symbols, tick_interval_ms=100)
+```
+
+Also extend `reset_runtime` to rebuild `market_data_hub` on scenario reload. Use `global market_data_hub`.
+
+If `ref_store.list_symbols()` does not exist, use the hardcoded fallback directly.
+
+- [ ] **Step 5: Relax the pre-existing tool-count assertion**
+
+`tests/test_server.py::test_tool_registry_and_resources` hardcodes `len(tools) == 15` but the registry already has 22 tools (pre-existing failure) and this task will push it higher. Change the assertion to `>= 15` so the test passes today and keeps passing after this plan adds 3 more tools.
+
+- [ ] **Step 6: Implement the tool handler**
 
 Add to `src/fix_mcp/server.py` (following the existing tool-registration pattern):
 
 ```python
-def _format_staleness_entry(hub, symbol: str) -> dict:
+def _format_staleness_entry(hub: MarketDataHub, symbol: str) -> dict:
     book = hub.get_quote(symbol)
     ms = hub.staleness_ms(symbol)
     return {
         "symbol": symbol,
         "last_quote_ts": book.last_updated if book else None,
         "staleness_ms": ms,
-        "stale": ms < 0 or ms > 500,  # default 500ms threshold for advisory flag
+        "stale": ms < 0 or ms > 500,  # advisory threshold
     }
 
 
 def handle_check_market_data_staleness(args: dict) -> list[dict]:
     """Return per-symbol staleness. Args: {symbol?: str}."""
-    hub = _get_market_data_hub()  # reuse whatever accessor exists
     symbol = args.get("symbol")
     if symbol:
-        return [_format_staleness_entry(hub, symbol)]
-    return [_format_staleness_entry(hub, s) for s in hub.get_all_quotes()]
+        _assert_symbol(symbol)
+        return [_format_staleness_entry(market_data_hub, symbol)]
+    # Enumerate known symbols from the hub's internal book map.
+    return [_format_staleness_entry(market_data_hub, s) for s in market_data_hub._books.keys()]
 ```
 
-Then register it in the tool table / decorator list alongside existing tools. Include an MCP schema describing the tool (follow the pattern used by `check_fix_sessions`).
+Register in the tool table / decorator list alongside existing tools. Include an MCP `Tool` schema describing the args (`symbol?: str`). Follow the pattern used by `check_fix_sessions` (locate via `grep -n "check_fix_sessions" src/fix_mcp/server.py`).
 
-- [ ] **Step 5: Run tests to verify they pass**
-
-```bash
-pytest tests/test_server.py -q -k staleness
-```
-
-Expected: PASS. Also run the full suite to ensure no regressions:
+- [ ] **Step 7: Run tests to verify they pass**
 
 ```bash
+pytest tests/test_server.py -q -k "staleness or tool_registry"
 pytest -q
 ```
 
-- [ ] **Step 6: Commit**
+Expected: PASS. No regressions elsewhere.
+
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/fix_mcp/server.py tests/test_server.py
-git commit -m "feat(tools): add check_market_data_staleness MCP tool"
+git commit -m "feat(tools): add check_market_data_staleness + wire MarketDataHub into server"
 ```
 
 ---
@@ -634,9 +662,10 @@ def _pending_since_seconds(iso_ts: str | None) -> float:
 
 
 def handle_check_pending_acks(args: dict) -> list[dict]:
-    """Return orders currently in pending_ack state with duplicate-risk flags."""
-    oms = _get_oms()
-    session_mgr = _get_session_mgr()
+    """Return orders currently in pending_ack state with duplicate-risk flags.
+
+    Reads module-level `oms` and `session_manager` singletons in `server.py`.
+    """
     venue_filter = args.get("venue")
 
     result: list[dict] = []
@@ -645,7 +674,7 @@ def handle_check_pending_acks(args: dict) -> list[dict]:
             continue
         if venue_filter and order.venue.upper() != venue_filter.upper():
             continue
-        session = session_mgr.get_session(order.venue)
+        session = session_manager.get_session(order.venue)
         ack_delay_ms = getattr(session, "ack_delay_ms", 0) if session else 0
         age_s = _pending_since_seconds(order.pending_since)
         result.append({
@@ -733,9 +762,9 @@ Add to `src/fix_mcp/server.py`:
 def handle_clear_market_data_delay(args: dict) -> dict:
     """Clear any injected market_data.delay on *venue*."""
     venue = args["venue"]
-    hub = _get_market_data_hub()
-    previous = hub._venue_delays.get(venue.upper(), 0)
-    hub.reset_feed(venue)
+    _assert_venue_or_side(venue, "venue")
+    previous = market_data_hub._venue_delays.get(venue.upper(), 0)
+    market_data_hub.reset_feed(venue)
     return {
         "venue": venue,
         "cleared": previous > 0,
@@ -846,18 +875,21 @@ In `src/fix_mcp/server.py`, update the handler:
 _DEFAULT_MD_FRESHNESS_MS = 500
 
 
-def _is_blocker_clear(order, oms, algos, hub) -> bool:
-    """For a stuck order, check whether its blocking condition has cleared."""
+def _is_blocker_clear(order) -> bool:
+    """For a stuck order, check whether its blocking condition has cleared.
+
+    Reads module-level `algo_engine` and `market_data_hub` singletons.
+    """
     reason = order.stuck_reason or ""
     if reason == "stale_md":
         threshold = _DEFAULT_MD_FRESHNESS_MS
         # If this is an algo child, prefer the parent algo's gate.
         if "algo_child" in order.flags:
-            for algo in algos.get_active():
+            for algo in algo_engine.get_active():
                 if order.order_id in algo.child_order_ids and algo.md_freshness_gate_ms:
                     threshold = algo.md_freshness_gate_ms
                     break
-        return not hub.is_stale(order.symbol, threshold_ms=threshold)
+        return not market_data_hub.is_stale(order.symbol, threshold_ms=threshold)
     # Unknown reason — conservative: do not auto-release.
     return False
 
@@ -870,10 +902,6 @@ def handle_release_stuck_orders(args: dict) -> dict:
                      orders are considered (same as legacy behavior).
     """
     reason_filter = args.get("reason_filter")
-    oms = _get_oms()
-    algos = _get_algo_engine()
-    hub = _get_market_data_hub()
-
     released: list[str] = []
     skipped: list[dict] = []
     for order in list(oms.orders.values()):
@@ -881,7 +909,7 @@ def handle_release_stuck_orders(args: dict) -> dict:
             continue
         if reason_filter and order.stuck_reason != reason_filter:
             continue
-        if _is_blocker_clear(order, oms, algos, hub):
+        if _is_blocker_clear(order):
             oms.update_order_status(order.order_id, "new")
             released.append(order.order_id)
         else:
@@ -890,7 +918,7 @@ def handle_release_stuck_orders(args: dict) -> dict:
     return {"released": released, "skipped": skipped}
 ```
 
-If the existing handler returns a different shape, ADD new fields rather than renaming existing ones — preserve backwards-compatibility with any dashboard consumer.
+If the existing handler returns a different shape, ADD new fields rather than renaming existing ones — preserve backwards-compatibility with any dashboard consumer. The `AlgoEngine.get_active()` accessor may not exist — confirm via grep and substitute the correct method (e.g. iterate `algo_engine.algos.values()` filtered on `status == "running"`).
 
 - [ ] **Step 5: Run tests to verify they pass**
 
@@ -910,123 +938,142 @@ git commit -m "feat(tools): implement release_stuck_orders with reason_filter + 
 
 ---
 
-## Task 9: Scenario loader — honor new fields + relative-timestamp helper
+## Task 9: Scenario loader — honor new fields + injections + relative-timestamp helper
 
-**Goal:** Scenario JSON loader populates the new fields (`pending_since`, `stuck_reason`, `md_freshness_gate_ms`, `ack_delay_ms`) onto the respective objects, and resolves relative timestamps like `"-90s"` to absolute ISO strings at load time.
+**Goal:** v1 `ScenarioEngine` (`src/fix_mcp/engine/scenarios.py`) (a) threads the new optional fields through `_load_orders`, `_load_algo_orders`, `_load_sessions`; (b) resolves relative timestamps like `"-90s"` to absolute ISO strings at load time; (c) applies the top-level `"injections"` array (currently ignored by v1) against a passed-in `MarketDataHub`.
+
+**v1 loader construction reality (important):** `_load_*` methods pass fields as **explicit kwargs** to the dataclass constructors (not `**kwargs`). New fields will NOT flow automatically — each `_load_*` method must be edited to pass the new field explicitly.
 
 **Files:**
-- Modify: `src/fix_mcp/engine/scenario_engine_v2.py` **OR** `src/fix_mcp/engine/scenarios.py` — use whichever was identified as live-wired in Task 0 Step 4.
-- Modify (or create): matching test file.
+- Modify: `src/fix_mcp/engine/scenarios.py` (v1 — the live loader).
+- Modify: `src/fix_mcp/server.py` — `engine.load_scenario()` callsite must also apply injections against the `market_data_hub` singleton created in Task 5.
+- Create: `tests/test_scenario_loader.py` — unit tests for the loader.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
-Create a small scenario fixture and test. Append to an appropriate test file (e.g. `tests/test_scenario_midday_chaos.py` — part of Task 10 setup):
+Create `tests/test_scenario_loader.py`. These unit-test the private `_load_*` methods directly (small, isolated) and the relative-timestamp helper. A full JSON-on-disk integration test comes in Task 10.
 
 ```python
-import json
-from pathlib import Path
-
-import pytest
-
-
-def test_loader_resolves_relative_timestamps(tmp_path, scenario_loader):
-    data = {
-        "name": "_unit",
-        "severity": "Low",
-        "difficulty": "beginner",
-        "time": "12:00",
-        "est_minutes": 5,
-        "sessions": [{"venue": "NYSE", "status": "active", "ack_delay_ms": 5000}],
-        "orders": [
-            {"order_id": "O1", "cl_ord_id": "C1", "symbol": "MSFT",
-             "cusip": "594918104", "side": "sell", "quantity": 1000,
-             "order_type": "LIMIT", "price": 405.20, "venue": "NYSE",
-             "client_name": "acme", "status": "pending_ack",
-             "pending_since": "-90s", "filled_quantity": 100,
-             "created_at": "2026-04-19T12:00:00+00:00",
-             "updated_at": "2026-04-19T12:00:00+00:00"}
-        ],
-        "algos": [],
-        "injections": [],
-        "runbook": {"narrative": "", "steps": [], "success_criteria": []},
-        "hints": {"key_problems": [], "common_mistakes": []},
-    }
-    path = tmp_path / "_unit.json"
-    path.write_text(json.dumps(data))
-
-    loaded = scenario_loader.load_from_path(path)
-    order = loaded.oms.get_order("O1")
-    assert order.status == "pending_ack"
-    # Relative "-90s" should be resolved to an absolute ISO string.
-    assert order.pending_since is not None
-    assert order.pending_since != "-90s"
-    # Session ack_delay_ms should be populated.
-    session = loaded.session_mgr.get_session("NYSE")
-    assert session.ack_delay_ms == 5000
+from fix_mcp.engine.scenarios import ScenarioEngine, resolve_relative_timestamp
+from fix_mcp.engine.oms import OMS
+from fix_mcp.engine.fix_sessions import FIXSessionManager
+from fix_mcp.engine.algos import AlgoEngine
+from fix_mcp.engine.reference import ReferenceDataStore
 
 
-def test_loader_honors_md_freshness_gate_and_stuck_reason(tmp_path, scenario_loader):
-    data = {
-        "name": "_unit2",
-        "severity": "Low", "difficulty": "beginner",
-        "time": "12:00", "est_minutes": 5,
-        "sessions": [{"venue": "BATS", "status": "active"}],
-        "orders": [
-            {"order_id": "O2", "cl_ord_id": "C2", "symbol": "AAPL",
-             "cusip": "037833100", "side": "buy", "quantity": 500,
-             "order_type": "MARKET", "venue": "BATS", "client_name": "acme",
-             "status": "stuck", "stuck_reason": "stale_md",
-             "flags": ["algo_child"],
-             "created_at": "2026-04-19T12:00:00+00:00",
-             "updated_at": "2026-04-19T12:00:00+00:00"}
-        ],
-        "algos": [
-            {"algo_id": "A1", "client_name": "acme", "symbol": "AAPL",
-             "cusip": "037833100", "side": "buy", "total_qty": 10000,
-             "algo_type": "TWAP",
-             "start_time": "2026-04-19T12:00:00+00:00", "venue": "BATS",
-             "created_at": "2026-04-19T12:00:00+00:00",
-             "updated_at": "2026-04-19T12:00:00+00:00",
-             "md_freshness_gate_ms": 100,
-             "child_order_ids": ["O2"]}
-        ],
-        "injections": [],
-        "runbook": {"narrative": "", "steps": [], "success_criteria": []},
-        "hints": {"key_problems": [], "common_mistakes": []},
-    }
-    path = tmp_path / "_unit2.json"
-    path.write_text(json.dumps(data))
+def test_resolve_relative_timestamp_90s():
+    result = resolve_relative_timestamp("-90s")
+    # Resolved to an ISO string, not the literal "-90s".
+    assert result != "-90s"
+    assert "T" in result and result.count(":") >= 2
 
-    loaded = scenario_loader.load_from_path(path)
-    assert loaded.oms.get_order("O2").stuck_reason == "stale_md"
-    assert loaded.algos.get_algo("A1").md_freshness_gate_ms == 100
+
+def test_resolve_relative_timestamp_passthrough_absolute():
+    absolute = "2026-04-19T12:03:45+00:00"
+    assert resolve_relative_timestamp(absolute) == absolute
+
+
+def test_resolve_relative_timestamp_passthrough_none():
+    assert resolve_relative_timestamp(None) is None
+
+
+def test_load_orders_threads_pending_since_and_stuck_reason():
+    engine = ScenarioEngine()
+    oms = OMS()
+    engine._load_orders(
+        oms,
+        [{
+            "order_id": "O1", "cl_ord_id": "C1", "symbol": "MSFT",
+            "cusip": "594918104", "side": "sell", "quantity": 1000,
+            "order_type": "LIMIT", "price": 405.20, "venue": "NYSE",
+            "client_name": "acme", "status": "pending_ack",
+            "pending_since": "-90s", "filled_quantity": 100,
+            "created_at": "2026-04-19T12:00:00+00:00",
+            "updated_at": "2026-04-19T12:00:00+00:00",
+            "is_institutional": True,
+        }],
+        ReferenceDataStore(),
+    )
+    o = oms.get_order("O1")
+    assert o.status == "pending_ack"
+    assert o.pending_since is not None and o.pending_since != "-90s"
+
+    engine._load_orders(
+        oms,
+        [{
+            "order_id": "O2", "cl_ord_id": "C2", "symbol": "AAPL",
+            "cusip": "037833100", "side": "buy", "quantity": 500,
+            "order_type": "MARKET", "venue": "BATS", "client_name": "acme",
+            "status": "stuck", "stuck_reason": "stale_md",
+            "flags": ["algo_child"],
+            "created_at": "2026-04-19T12:00:00+00:00",
+            "updated_at": "2026-04-19T12:00:00+00:00",
+            "is_institutional": True,
+        }],
+        ReferenceDataStore(),
+    )
+    assert oms.get_order("O2").stuck_reason == "stale_md"
+
+
+def test_load_sessions_threads_ack_delay_ms():
+    engine = ScenarioEngine()
+    mgr = FIXSessionManager()
+    engine._load_sessions(mgr, [{
+        "venue": "NYSE", "session_id": "NYSE-1",
+        "sender_comp_id": "ACME", "target_comp_id": "NYSE",
+        "status": "active", "ack_delay_ms": 5000,
+    }])
+    assert mgr.get_session("NYSE").ack_delay_ms == 5000
+
+
+def test_load_algo_orders_threads_md_freshness_gate():
+    engine = ScenarioEngine()
+    ae = AlgoEngine()
+    engine._load_algo_orders(ae, [{
+        "algo_id": "A1", "client_name": "acme", "symbol": "AAPL",
+        "cusip": "037833100", "side": "buy", "total_qty": 10000,
+        "algo_type": "TWAP",
+        "start_time": "2026-04-19T12:00:00+00:00", "venue": "BATS",
+        "created_at": "2026-04-19T12:00:00+00:00",
+        "updated_at": "2026-04-19T12:00:00+00:00",
+        "md_freshness_gate_ms": 100,
+        "child_order_ids": ["O2"],
+    }], ReferenceDataStore())
+    assert ae.get_algo("A1").md_freshness_gate_ms == 100
+
+
+def test_apply_injections_delays_venue():
+    from fix_mcp.engine.market_data import MarketDataHub
+    hub = MarketDataHub(symbols={"AAPL": 195.0}, tick_interval_ms=100)
+    engine = ScenarioEngine()
+    engine._apply_injections(hub, [
+        {"type": "market_data.delay", "args": {"venue": "BATS", "delay_ms": 600}},
+    ])
+    assert hub._venue_delays.get("BATS") == 600
 ```
-
-`scenario_loader` is a pytest fixture returning the live loader — match the project's existing test harness for scenarios. If no such fixture exists, use the actual engine classes directly.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-pytest tests/test_scenario_midday_chaos.py -q -k loader
+pytest tests/test_scenario_loader.py -q
 ```
 
-Expected: FAIL — loader ignores the new fields or fails on `-90s`.
+Expected: FAIL — `ImportError` on `resolve_relative_timestamp`, then `AttributeError` on `_apply_injections`, then missing kwargs on the dataclasses.
 
-- [ ] **Step 3: Add a relative-timestamp helper**
-
-Add to the top of the loader file (`scenario_engine_v2.py` or `scenarios.py`):
+- [ ] **Step 3: Add the relative-timestamp helper at module level in `scenarios.py`**
 
 ```python
-import re
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta  # add to the existing datetime import
 
 
 _REL_TS_RE = re.compile(r"^-(\d+)([smh])$")
 
 
 def resolve_relative_timestamp(value, now=None):
-    """If value matches '-<N><s|m|h>', return an ISO string N units ago.
-    Otherwise return value unchanged.
+    """If *value* matches '-<N><s|m|h>', return an ISO string N units ago.
+
+    Otherwise return *value* unchanged. Used by scenario loader so scenarios
+    can express 'pending since 90 seconds before now' as "-90s" in JSON.
     """
     if not isinstance(value, str):
         return value
@@ -1040,31 +1087,86 @@ def resolve_relative_timestamp(value, now=None):
     return (base - timedelta(seconds=seconds)).isoformat()
 ```
 
-- [ ] **Step 4: Wire the helper and new fields into the loader**
+- [ ] **Step 4: Thread the new fields through `_load_orders`**
 
-Locate the part of the loader that builds `Order`, `AlgoOrder`, `FIXSession` objects from JSON. For each:
+In `_load_orders` (around line 271), extend the `Order(...)` kwargs with:
 
-- Before passing `pending_since` to `Order`, pass it through `resolve_relative_timestamp`.
-- Pass `stuck_reason` straight through (optional field, defaults to `None`).
-- Pass `md_freshness_gate_ms` straight through on `AlgoOrder`.
-- Pass `ack_delay_ms` straight through on `FIXSession`.
+```python
+                pending_since=resolve_relative_timestamp(o.get("pending_since")),
+                stuck_reason=o.get("stuck_reason"),
+```
 
-Concretely, if the loader currently does something like `Order(**order_dict)`, the new fields will flow automatically as long as the dataclass has the fields (which Tasks 1-3 added). The only loader change required is: **call `resolve_relative_timestamp` on any field that could hold a relative timestamp** — minimally `pending_since`.
+- [ ] **Step 5: Thread `md_freshness_gate_ms` through `_load_algo_orders`**
 
-- [ ] **Step 5: Run tests to verify they pass**
+In `_load_algo_orders` (around line 313), extend the `AlgoOrder(...)` kwargs with:
+
+```python
+                md_freshness_gate_ms=a.get("md_freshness_gate_ms"),
+```
+
+- [ ] **Step 6: Thread `ack_delay_ms` through `_load_sessions`**
+
+In `_load_sessions` (around line 214), extend the `FIXSession(...)` kwargs with:
+
+```python
+                ack_delay_ms=int(s.get("ack_delay_ms", 0)),
+```
+
+- [ ] **Step 7: Add `_apply_injections` method to `ScenarioEngine`**
+
+```python
+    def _apply_injections(self, market_data_hub, injections: list) -> None:
+        """Apply the scenario's top-level ``injections`` array to live engines.
+
+        Currently only ``market_data.delay`` is supported. Unknown types are
+        logged and skipped rather than raising, so scenarios can carry
+        forward-compatible injection types.
+        """
+        if not injections or market_data_hub is None:
+            return
+        for inj in injections:
+            itype = inj.get("type")
+            args = inj.get("args", {})
+            if itype == "market_data.delay":
+                venue = args["venue"]
+                delay_ms = int(args["delay_ms"])
+                market_data_hub.delay_venue(venue, delay_ms)
+            # Add more injection types here as they are defined.
+```
+
+- [ ] **Step 8: Extend `load_scenario` to accept an optional hub and apply injections**
+
+Change the signature and body so the caller can pass a hub:
+
+```python
+    def load_scenario(
+        self, scenario_name: str, market_data_hub=None,
+    ) -> tuple[OMS, FIXSessionManager, ReferenceDataStore]:
+        ...  # existing body unchanged up through algo loading
+        self._apply_injections(market_data_hub, scenario_data.get("injections", []))
+        return oms, session_mgr, ref_store
+```
+
+Keep `market_data_hub=None` default so existing callers (and pre-existing tests) still pass.
+
+- [ ] **Step 9: Pass the hub from `server.py`**
+
+In `src/fix_mcp/server.py` `reset_runtime` and at module init, change `engine.load_scenario(SCENARIO)` to `engine.load_scenario(SCENARIO, market_data_hub=market_data_hub)`. Instantiation order matters: `market_data_hub` must be created before `load_scenario` is called. If Task 5 already instantiated `market_data_hub` *after* the first `load_scenario` call, reorder so the hub is created first, then call `load_scenario(...)` with it. (For the first module-level call, if symbols need to come from ref_store, do a two-pass: first `load_scenario` with no hub, then build hub from ref_store, then re-apply injections by calling `engine._apply_injections(market_data_hub, <scenario-injections>)`. Prefer the single-pass approach — hardcoded symbols are fine for the demo.)
+
+- [ ] **Step 10: Run tests to verify they pass**
 
 ```bash
-pytest tests/test_scenario_midday_chaos.py -q -k loader
+pytest tests/test_scenario_loader.py -q
 pytest -q
 ```
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add src/fix_mcp/engine/ tests/test_scenario_midday_chaos.py
-git commit -m "feat(scenarios): loader resolves relative timestamps, honors new optional fields"
+git add src/fix_mcp/engine/scenarios.py src/fix_mcp/server.py tests/test_scenario_loader.py
+git commit -m "feat(scenarios): loader threads new fields, resolves relative timestamps, applies injections"
 ```
 
 ---
@@ -1074,19 +1176,28 @@ git commit -m "feat(scenarios): loader resolves relative timestamps, honors new 
 **Goal:** The flagship scenario file. Loads cleanly, populates both incidents in the exact states the demo script depends on.
 
 **Files:**
-- Create: `config/scenarios_v2/midday_chaos_1205.json`
-- Modify: `tests/test_scenario_midday_chaos.py` (add integration test)
+- Create: `config/scenarios/midday_chaos_1205.json` (v1 loader reads this path)
+- Create: `tests/test_scenario_midday_chaos.py`
 
 - [ ] **Step 1: Write the failing integration test**
 
-Append to `tests/test_scenario_midday_chaos.py`:
+Create `tests/test_scenario_midday_chaos.py`:
 
 ```python
-def test_midday_chaos_scenario_loads_with_expected_state(scenario_loader):
-    loaded = scenario_loader.load_named("midday_chaos_1205")
+from fix_mcp.engine.scenarios import ScenarioEngine
+from fix_mcp.engine.market_data import MarketDataHub
+
+
+def test_midday_chaos_scenario_loads_with_expected_state():
+    engine = ScenarioEngine()
+    hub = MarketDataHub(symbols={"AAPL": 195.0, "MSFT": 405.0}, tick_interval_ms=100)
+    oms, session_mgr, ref_store = engine.load_scenario(
+        "midday_chaos_1205", market_data_hub=hub,
+    )
+    algos = engine.algo_engine
 
     # Incident A — algo + stuck children
-    algo = loaded.algos.get_algo("ALGO-PARENT-001")
+    algo = algos.get_algo("ALGO-PARENT-001")
     assert algo is not None
     assert algo.symbol == "AAPL"
     assert algo.md_freshness_gate_ms == 100
@@ -1094,26 +1205,25 @@ def test_midday_chaos_scenario_loads_with_expected_state(scenario_loader):
     assert sorted(algo.child_order_ids) == ["ORD-1005", "ORD-1006"]
 
     for child_id in ("ORD-1005", "ORD-1006"):
-        child = loaded.oms.get_order(child_id)
+        child = oms.get_order(child_id)
         assert child is not None, child_id
         assert child.status == "stuck"
         assert child.stuck_reason == "stale_md"
         assert "algo_child" in child.flags
 
     # Incident B — pending-ack NYSE order
-    nyse = loaded.oms.get_order("ORD-NYSE-7731")
+    nyse = oms.get_order("ORD-NYSE-7731")
     assert nyse is not None
     assert nyse.symbol == "MSFT"
     assert nyse.status == "pending_ack"
     assert nyse.pending_since is not None and nyse.pending_since != "-90s"
     assert nyse.filled_quantity == 100
 
-    nyse_session = loaded.session_mgr.get_session("NYSE")
+    nyse_session = session_mgr.get_session("NYSE")
     assert nyse_session.ack_delay_ms == 5000
 
-    # Injections applied
-    hub = loaded.market_data_hub
-    assert hub._venue_delays.get("BATS") == 600  # MD delay on BATS
+    # Injection applied via _apply_injections
+    assert hub._venue_delays.get("BATS") == 600
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -1126,7 +1236,7 @@ Expected: FAIL — scenario file not found.
 
 - [ ] **Step 3: Create the scenario file**
 
-Create `config/scenarios_v2/midday_chaos_1205.json`:
+Create `config/scenarios/midday_chaos_1205.json` (NOTE: v1 loader uses top-level key `"algo_orders"`, NOT `"algos"`):
 
 ```json
 {
@@ -1157,7 +1267,7 @@ Create `config/scenarios_v2/midday_chaos_1205.json`:
       "ack_delay_ms": 5000
     }
   ],
-  "algos": [
+  "algo_orders": [
     {
       "algo_id": "ALGO-PARENT-001",
       "client_name": "acme_capital",
@@ -1356,7 +1466,7 @@ Adjust the one-liner if `handle_list_scenarios` is not the real name — just co
 - [ ] **Step 6: Commit**
 
 ```bash
-git add config/scenarios_v2/midday_chaos_1205.json tests/test_scenario_midday_chaos.py
+git add config/scenarios/midday_chaos_1205.json tests/test_scenario_midday_chaos.py
 git commit -m "feat(scenarios): add midday_chaos_1205 compound-incident scenario"
 ```
 
@@ -1509,8 +1619,8 @@ For each issue: reproduce with a unit test first (TDD), fix, re-run the smoke te
 
 Common likely issues:
 - The scenario file path isn't seen by the container → bind-mount fix or rebuild.
-- `list_scenarios` tool only reads the v1 `config/scenarios/` directory → also read from `config/scenarios_v2/`.
 - Pending-ack order fails validation somewhere because `pending_ack` isn't expected by one of the query/validate tools → widen the status whitelist.
+- `list_scenarios` doesn't include the new file → confirm it enumerates `config/scenarios/*.json`.
 
 - [ ] **Step 6: Final pytest sweep**
 
@@ -1542,7 +1652,7 @@ git push -u origin feat/midday-chaos
 ## Deliverables Checklist
 
 - [ ] `feat/midday-chaos` branch with all tasks committed
-- [ ] `config/scenarios_v2/midday_chaos_1205.json` loadable from dashboard
+- [ ] `config/scenarios/midday_chaos_1205.json` loadable from dashboard
 - [ ] `docs/demo-midday-chaos.md` present
 - [ ] `pytest -q` green
 - [ ] End-to-end runbook executable via REST
