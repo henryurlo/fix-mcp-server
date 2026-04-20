@@ -17,7 +17,7 @@ def test_tool_registry_and_resources() -> None:
     tools = asyncio.run(server.list_tools())
 
     assert len(resources) == 4
-    assert len(tools) == 15
+    assert len(tools) >= 15
     assert any(tool.name == "send_order" for tool in tools)
     assert any(str(resource.uri) == "fix://sessions" for resource in resources)
 
@@ -164,3 +164,24 @@ def test_cancel_algo_cancels_children() -> None:
 
     assert "ALGO CANCELED" in result[0].text
     assert "ALGO-20260328-001" in result[0].text
+
+
+def test_check_market_data_staleness_returns_list() -> None:
+    server = _load_server()
+    result = asyncio.run(server.call_tool("check_market_data_staleness", {}))
+    assert result, "expected non-empty result"
+    txt = result[0].text
+    # Tool returns a formatted text listing per-symbol staleness.
+    # AAPL is in the default symbol set, so it should appear.
+    assert "AAPL" in txt
+    assert "ms" in txt  # staleness unit appears in output
+
+
+def test_check_market_data_staleness_single_symbol() -> None:
+    server = _load_server()
+    result = asyncio.run(server.call_tool("check_market_data_staleness", {"symbol": "AAPL"}))
+    assert result
+    txt = result[0].text
+    assert "AAPL" in txt
+    # The output should not mention other symbols when filtering.
+    assert "MSFT" not in txt

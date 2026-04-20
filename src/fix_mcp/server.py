@@ -20,6 +20,7 @@ from fix_mcp.engine.scenarios import ScenarioEngine
 from fix_mcp.engine.algos import AlgoEngine, AlgoOrder, ALGO_TYPES
 from fix_mcp.fix.messages import FIXMessageBuilder
 from fix_mcp.fix.protocol import SequenceManager, format_fix_timestamp
+from fix_mcp.engine.market_data import MarketDataHub
 
 # ---------------------------------------------------------------------------
 # Attempt to import the trading ops prompt; fall back to a stub if the module
@@ -105,10 +106,18 @@ msg_builder = FIXMessageBuilder(
     session_manager=SequenceManager(),
 )
 
+# Market data hub — one process-wide instance. Seed symbols from ref_store
+# (ref_store.symbols is a dict keyed by symbol); fall back to a hardcoded
+# demo set if ref_store has no symbols loaded.
+_md_seed_symbols = {sym: 100.0 for sym in ref_store.symbols.keys()} or {
+    "AAPL": 195.0, "MSFT": 405.0, "SPY": 520.0,
+}
+market_data_hub = MarketDataHub(symbols=_md_seed_symbols, tick_interval_ms=100)
+
 
 def reset_runtime(scenario_name: str | None = None) -> str:
     """Reload scenario-backed runtime state in-process (thread-safe)."""
-    global SCENARIO, oms, session_manager, ref_store, algo_engine, msg_builder
+    global SCENARIO, oms, session_manager, ref_store, algo_engine, msg_builder, market_data_hub
 
     with _engine_lock:  # serialise against concurrent tool dispatch
         if scenario_name:
@@ -116,6 +125,10 @@ def reset_runtime(scenario_name: str | None = None) -> str:
 
         oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
         algo_engine = engine.algo_engine
+        _seed = {sym: 100.0 for sym in ref_store.symbols.keys()} or {
+            "AAPL": 195.0, "MSFT": 405.0, "SPY": 520.0,
+        }
+        market_data_hub = MarketDataHub(symbols=_seed, tick_interval_ms=100)
         msg_builder = FIXMessageBuilder(
             sender_comp_id="FIRM_PROD",
             target_comp_id="EXCHANGE_GW",
@@ -634,6 +647,19 @@ async def list_tools() -> list[Tool]:
                 },
             },
         ),
+        Tool(
+            name="check_market_data_staleness",
+            description=(
+                "Report per-symbol market-data staleness in ms. Flags symbols whose "
+                "last quote exceeds a 500ms advisory threshold. Pass 'symbol' to filter."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Specific symbol, or omit for all"},
+                },
+            },
+        ),
     ]
 
 
@@ -680,6 +706,8 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
         if name == "grep_logs":            return await _tool_grep_logs(arguments)
         if name == "release_stuck_orders": return await _tool_release_stuck_orders(arguments)
         if name == "update_venue_status":  return await _tool_update_venue_status(arguments)
+        if name == "check_market_data_staleness":
+            return await _tool_check_market_data_staleness(arguments)
         if name == "cancel_order":
             # Alias: cancel_order → cancel_replace with action="cancel"
             args = {**arguments, "action": arguments.get("action", "cancel")}
@@ -2049,6 +2077,36 @@ async def _tool_update_venue_status(args: dict) -> list[TextContent]:
         return _tc("\n".join(lines))
     except Exception as exc:
         return _tc(f"ERROR in update_venue_status: {exc!r}")
+
+
+async def _tool_check_market_data_staleness(args: dict) -> list[TextContent]:
+    try:
+        symbol = args.get("symbol")
+        if symbol:
+            _assert_symbol(symbol)
+            symbols = [symbol.upper()] if symbol.upper() in market_data_hub._books else []
+            if not symbols:
+                return _tc(f"Unknown symbol '{symbol}'. No market data tracked.")
+        else:
+            symbols = sorted(market_data_hub._books.keys())
+
+        if not symbols:
+            return _tc("No market data tracked.")
+
+        lines = ["MARKET DATA STALENESS", "=" * 60]
+        lines.append(f"  {'SYMBOL':<8} {'STALENESS':>12} {'LAST UPDATE':>30}  FLAG")
+        for sym in symbols:
+            book = market_data_hub.get_quote(sym)
+            ms = market_data_hub.staleness_ms(sym)
+            flag = "[STALE]" if ms < 0 or ms > 500 else "[OK]"
+            ms_str = f"{ms} ms" if ms >= 0 else "unknown"
+            last = book.last_updated if book and book.last_updated else "—"
+            lines.append(f"  {sym:<8} {ms_str:>12} {last:>30}  {flag}")
+        return _tc("\n".join(lines))
+    except ValueError as exc:
+        return _tc(f"ERROR in check_market_data_staleness: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        return _tc(f"ERROR in check_market_data_staleness: {exc!r}")
 
 
 async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
