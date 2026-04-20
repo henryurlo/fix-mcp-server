@@ -174,6 +174,30 @@ class MarketDataHub:
             result[pair] = self._corrupted_fx.get(pair, rate)
         return result
 
+    def staleness_ms(self, symbol: str) -> int:
+        """Return age of the latest quote for *symbol* in ms.
+
+        Returns -1 if the symbol is not tracked or has no valid timestamp.
+        """
+        book = self._books.get(symbol)
+        if book is None or not book.last_updated:
+            return -1
+        try:
+            ts = datetime.fromisoformat(book.last_updated)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            return -1
+        delta = datetime.now(timezone.utc) - ts
+        return max(0, int(delta.total_seconds() * 1000))
+
+    def is_stale(self, symbol: str, threshold_ms: int) -> bool:
+        """True if MD for *symbol* is older than *threshold_ms* or unknown."""
+        ms = self.staleness_ms(symbol)
+        if ms < 0:
+            return True
+        return ms > threshold_ms
+
     # ------------------------------------------------------------------ #
     # Subscriptions (hook for broker to plug in)                          #
     # ------------------------------------------------------------------ #
