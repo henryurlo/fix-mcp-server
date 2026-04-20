@@ -98,17 +98,17 @@ SCENARIO = os.environ.get("SCENARIO", "morning_triage")
 CONFIG_DIR = os.environ.get("FIX_MCP_CONFIG_DIR")
 
 engine = ScenarioEngine(CONFIG_DIR)
-oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
+# Market data hub — one process-wide instance.
+# Pass symbols=None so MarketDataHub uses its own _DEFAULT_SYMBOLS (realistic prices).
+# Instantiated before load_scenario so injections (e.g. market_data.delay) are applied.
+market_data_hub = MarketDataHub(symbols=None, tick_interval_ms=100)
+oms, session_manager, ref_store = engine.load_scenario(SCENARIO, market_data_hub=market_data_hub)
 algo_engine: AlgoEngine = engine.algo_engine
 msg_builder = FIXMessageBuilder(
     sender_comp_id="FIRM_PROD",
     target_comp_id="EXCHANGE_GW",
     session_manager=SequenceManager(),
 )
-
-# Market data hub — one process-wide instance.
-# Pass symbols=None so MarketDataHub uses its own _DEFAULT_SYMBOLS (realistic prices).
-market_data_hub = MarketDataHub(symbols=None, tick_interval_ms=100)
 
 
 def reset_runtime(scenario_name: str | None = None) -> str:
@@ -119,9 +119,9 @@ def reset_runtime(scenario_name: str | None = None) -> str:
         if scenario_name:
             SCENARIO = scenario_name
 
-        oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
-        algo_engine = engine.algo_engine
         market_data_hub = MarketDataHub(symbols=None, tick_interval_ms=100)
+        oms, session_manager, ref_store = engine.load_scenario(SCENARIO, market_data_hub=market_data_hub)
+        algo_engine = engine.algo_engine
         msg_builder = FIXMessageBuilder(
             sender_comp_id="FIRM_PROD",
             target_comp_id="EXCHANGE_GW",

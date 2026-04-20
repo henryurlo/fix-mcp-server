@@ -3,7 +3,7 @@ and ReferenceDataStore with pre-seeded demo state."""
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +29,36 @@ def _rebase_today(ts: str) -> str:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     # Replace the leading date (YYYY-MM-DD) portion, keep the time part
     return re.sub(r"^\d{4}-\d{2}-\d{2}", today, ts)
+
+
+_REL_TS_RE = re.compile(r"^-(\d+)([smh])$")
+
+
+def resolve_relative_timestamp(value, now=None):
+    """Convert a relative timestamp like ``"-90s"`` / ``"-5m"`` / ``"-2h"`` to
+    an absolute ISO-8601 string.  Passes non-matching strings and ``None``
+    through unchanged.
+
+    Args:
+        value: The value to resolve.  If it matches the pattern ``-<n><unit>``
+            where unit is ``s``, ``m``, or ``h``, it is converted.  Otherwise
+            it is returned as-is.
+        now: Optional ``datetime`` to treat as "now"; defaults to
+            ``datetime.now(timezone.utc)``.
+
+    Returns:
+        An ISO-8601 string or the original value unchanged.
+    """
+    if not isinstance(value, str):
+        return value
+    m = _REL_TS_RE.match(value)
+    if not m:
+        return value
+    n = int(m.group(1))
+    unit = m.group(2)
+    seconds = {"s": 1, "m": 60, "h": 3600}[unit] * n
+    base = now or datetime.now(timezone.utc)
+    return (base - timedelta(seconds=seconds)).isoformat()
 
 
 class ScenarioEngine:
@@ -67,7 +97,7 @@ class ScenarioEngine:
     # ------------------------------------------------------------------
 
     def load_scenario(
-        self, scenario_name: str
+        self, scenario_name: str, market_data_hub=None
     ) -> tuple[OMS, FIXSessionManager, ReferenceDataStore]:
         """Load a named scenario and return fully populated engine objects.
 
@@ -115,11 +145,36 @@ class ScenarioEngine:
             self.algo_engine, scenario_data.get("algo_orders", []), ref_store
         )
 
+        self._apply_injections(market_data_hub, scenario_data.get("injections", []))
+
         return oms, session_mgr, ref_store
 
     # ------------------------------------------------------------------
     # Private loaders
     # ------------------------------------------------------------------
+
+    def _apply_injections(self, market_data_hub, injections: list) -> None:
+        """Apply scenario injections to runtime objects.
+
+        Currently handles ``type: "market_data.delay"`` which calls
+        ``market_data_hub.delay_venue(venue, delay_ms)``.  Unknown injection
+        types are silently skipped.
+
+        Args:
+            market_data_hub: The :class:`MarketDataHub` instance, or ``None``
+                if no hub is available.
+            injections: List of injection dicts from the scenario JSON.
+        """
+        if not injections or market_data_hub is None:
+            return
+        for inj in injections:
+            itype = inj.get("type")
+            args = inj.get("args", {})
+            if itype == "market_data.delay":
+                venue = args["venue"]
+                delay_ms = int(args["delay_ms"])
+                market_data_hub.delay_venue(venue, delay_ms)
+            # Unknown types silently skipped
 
     def _load_reference_data(
         self, ref_store: ReferenceDataStore, data: dict
@@ -227,6 +282,7 @@ class ScenarioEngine:
                 port=s.get("port", 0),
                 error=s.get("error"),
                 connected_since=s.get("connected_since"),
+                ack_delay_ms=int(s.get("ack_delay_ms", 0)),
             )
             session_mgr.add_session(session)
 
@@ -287,6 +343,8 @@ class ScenarioEngine:
                 flags=list(o.get("flags", [])),
                 is_institutional=is_institutional,
                 sla_minutes=sla_minutes,
+                pending_since=resolve_relative_timestamp(o.get("pending_since")),
+                stuck_reason=o.get("stuck_reason"),
             )
             oms.add_order(order)
 
@@ -338,6 +396,7 @@ class ScenarioEngine:
                 is_institutional=is_institutional,
                 sla_minutes=sla_minutes,
                 notes=a.get("notes", ""),
+                md_freshness_gate_ms=a.get("md_freshness_gate_ms"),
             )
             algo_engine.add_algo(algo)
 
