@@ -59,30 +59,19 @@ def test_total_notional_at_risk_only_counts_institutional_new_and_stuck() -> Non
     assert oms.total_notional_at_risk() == 2000.0
 
 
-def _make_order(order_id="ORD-1", **overrides):
-    defaults = dict(
-        order_id=order_id, cl_ord_id="CLO-1", symbol="AAPL", cusip="037833100",
-        side="buy", quantity=100, order_type="LIMIT", venue="BATS",
-        client_name="acme", created_at="2026-04-19T12:00:00+00:00",
-        updated_at="2026-04-19T12:00:00+00:00",
-    )
-    defaults.update(overrides)
-    return Order(**defaults)
-
-
 def test_order_accepts_pending_ack_state():
-    o = _make_order(status="pending_ack", pending_since="2026-04-19T12:04:30+00:00")
+    o = _order("O1", status="pending_ack", pending_since="2026-04-19T12:04:30+00:00")
     assert o.status == "pending_ack"
     assert o.pending_since == "2026-04-19T12:04:30+00:00"
 
 
 def test_order_stuck_reason_roundtrip():
-    o = _make_order(status="stuck", stuck_reason="stale_md")
+    o = _order("O1", status="stuck", stuck_reason="stale_md")
     assert o.stuck_reason == "stale_md"
 
 
 def test_order_defaults_for_new_fields():
-    o = _make_order()
+    o = _order("O1")
     assert o.pending_since is None
     assert o.stuck_reason is None
 
@@ -93,6 +82,6 @@ def test_pending_ack_is_in_open_statuses():
 
 def test_pending_ack_orders_counted_by_venue():
     oms = OMS()
-    oms.add_order(_make_order(order_id="O1", status="pending_ack", venue="NYSE"))
+    oms.add_order(_order("O1", status="pending_ack", venue="NYSE"))
     counts = oms.count_by_venue()
     assert counts.get("NYSE") == 1
