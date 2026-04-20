@@ -280,3 +280,119 @@ def test_clear_market_data_delay_noop_when_no_delay() -> None:
     assert "ARCA" in txt
     assert "0 ms" in txt
     assert "NOOP" in txt
+
+
+def test_release_stuck_orders_unblocks_when_md_fresh() -> None:
+    from fix_mcp.engine.oms import Order
+
+    server = _load_server()
+
+    now_ts = datetime.now(timezone.utc).isoformat()
+    order = Order(
+        order_id="ORD-2001",
+        cl_ord_id="CLO-TEST-2001",
+        symbol="AAPL",
+        cusip="037833100",
+        side="buy",
+        quantity=100,
+        order_type="limit",
+        venue="BATS",
+        client_name="Test Client",
+        created_at=now_ts,
+        updated_at=now_ts,
+        status="stuck",
+        stuck_reason="stale_md",
+        flags=["algo_child"],
+    )
+    server.oms.orders["ORD-2001"] = order
+
+    # Ensure MD is fresh for AAPL
+    book = server.market_data_hub.get_quote("AAPL")
+    if book is not None:
+        book.last_updated = datetime.now(timezone.utc).isoformat()
+
+    result = asyncio.run(server.call_tool("release_stuck_orders", {"reason_filter": "stale_md"}))
+    assert result
+    txt = result[0].text
+    assert "ORD-2001" in txt
+    assert "released" in txt.lower()
+    assert server.oms.get_order("ORD-2001").status == "new"
+
+
+def test_release_stuck_orders_skips_when_md_stale() -> None:
+    from fix_mcp.engine.oms import Order
+
+    server = _load_server()
+
+    now_ts = datetime.now(timezone.utc).isoformat()
+    order = Order(
+        order_id="ORD-2002",
+        cl_ord_id="CLO-TEST-2002",
+        symbol="AAPL",
+        cusip="037833100",
+        side="buy",
+        quantity=200,
+        order_type="limit",
+        venue="BATS",
+        client_name="Test Client",
+        created_at=now_ts,
+        updated_at=now_ts,
+        status="stuck",
+        stuck_reason="stale_md",
+    )
+    server.oms.orders["ORD-2002"] = order
+
+    # Force MD stale: 10s ago >> 500ms threshold
+    book = server.market_data_hub.get_quote("AAPL")
+    if book is not None:
+        book.last_updated = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+    else:
+        # If AAPL not tracked, is_stale returns True (unknown = stale) — no action needed
+        pass
+
+    result = asyncio.run(server.call_tool("release_stuck_orders", {"reason_filter": "stale_md"}))
+    assert result
+    txt = result[0].text
+    assert "ORD-2002" in txt
+    assert "Skipped" in txt
+    assert server.oms.get_order("ORD-2002").status == "stuck"
+
+
+def test_release_stuck_orders_reason_filter_excludes_nonmatching() -> None:
+    from fix_mcp.engine.oms import Order
+
+    server = _load_server()
+
+    now_ts = datetime.now(timezone.utc).isoformat()
+    order = Order(
+        order_id="ORD-3001",
+        cl_ord_id="CLO-TEST-3001",
+        symbol="MSFT",
+        cusip="594918104",
+        side="sell",
+        quantity=50,
+        order_type="market",
+        venue="BATS",
+        client_name="Test Client",
+        created_at=now_ts,
+        updated_at=now_ts,
+        status="stuck",
+        stuck_reason="venue_down",
+        flags=["venue_down"],
+    )
+    server.oms.orders["ORD-3001"] = order
+
+    result = asyncio.run(server.call_tool("release_stuck_orders", {"reason_filter": "stale_md"}))
+    assert result
+    txt = result[0].text
+    assert "ORD-3001" not in txt
+    assert server.oms.get_order("ORD-3001").status == "stuck"
+
+
+def test_release_stuck_orders_no_args_still_works() -> None:
+    server = _load_server()
+
+    result = asyncio.run(server.call_tool("release_stuck_orders", {}))
+    assert result
+    txt = result[0].text
+    assert "RELEASED STUCK ORDERS" in txt

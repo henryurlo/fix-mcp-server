@@ -139,6 +139,7 @@ _ROUTE_PREFERENCE = ["NYSE", "IEX", "BATS", "ARCA"]
 _TERMINAL_STATUSES = {"filled", "canceled", "rejected"}
 _SLA_WARN_MINUTES = 30
 _PENDING_ACK_DUP_RISK_SECONDS = 30.0
+_DEFAULT_MD_FRESHNESS_MS = 500
 
 
 def _sla_countdown(order: Order) -> str | None:
@@ -626,8 +627,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="release_stuck_orders",
-            description="Release all stuck orders across all venues by removing venue_down flags.",
-            inputSchema={"type": "object", "properties": {}},
+            description="Release stuck orders, re-checking blockers. Optional reason_filter limits scope (e.g., 'stale_md', 'venue_down').",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "reason_filter": {"type": "string", "description": "Only process stuck orders whose stuck_reason matches (e.g., 'stale_md', 'venue_down'). Omit to process all."},
+                },
+            },
         ),
         Tool(
             name="update_venue_status",
@@ -2219,35 +2225,57 @@ async def _tool_clear_market_data_delay(args: dict) -> list[TextContent]:
         return _tc(f"ERROR in clear_market_data_delay: {exc!r}")
 
 
+def _is_blocker_clear(order: "Order") -> bool:  # type: ignore[name-defined]
+    """Return True if the blocker for *order* is resolved and it can be released."""
+    if order.stuck_reason == "stale_md":
+        threshold = _DEFAULT_MD_FRESHNESS_MS
+        if "algo_child" in order.flags:
+            for algo in algo_engine.get_active():
+                if order.order_id in algo.child_order_ids and algo.md_freshness_gate_ms:
+                    threshold = algo.md_freshness_gate_ms
+                    break
+        return not market_data_hub.is_stale(order.symbol, threshold_ms=threshold)
+    if order.stuck_reason == "venue_down":
+        session = session_manager.get_session(order.venue)
+        return session is not None and session.status == "active"
+    # Unknown / None reason — conservative: do not auto-release.
+    return False
+
+
 async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
-    """Release all stuck orders across all venues."""
+    """Release stuck orders, re-checking blockers. Optional reason_filter limits scope."""
     try:
-        all_sessions = session_manager.get_all_sessions()
-        released_all = []
-        for s in all_sessions:
-            if s.status == "down" or s.has_sequence_gap:
-                released = _release_venue_stuck_orders(s.venue)
-                released_all.extend(released)
+        reason_filter: str | None = args.get("reason_filter")
+        released: list = []
+        skipped: list = []  # (order_id, stuck_reason)
 
-        # Also release orders stuck regardless of session status
         for order in list(oms.orders.values()):
-            if order.status == "stuck" and "venue_down" in order.flags:
-                order.flags.remove("venue_down")
-                order.status = "new"
-                order.updated_at = datetime.now(timezone.utc).isoformat()
-                if order not in released_all:
-                    released_all.append(order)
+            if order.status != "stuck":
+                continue
+            if reason_filter and order.stuck_reason != reason_filter:
+                continue
+            if _is_blocker_clear(order):
+                oms.update_order_status(order.order_id, "new")
+                if "venue_down" in order.flags:
+                    order.flags.remove("venue_down")
+                released.append(order)
+            else:
+                skipped.append((order.order_id, order.stuck_reason))
 
-        lines = [f"RELEASED STUCK ORDERS — {len(released_all)} order(s)"]
-        if released_all:
-            for o in released_all:
+        lines = [f"RELEASED STUCK ORDERS — {len(released)} released, {len(skipped)} skipped"]
+        if released:
+            for o in released:
                 sla = _sla_countdown(o)
                 sla_str = f"  *** {sla} ***" if sla else ""
-                lines.append(f"  {o.order_id}  {o.symbol}  {o.side.upper()}  {o.quantity:,}  venue={o.venue}  status={o.status}{sla_str}")
-        else:
+                lines.append(f"  {o.order_id}  {o.symbol}  {o.side.upper()}  {o.quantity:,}  venue={o.venue}  reason={o.stuck_reason}{sla_str}")
+        if skipped:
+            lines.append("  --- Skipped (blocker still active) ---")
+            for (oid, reason) in skipped:
+                lines.append(f"  {oid}  reason={reason}")
+        if not released and not skipped:
             lines.append("  No stuck orders found.")
         return _tc("\n".join(lines))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR in release_stuck_orders: {exc!r}")
 
 
