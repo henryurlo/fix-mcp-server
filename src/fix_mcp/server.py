@@ -668,6 +668,20 @@ async def list_tools() -> list[Tool]:
                 },
             },
         ),
+        Tool(
+            name="clear_market_data_delay",
+            description=(
+                "Clear any simulated feed delay for a venue and report what delay was removed. "
+                "Returns NOOP when no delay was set."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name (e.g. BATS, ARCA)"},
+                },
+                "required": ["venue"],
+            },
+        ),
     ]
 
 
@@ -718,6 +732,8 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
             return await _tool_check_market_data_staleness(arguments)
         if name == "check_pending_acks":
             return await _tool_check_pending_acks(arguments)
+        if name == "clear_market_data_delay":
+            return await _tool_clear_market_data_delay(arguments)
         if name == "cancel_order":
             # Alias: cancel_order → cancel_replace with action="cancel"
             args = {**arguments, "action": arguments.get("action", "cancel")}
@@ -2170,6 +2186,37 @@ async def _tool_check_pending_acks(args: dict) -> list[TextContent]:
         return _tc("\n".join(lines))
     except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR in check_pending_acks: {exc!r}")
+
+
+async def _tool_clear_market_data_delay(args: dict) -> list[TextContent]:
+    try:
+        venue = args.get("venue")
+        if not venue:
+            raise ValueError("Missing required parameter: venue")
+        _assert_venue_or_side(venue, "venue")
+        venue_upper = venue.upper()
+
+        # Capture existing delay before resetting (no public accessor; access is acceptable here).
+        previous = market_data_hub._venue_delays.get(venue_upper, 0)  # noqa: SLF001
+
+        market_data_hub.reset_feed(venue_upper)
+
+        if previous:
+            status = "CLEARED"
+        else:
+            status = "NOOP (no delay to clear)"
+
+        lines = [
+            "MARKET DATA DELAY CLEARED",
+            f"Venue: {venue_upper}",
+            f"Previous delay: {int(previous)} ms",
+            f"Status: {status}",
+        ]
+        return _tc("\n".join(lines))
+    except ValueError as exc:
+        return _tc(f"ERROR in clear_market_data_delay: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        return _tc(f"ERROR in clear_market_data_delay: {exc!r}")
 
 
 async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:

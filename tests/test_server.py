@@ -257,3 +257,26 @@ def test_check_pending_acks_unknown_pending_since_flagged() -> None:
     txt = result[0].text
     assert "ORD-NYSE-9002" in txt
     assert "[AGE-UNKNOWN]" in txt
+
+
+def test_clear_market_data_delay_clears_and_reports() -> None:
+    server = _load_server()
+    server.market_data_hub.delay_venue("BATS", 600)
+    result = asyncio.run(server.call_tool("clear_market_data_delay", {"venue": "BATS"}))
+    assert result
+    txt = result[0].text
+    assert "BATS" in txt
+    assert "600" in txt
+    assert "CLEARED" in txt
+    assert "NOOP" not in txt
+    assert "BATS" not in server.market_data_hub._venue_delays
+
+
+def test_clear_market_data_delay_noop_when_no_delay() -> None:
+    server = _load_server()
+    result = asyncio.run(server.call_tool("clear_market_data_delay", {"venue": "ARCA"}))
+    assert result
+    txt = result[0].text
+    assert "ARCA" in txt
+    assert "0 ms" in txt
+    assert "NOOP" in txt
