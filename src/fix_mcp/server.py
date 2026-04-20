@@ -2255,7 +2255,7 @@ async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
             if reason_filter and order.stuck_reason != reason_filter:
                 continue
             if _is_blocker_clear(order):
-                oms.update_order_status(order.order_id, "new")
+                oms.update_order_status(order.order_id, "new", stuck_reason=None)
                 if "venue_down" in order.flags:
                     order.flags.remove("venue_down")
                 released.append(order)

@@ -396,3 +396,97 @@ def test_release_stuck_orders_no_args_still_works() -> None:
     assert result
     txt = result[0].text
     assert "RELEASED STUCK ORDERS" in txt
+
+
+def test_release_stuck_orders_uses_algo_md_freshness_gate() -> None:
+    """Algo-child with 2000 ms gate should be released when MD is 700 ms stale."""
+    from fix_mcp.engine.oms import Order
+    from fix_mcp.engine.algos import AlgoOrder
+
+    server = _load_server()
+
+    now_ts = datetime.now(timezone.utc).isoformat()
+
+    # Stuck algo-child order
+    order = Order(
+        order_id="ORD-ALGO-CHILD-1",
+        cl_ord_id="CLO-ALGO-CHILD-1",
+        symbol="AAPL",
+        cusip="037833100",
+        side="buy",
+        quantity=1000,
+        order_type="limit",
+        venue="BATS",
+        client_name="Test Client",
+        created_at=now_ts,
+        updated_at=now_ts,
+        status="stuck",
+        stuck_reason="stale_md",
+        flags=["algo_child"],
+    )
+    server.oms.orders["ORD-ALGO-CHILD-1"] = order
+
+    # Matching algo with generous 2000 ms gate
+    algo = AlgoOrder(
+        algo_id="ALGO-TEST-1",
+        client_name="Test Client",
+        symbol="AAPL",
+        cusip="037833100",
+        side="buy",
+        total_qty=1000,
+        algo_type="TWAP",
+        start_time=now_ts,
+        venue="BATS",
+        created_at=now_ts,
+        updated_at=now_ts,
+        child_order_ids=["ORD-ALGO-CHILD-1"],
+        md_freshness_gate_ms=2000,
+    )
+    server.algo_engine.algos["ALGO-TEST-1"] = algo
+
+    # Force AAPL MD to be ~700 ms stale (stale under 500 ms default, fresh under 2000 ms gate)
+    book = server.market_data_hub.get_quote("AAPL")
+    assert book is not None, "AAPL must be in default symbols"
+    book.last_updated = (datetime.now(timezone.utc) - timedelta(milliseconds=700)).isoformat()
+
+    result = asyncio.run(server.call_tool("release_stuck_orders", {"reason_filter": "stale_md"}))
+    assert result
+    txt = result[0].text
+    assert "ORD-ALGO-CHILD-1" in txt
+    assert server.oms.get_order("ORD-ALGO-CHILD-1").status == "new"
+
+
+def test_release_stuck_orders_default_threshold_skips_borderline_stale() -> None:
+    """Without algo, default 500 ms gate must NOT release an order at 700 ms staleness."""
+    from fix_mcp.engine.oms import Order
+
+    server = _load_server()
+
+    now_ts = datetime.now(timezone.utc).isoformat()
+
+    # Stuck order with no algo_child flag — falls back to default 500 ms threshold
+    order = Order(
+        order_id="ORD-BORDER-1",
+        cl_ord_id="CLO-BORDER-1",
+        symbol="AAPL",
+        cusip="037833100",
+        side="buy",
+        quantity=500,
+        order_type="limit",
+        venue="BATS",
+        client_name="Test Client",
+        created_at=now_ts,
+        updated_at=now_ts,
+        status="stuck",
+        stuck_reason="stale_md",
+    )
+    server.oms.orders["ORD-BORDER-1"] = order
+
+    # Force AAPL MD to be ~700 ms stale — exceeds default 500 ms threshold
+    book = server.market_data_hub.get_quote("AAPL")
+    assert book is not None, "AAPL must be in default symbols"
+    book.last_updated = (datetime.now(timezone.utc) - timedelta(milliseconds=700)).isoformat()
+
+    result = asyncio.run(server.call_tool("release_stuck_orders", {"reason_filter": "stale_md"}))
+    assert result
+    assert server.oms.get_order("ORD-BORDER-1").status == "stuck"
