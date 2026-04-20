@@ -194,3 +194,46 @@ def test_apply_injections_unknown_type_silently_skipped():
     # Should not raise and should not call delay_venue
     engine._apply_injections(hub, injections)
     hub.delay_venue.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 8. resolve_relative_timestamp — invalid relative strings raise ValueError
+# ---------------------------------------------------------------------------
+
+def test_resolve_relative_timestamp_rejects_unknown_unit():
+    with pytest.raises(ValueError, match="Unrecognized relative timestamp"):
+        resolve_relative_timestamp("-5d")
+
+
+def test_resolve_relative_timestamp_rejects_typo():
+    with pytest.raises(ValueError):
+        resolve_relative_timestamp("-5min")
+
+
+def test_resolve_relative_timestamp_zero_seconds():
+    result = resolve_relative_timestamp("-0s")
+    assert isinstance(result, str) and "T" in result
+
+
+# ---------------------------------------------------------------------------
+# 9. _apply_injections — unknown type emits a WARNING log
+# ---------------------------------------------------------------------------
+
+def test_apply_injections_unknown_type_logged(caplog):
+    import logging
+    from fix_mcp.engine.market_data import MarketDataHub
+    hub = MarketDataHub(symbols={"AAPL": 195.0}, tick_interval_ms=100)
+    engine = ScenarioEngine()
+    with caplog.at_level(logging.WARNING):
+        engine._apply_injections(hub, [
+            {"type": "unknown.type", "args": {}},
+        ])
+    assert any("Unknown injection type" in record.message for record in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# 10. resolve_relative_timestamp — empty string passes through unchanged
+# ---------------------------------------------------------------------------
+
+def test_resolve_relative_timestamp_passes_through_empty_string():
+    assert resolve_relative_timestamp("") == ""

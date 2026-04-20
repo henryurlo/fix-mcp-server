@@ -2,10 +2,13 @@
 and ReferenceDataStore with pre-seeded demo state."""
 
 import json
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fix_mcp.engine.oms import OMS, Order
 from fix_mcp.engine.fix_sessions import FIXSessionManager, FIXSession
@@ -52,13 +55,18 @@ def resolve_relative_timestamp(value, now=None):
     if not isinstance(value, str):
         return value
     m = _REL_TS_RE.match(value)
-    if not m:
-        return value
-    n = int(m.group(1))
-    unit = m.group(2)
-    seconds = {"s": 1, "m": 60, "h": 3600}[unit] * n
-    base = now or datetime.now(timezone.utc)
-    return (base - timedelta(seconds=seconds)).isoformat()
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2)
+        seconds = {"s": 1, "m": 60, "h": 3600}[unit] * n
+        base = now or datetime.now(timezone.utc)
+        return (base - timedelta(seconds=seconds)).isoformat()
+    if value.startswith("-"):
+        raise ValueError(
+            f"Unrecognized relative timestamp {value!r}. "
+            "Expected format: -<n>s / -<n>m / -<n>h (e.g., '-90s', '-5m', '-2h')."
+        )
+    return value
 
 
 class ScenarioEngine:
@@ -174,7 +182,8 @@ class ScenarioEngine:
                 venue = args["venue"]
                 delay_ms = int(args["delay_ms"])
                 market_data_hub.delay_venue(venue, delay_ms)
-            # Unknown types silently skipped
+            else:
+                logger.warning("Unknown injection type %r — skipping", itype)
 
     def _load_reference_data(
         self, ref_store: ReferenceDataStore, data: dict
