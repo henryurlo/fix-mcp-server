@@ -20,6 +20,7 @@ class FIXSession:
     port: int = 0
     error: Optional[str] = None
     connected_since: Optional[str] = None
+    ack_delay_ms: int = 0
 
     @property
     def has_sequence_gap(self) -> bool:
