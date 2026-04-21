@@ -7,19 +7,20 @@ import json
 import os
 import threading
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent, Resource, Prompt
 import mcp.types as types
 from fix_mcp.engine.oms import OMS, Order
-from fix_mcp.engine.fix_sessions import FIXSessionManager, FIXSession
+from fix_mcp.engine.fix_sessions import FIXSessionManager, FIXSession, _age_seconds
 from fix_mcp.engine.reference import ReferenceDataStore, Symbol, CorporateAction, Venue, Client
 from fix_mcp.engine.scenarios import ScenarioEngine
 from fix_mcp.engine.algos import AlgoEngine, AlgoOrder, ALGO_TYPES
 from fix_mcp.fix.messages import FIXMessageBuilder
 from fix_mcp.fix.protocol import SequenceManager, format_fix_timestamp
+from fix_mcp.engine.market_data import MarketDataHub
 
 # ---------------------------------------------------------------------------
 # Attempt to import the trading ops prompt; fall back to a stub if the module
@@ -97,7 +98,11 @@ SCENARIO = os.environ.get("SCENARIO", "morning_triage")
 CONFIG_DIR = os.environ.get("FIX_MCP_CONFIG_DIR")
 
 engine = ScenarioEngine(CONFIG_DIR)
-oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
+# Market data hub — one process-wide instance.
+# Pass symbols=None so MarketDataHub uses its own _DEFAULT_SYMBOLS (realistic prices).
+# Instantiated before load_scenario so injections (e.g. market_data.delay) are applied.
+market_data_hub = MarketDataHub(symbols=None, tick_interval_ms=100)
+oms, session_manager, ref_store = engine.load_scenario(SCENARIO, market_data_hub=market_data_hub)
 algo_engine: AlgoEngine = engine.algo_engine
 msg_builder = FIXMessageBuilder(
     sender_comp_id="FIRM_PROD",
@@ -108,13 +113,14 @@ msg_builder = FIXMessageBuilder(
 
 def reset_runtime(scenario_name: str | None = None) -> str:
     """Reload scenario-backed runtime state in-process (thread-safe)."""
-    global SCENARIO, oms, session_manager, ref_store, algo_engine, msg_builder
+    global SCENARIO, oms, session_manager, ref_store, algo_engine, msg_builder, market_data_hub
 
     with _engine_lock:  # serialise against concurrent tool dispatch
         if scenario_name:
             SCENARIO = scenario_name
 
-        oms, session_manager, ref_store = engine.load_scenario(SCENARIO)
+        market_data_hub = MarketDataHub(symbols=None, tick_interval_ms=100)
+        oms, session_manager, ref_store = engine.load_scenario(SCENARIO, market_data_hub=market_data_hub)
         algo_engine = engine.algo_engine
         msg_builder = FIXMessageBuilder(
             sender_comp_id="FIRM_PROD",
@@ -132,6 +138,8 @@ _ORD_TYPE_MAP = {"market": "1", "limit": "2", "stop": "3"}
 _ROUTE_PREFERENCE = ["NYSE", "IEX", "BATS", "ARCA"]
 _TERMINAL_STATUSES = {"filled", "canceled", "rejected"}
 _SLA_WARN_MINUTES = 30
+_PENDING_ACK_DUP_RISK_SECONDS = 30.0
+_DEFAULT_MD_FRESHNESS_MS = 500
 
 
 def _sla_countdown(order: Order) -> str | None:
@@ -619,8 +627,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="release_stuck_orders",
-            description="Release all stuck orders across all venues by removing venue_down flags.",
-            inputSchema={"type": "object", "properties": {}},
+            description="Release stuck orders, re-checking blockers. Optional reason_filter limits scope (e.g., 'stale_md', 'venue_down').",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "reason_filter": {"type": "string", "description": "Only process stuck orders whose stuck_reason matches (e.g., 'stale_md', 'venue_down'). Omit to process all."},
+                },
+            },
         ),
         Tool(
             name="update_venue_status",
@@ -632,6 +645,47 @@ async def list_tools() -> list[Tool]:
                     "venue": {"type": "string", "description": "Venue name"},
                     "status": {"type": "string", "enum": ["active", "degraded", "down"]},
                 },
+            },
+        ),
+        Tool(
+            name="check_market_data_staleness",
+            description=(
+                "Report per-symbol market-data staleness in ms. Flags symbols whose "
+                "last quote exceeds a 500ms advisory threshold. Pass 'symbol' to filter."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Specific symbol, or omit for all"},
+                },
+            },
+        ),
+        Tool(
+            name="check_pending_acks",
+            description=(
+                "List all orders in pending_ack status with pending age, venue ACK delay, "
+                "and a duplicate-risk flag (true when pending age > 30 s). "
+                "Pass 'venue' to filter to a single venue."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name (optional)"},
+                },
+            },
+        ),
+        Tool(
+            name="clear_market_data_delay",
+            description=(
+                "Clear any simulated feed delay for a venue and report what delay was removed. "
+                "Returns NOOP when no delay was set."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "venue": {"type": "string", "description": "Venue name (e.g. BATS, ARCA)"},
+                },
+                "required": ["venue"],
             },
         ),
     ]
@@ -680,6 +734,12 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
         if name == "grep_logs":            return await _tool_grep_logs(arguments)
         if name == "release_stuck_orders": return await _tool_release_stuck_orders(arguments)
         if name == "update_venue_status":  return await _tool_update_venue_status(arguments)
+        if name == "check_market_data_staleness":
+            return await _tool_check_market_data_staleness(arguments)
+        if name == "check_pending_acks":
+            return await _tool_check_pending_acks(arguments)
+        if name == "clear_market_data_delay":
+            return await _tool_clear_market_data_delay(arguments)
         if name == "cancel_order":
             # Alias: cancel_order → cancel_replace with action="cancel"
             args = {**arguments, "action": arguments.get("action", "cancel")}
@@ -2051,35 +2111,173 @@ async def _tool_update_venue_status(args: dict) -> list[TextContent]:
         return _tc(f"ERROR in update_venue_status: {exc!r}")
 
 
-async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
-    """Release all stuck orders across all venues."""
+async def _tool_check_market_data_staleness(args: dict) -> list[TextContent]:
     try:
-        all_sessions = session_manager.get_all_sessions()
-        released_all = []
-        for s in all_sessions:
-            if s.status == "down" or s.has_sequence_gap:
-                released = _release_venue_stuck_orders(s.venue)
-                released_all.extend(released)
+        symbol = args.get("symbol")
+        all_books = market_data_hub.get_all_quotes()
+        if symbol:
+            symbol = symbol.upper()
+            _assert_symbol(symbol)
+            if symbol not in all_books:
+                return _tc(f"Unknown symbol '{symbol}'. No market data tracked.")
+            symbols = [symbol]
+        else:
+            symbols = sorted(all_books.keys())
 
-        # Also release orders stuck regardless of session status
+        if not symbols:
+            return _tc("No market data tracked.")
+
+        lines = ["MARKET DATA STALENESS", "=" * 60]
+        lines.append(f"  {'SYMBOL':<8} {'STALENESS':>12} {'LAST UPDATE':>30}  FLAG")
+        for sym in symbols:
+            book = market_data_hub.get_quote(sym)
+            ms = market_data_hub.staleness_ms(sym)
+            flag = "[STALE]" if ms < 0 or ms > 500 else "[OK]"
+            ms_str = f"{ms} ms" if ms >= 0 else "unknown"
+            last = book.last_updated if book and book.last_updated else "—"
+            lines.append(f"  {sym:<8} {ms_str:>12} {last:>30}  {flag}")
+        return _tc("\n".join(lines))
+    except ValueError as exc:
+        return _tc(f"ERROR in check_market_data_staleness: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        return _tc(f"ERROR in check_market_data_staleness: {exc!r}")
+
+
+def _pending_since_seconds(iso_ts: str | None) -> float | None:
+    """Return elapsed seconds since `iso_ts`, or None if unknown/unparseable."""
+    return _age_seconds(iso_ts)
+
+
+async def _tool_check_pending_acks(args: dict) -> list[TextContent]:
+    try:
+        venue_filter = args.get("venue")
+        if venue_filter:
+            venue_filter = venue_filter.upper()
+
+        pending = [
+            o for o in oms.orders.values()
+            if o.status == "pending_ack"
+            and (venue_filter is None or o.venue.upper() == venue_filter)
+        ]
+
+        lines = ["PENDING ACKS", "=" * 72]
+        lines.append(
+            f"  {'ORDER ID':<20} {'SYM':<6} {'VENUE':<8} {'FILL/QTY':>10} "
+            f"{'AGE(s)':>8} {'ACK DLY(ms)':>11}  FLAG"
+        )
+
+        if not pending:
+            lines.append("  No orders in pending_ack status.")
+            return _tc("\n".join(lines))
+
+        for o in pending:
+            age_s = _pending_since_seconds(o.pending_since)
+            session = session_manager.get_session(o.venue)
+            ack_delay_ms = session.ack_delay_ms if session else 0
+            if age_s is None:
+                age_col = f"{'?':>8}"
+                flag = "[AGE-UNKNOWN]"
+            elif age_s > _PENDING_ACK_DUP_RISK_SECONDS:
+                age_col = f"{age_s:>8.1f}"
+                flag = "[DUP-RISK]"
+            else:
+                age_col = f"{age_s:>8.1f}"
+                flag = "[OK]"
+            fill_qty = f"{o.filled_quantity}/{o.quantity}"
+            lines.append(
+                f"  {o.order_id:<20} {o.symbol:<6} {o.venue:<8} {fill_qty:>10} "
+                f"{age_col} {ack_delay_ms:>11}  {flag}"
+            )
+
+        return _tc("\n".join(lines))
+    except Exception as exc:  # noqa: BLE001
+        return _tc(f"ERROR in check_pending_acks: {exc!r}")
+
+
+async def _tool_clear_market_data_delay(args: dict) -> list[TextContent]:
+    try:
+        venue = args.get("venue")
+        if not venue:
+            raise ValueError("Missing required parameter: venue")
+        _assert_venue_or_side(venue, "venue")
+        venue_upper = venue.upper()
+
+        # Capture existing delay before resetting (no public accessor; access is acceptable here).
+        previous = market_data_hub._venue_delays.get(venue_upper, 0)  # noqa: SLF001
+
+        market_data_hub.reset_feed(venue_upper)
+
+        if previous:
+            header = "MARKET DATA DELAY CLEARED"
+            status = "CLEARED"
+        else:
+            header = "MARKET DATA DELAY STATUS"
+            status = "NO DELAY ACTIVE"
+
+        lines = [
+            header,
+            f"Venue: {venue_upper}",
+            f"Previous delay: {int(previous)} ms",
+            f"Status: {status}",
+        ]
+        return _tc("\n".join(lines))
+    except ValueError as exc:
+        return _tc(f"ERROR in clear_market_data_delay: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        return _tc(f"ERROR in clear_market_data_delay: {exc!r}")
+
+
+def _is_blocker_clear(order: "Order") -> bool:  # type: ignore[name-defined]
+    """Return True if the blocker for *order* is resolved and it can be released."""
+    if order.stuck_reason == "stale_md":
+        threshold = _DEFAULT_MD_FRESHNESS_MS
+        if "algo_child" in order.flags:
+            for algo in algo_engine.get_active():
+                if order.order_id in algo.child_order_ids and algo.md_freshness_gate_ms:
+                    threshold = algo.md_freshness_gate_ms
+                    break
+        return not market_data_hub.is_stale(order.symbol, threshold_ms=threshold)
+    if order.stuck_reason == "venue_down":
+        session = session_manager.get_session(order.venue)
+        return session is not None and session.status == "active"
+    # Unknown / None reason — conservative: do not auto-release.
+    return False
+
+
+async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
+    """Release stuck orders, re-checking blockers. Optional reason_filter limits scope."""
+    try:
+        reason_filter: str | None = args.get("reason_filter")
+        released: list = []
+        skipped: list = []  # (order_id, stuck_reason)
+
         for order in list(oms.orders.values()):
-            if order.status == "stuck" and "venue_down" in order.flags:
-                order.flags.remove("venue_down")
-                order.status = "new"
-                order.updated_at = datetime.now(timezone.utc).isoformat()
-                if order not in released_all:
-                    released_all.append(order)
+            if order.status != "stuck":
+                continue
+            if reason_filter and order.stuck_reason != reason_filter:
+                continue
+            if _is_blocker_clear(order):
+                oms.update_order_status(order.order_id, "new", stuck_reason=None)
+                if "venue_down" in order.flags:
+                    order.flags.remove("venue_down")
+                released.append(order)
+            else:
+                skipped.append((order.order_id, order.stuck_reason))
 
-        lines = [f"RELEASED STUCK ORDERS — {len(released_all)} order(s)"]
-        if released_all:
-            for o in released_all:
+        lines = [f"RELEASED STUCK ORDERS — {len(released)} released, {len(skipped)} skipped"]
+        if released:
+            for o in released:
                 sla = _sla_countdown(o)
                 sla_str = f"  *** {sla} ***" if sla else ""
-                lines.append(f"  {o.order_id}  {o.symbol}  {o.side.upper()}  {o.quantity:,}  venue={o.venue}  status={o.status}{sla_str}")
-        else:
+                lines.append(f"  {o.order_id}  {o.symbol}  {o.side.upper()}  {o.quantity:,}  venue={o.venue}  reason={o.stuck_reason}{sla_str}")
+        if skipped:
+            lines.append("  --- Skipped (blocker still active) ---")
+            for (oid, reason) in skipped:
+                lines.append(f"  {oid}  reason={reason}")
+        if not released and not skipped:
             lines.append("  No stuck orders found.")
         return _tc("\n".join(lines))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR in release_stuck_orders: {exc!r}")
 
 

@@ -57,6 +57,8 @@ class AlgoOrder:
         is_institutional: Whether the parent client is institutional.
         sla_minutes:      Client SLA for the overall algo execution.
         notes:            Operator notes about the algo's current state.
+        md_freshness_gate_ms: If set, slicer must not release child orders
+                              while MD for `symbol` is older than this threshold.
     """
 
     algo_id: str
@@ -86,6 +88,7 @@ class AlgoOrder:
     is_institutional: bool = True
     sla_minutes: Optional[int] = None
     notes: str = ""
+    md_freshness_gate_ms: Optional[int] = None
 
     # ------------------------------------------------------------------
     # Computed properties

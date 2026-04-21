@@ -53,3 +53,28 @@ def test_manager_recovery_operations_reset_state() -> None:
     assert reconnected.status == "active"
     assert reconnected.last_recv_seq == 1
     assert reconnected.expected_recv_seq == 1
+
+
+def _make_session(**overrides) -> FIXSession:
+    defaults = dict(
+        venue="NYSE", session_id="S1",
+        sender_comp_id="ACME", target_comp_id="NYSE",
+    )
+    defaults.update(overrides)
+    return FIXSession(**defaults)
+
+
+def test_ack_delay_ms_defaults_to_zero() -> None:
+    s = _make_session()
+    assert s.ack_delay_ms == 0
+
+
+def test_ack_delay_ms_can_be_set() -> None:
+    s = _make_session(ack_delay_ms=5000)
+    assert s.ack_delay_ms == 5000
+
+
+def test_session_manager_preserves_ack_delay_ms() -> None:
+    mgr = FIXSessionManager()
+    mgr.add_session(_make_session(ack_delay_ms=5000))
+    assert mgr.get_session("NYSE").ack_delay_ms == 5000

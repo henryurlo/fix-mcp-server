@@ -3,6 +3,24 @@ from datetime import datetime, timezone
 from typing import Optional
 
 
+def _age_seconds(iso_ts: Optional[str]) -> Optional[float]:
+    """Return elapsed seconds since *iso_ts* (ISO 8601 string), or None.
+
+    Returns None if *iso_ts* is falsy, unparseable, or causes a TypeError.
+    Naive timestamps are coerced to UTC.  Result is clamped to >= 0.0.
+    """
+    if not iso_ts:
+        return None
+    try:
+        ts = datetime.fromisoformat(iso_ts)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        now_utc = datetime.now(timezone.utc)
+        return max(0.0, (now_utc - ts).total_seconds())
+    except (ValueError, TypeError):
+        return None
+
+
 @dataclass
 class FIXSession:
     venue: str
@@ -20,6 +38,7 @@ class FIXSession:
     port: int = 0
     error: Optional[str] = None
     connected_since: Optional[str] = None
+    ack_delay_ms: int = 0
 
     @property
     def has_sequence_gap(self) -> bool:
@@ -31,18 +50,7 @@ class FIXSession:
 
     @property
     def heartbeat_age_seconds(self) -> Optional[float]:
-        if self.last_heartbeat is None:
-            return None
-        try:
-            hb_time = datetime.fromisoformat(self.last_heartbeat)
-            # Ensure both sides are offset-aware for comparison
-            now = datetime.now(timezone.utc)
-            if hb_time.tzinfo is None:
-                hb_time = hb_time.replace(tzinfo=timezone.utc)
-            delta = now - hb_time
-            return delta.total_seconds()
-        except (ValueError, TypeError):
-            return None
+        return _age_seconds(self.last_heartbeat)
 
 
 class FIXSessionManager:

@@ -57,3 +57,31 @@ def test_total_notional_at_risk_only_counts_institutional_new_and_stuck() -> Non
     oms.add_order(_order("ORD-4", status="new", is_institutional=False, price=999.0))
 
     assert oms.total_notional_at_risk() == 2000.0
+
+
+def test_order_accepts_pending_ack_state():
+    o = _order("O1", status="pending_ack", pending_since="2026-04-19T12:04:30+00:00")
+    assert o.status == "pending_ack"
+    assert o.pending_since == "2026-04-19T12:04:30+00:00"
+
+
+def test_order_stuck_reason_roundtrip():
+    o = _order("O1", status="stuck", stuck_reason="stale_md")
+    assert o.stuck_reason == "stale_md"
+
+
+def test_order_defaults_for_new_fields():
+    o = _order("O1")
+    assert o.pending_since is None
+    assert o.stuck_reason is None
+
+
+def test_pending_ack_is_in_open_statuses():
+    assert "pending_ack" in OMS._OPEN_STATUSES
+
+
+def test_pending_ack_orders_counted_by_venue():
+    oms = OMS()
+    oms.add_order(_order("O1", status="pending_ack", venue="NYSE"))
+    counts = oms.count_by_venue()
+    assert counts.get("NYSE") == 1
