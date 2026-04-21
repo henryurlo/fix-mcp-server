@@ -58,24 +58,24 @@ function ExchangeNode({ data }: { data: any }) {
 
   return (
     <div style={{
-      minWidth: 130, padding: '12px 16px', position: 'relative',
+      minWidth: 110, padding: '8px 12px', position: 'relative',
       background: `linear-gradient(135deg, ${sc.bg}, #10131f)`,
       border: `1.5px solid ${sc.border}`, borderRadius: 10,
       textAlign: 'center', boxShadow: sc.glow,
     }}>
-      {flashOverlay}
+      {flashOverlay && <div style={{ position: 'absolute', inset: 0, borderRadius: 10, background: flash === 'down' ? 'rgba(255,51,102,0.3)' : flash === 'degraded' ? 'rgba(245,158,11,0.3)' : 'rgba(0,255,136,0.2)', transition: 'opacity 0.5s ease-out', pointerEvents: 'none' as const }} />}
       <Handle type="source" position={Position.Bottom} id="source"
         style={{ width: 6, height: 6, background: sc.border, border: 'none' }} />
-      <div style={{ fontSize: 10, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 3, letterSpacing: '0.1em' }}>EXCHANGE</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: sc.text, letterSpacing: '0.04em' }}>{data.label}</div>
-      <div style={{ fontSize: 11, color: '#8b92b0', marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>{data.sub}</div>
+      <div style={{ fontSize: 9, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 2, letterSpacing: '0.1em' }}>EXCHANGE</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: sc.text, letterSpacing: '0.04em' }}>{data.label}</div>
+      <div style={{ fontSize: 10, color: '#8b92b0', marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{data.sub}</div>
       {data.latency_ms != null && (
-        <div style={{ fontSize: 11, color: data.latency_ms > 100 ? '#ff3366' : data.latency_ms > 20 ? '#f59e0b' : '#555d7a', marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
+        <div style={{ fontSize: 10, color: data.latency_ms > 100 ? '#ff3366' : data.latency_ms > 20 ? '#f59e0b' : '#555d7a', marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>
           {data.latency_ms.toFixed(1)}ms
         </div>
       )}
       {data.lastAction && (
-        <div style={{ fontSize: 10, color: 'var(--cyan)', marginTop: 2, fontFamily: 'JetBrains Mono, monospace', opacity: 0.7 }}>
+        <div style={{ fontSize: 9, color: 'var(--cyan)', marginTop: 2, fontFamily: 'JetBrains Mono, monospace', opacity: 0.7 }}>
           <Zap size={8} style={{ display: 'inline', marginRight: 2 }} /> {data.lastAction}
         </div>
       )}
@@ -89,16 +89,16 @@ function BrokerNode({ data }: { data: any }) {
   const glow = hasDown ? '0 0 20px #ff336630, 0 0 40px #ff336620' : '0 0 20px #3b82f620, 0 0 40px #3b82f610';
   return (
     <div style={{
-      padding: '14px 28px',
+      padding: '10px 22px',
       background: `linear-gradient(135deg, ${hasDown ? '#2a0a0a' : '#0c1a30'}, #10131f)`,
       border: `2px solid ${borderColor}`, borderRadius: 14, textAlign: 'center',
-      boxShadow: glow, minWidth: 190,
+      boxShadow: glow, minWidth: 170,
     }}>
       <Handle type="target" position={Position.Top} id="target-top"
         style={{ width: 6, height: 6, background: borderColor, border: 'none' }} />
-      <div style={{ fontSize: 10, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 3, letterSpacing: '0.1em' }}>BROKER-DEALER</div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: borderColor, letterSpacing: '0.03em' }}>{data.label}</div>
-      <div style={{ fontSize: 11, color: '#8b92b0', marginTop: 3 }}>{data.sub}</div>
+      <div style={{ fontSize: 9, color: '#555d7a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 2, letterSpacing: '0.1em' }}>BROKER-DEALER</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: borderColor, letterSpacing: '0.03em' }}>{data.label}</div>
+      <div style={{ fontSize: 10, color: '#8b92b0', marginTop: 2 }}>{data.sub}</div>
       <Handle type="source" position={Position.Right} id="source-right"
         style={{ width: 6, height: 6, background: '#00d4ff', border: 'none' }} />
       <Handle type="source" position={Position.Bottom} id="source-bottom"
@@ -162,9 +162,9 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null, active:
     ? sessions.map(s => ({ id: s.venue.toLowerCase(), label: s.venue }))
     : DEFAULT_VENUES;
 
-  const exchangeY = 50;
-  const exchangeXStart = 70;
-  const exchangeXGap = Math.min(200, (900 - 140) / Math.max(venueList.length, 1));
+  const exchangeY = 15;
+  const exchangeXStart = 50;
+  const exchangeXGap = Math.min(155, (700 - 100) / Math.max(venueList.length, 1));
 
   venueList.forEach((ex, i) => {
     const session = sessions.find(s => s.venue === ex.label);
@@ -202,7 +202,7 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null, active:
   });
 
   const centerX = exchangeXStart + (venueList.length - 1) * exchangeXGap / 2;
-  const brokerY = 250;
+  const brokerY = 180;
 
   const hasDown = sessions.some(s => s.status === 'down');
   const hasDegraded = sessions.some(s => s.status === 'degraded');
@@ -232,10 +232,10 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null, active:
   });
 
   // Client Sessions
-  const clientY = 440;
-  const clientXStart = centerX - 220;
-  const clientXGap = 180;
-  const clients = ['INSTITUTIONAL', 'HEDGE_FUND', 'RETAIL', 'PROP_DESK'];
+  const clientY = 320;
+  const clientXStart = centerX - 180;
+  const clientXGap = 140;
+  const clients = ['INSTITUTIONAL', 'HEDGE_FUND', 'RETAIL'];
 
   clients.forEach((cl, i) => {
     nodes.push({
@@ -253,12 +253,12 @@ function buildTopology(sessions: SessionInfo[], scenario: string | null, active:
 
   nodes.push({
     id: 'postgres', type: 'infra',
-    position: { x: centerX + 260, y: clientY - 35 },
+    position: { x: centerX + 180, y: clientY - 25 },
     data: { label: 'PostgreSQL', icon: '🐘' },
   });
   nodes.push({
     id: 'redis', type: 'infra',
-    position: { x: centerX + 260, y: clientY + 35 },
+    position: { x: centerX + 180, y: clientY + 25 },
     data: { label: 'Redis', icon: '⚡' },
   });
 
@@ -327,7 +327,7 @@ export default function TopologyGraph() {
 
       <ReactFlow
         nodes={nodes} edges={edges} nodeTypes={nodeTypes}
-        fitView fitViewOptions={{ padding: 0.15, minZoom: 0.35, maxZoom: 1.2 }}
+        fitView fitViewOptions={{ padding: 0.1, minZoom: 0.3, maxZoom: 1.2 }}
         minZoom={0.3} maxZoom={2} defaultEdgeOptions={{ type: 'smoothstep' }}
         proOptions={{ hideAttribution: true }}
       >

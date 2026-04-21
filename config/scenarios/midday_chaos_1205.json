@@ -46,8 +46,13 @@
       "schedule_pct": 8.3,
       "execution_pct": 10.0,
       "status": "running",
-      "flags": ["algo_behind_schedule"],
-      "child_order_ids": ["ORD-1005", "ORD-1006"],
+      "flags": [
+        "algo_behind_schedule"
+      ],
+      "child_order_ids": [
+        "ORD-1005",
+        "ORD-1006"
+      ],
       "is_institutional": true,
       "md_freshness_gate_ms": 100,
       "notes": "Slicer gated on BATS MD freshness"
@@ -62,14 +67,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "LIMIT",
-      "price": 195.60,
+      "price": 195.6,
       "venue": "BATS",
       "client_name": "acme_capital",
       "created_at": "2026-04-19T12:03:00+00:00",
       "updated_at": "2026-04-19T12:04:30+00:00",
       "status": "stuck",
       "stuck_reason": "stale_md",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "is_institutional": true
     },
     {
@@ -80,14 +87,16 @@
       "side": "buy",
       "quantity": 500,
       "order_type": "LIMIT",
-      "price": 195.60,
+      "price": 195.6,
       "venue": "BATS",
       "client_name": "acme_capital",
       "created_at": "2026-04-19T12:04:00+00:00",
       "updated_at": "2026-04-19T12:04:45+00:00",
       "status": "stuck",
       "stuck_reason": "stale_md",
-      "flags": ["algo_child"],
+      "flags": [
+        "algo_child"
+      ],
       "is_institutional": true
     },
     {
@@ -98,7 +107,7 @@
       "side": "sell",
       "quantity": 1000,
       "order_type": "LIMIT",
-      "price": 405.20,
+      "price": 405.2,
       "venue": "NYSE",
       "client_name": "acme_capital",
       "created_at": "2026-04-19T12:03:30+00:00",
@@ -112,74 +121,102 @@
   "injections": [
     {
       "type": "market_data.delay",
-      "args": { "venue": "BATS", "delay_ms": 600 }
+      "args": {
+        "venue": "BATS",
+        "delay_ms": 600
+      }
     }
   ],
   "runbook": {
-    "narrative": "Midday 12:05. Two independent incidents surface almost simultaneously. Mission Control lights up: an AAPL TWAP is falling behind, two of its child slices are stuck, and an MSFT limit-sell on NYSE is showing pending fills that aren't resolving. The temptation is to treat this as one big outage — resist. Diagnose each incident independently before touching anything irreversible.",
+    "narrative": "Midday 12:05. Two independent incidents surface almost simultaneously. Mission Control lights up: an AAPL TWAP is falling behind, two of its child slices are stuck, and an MSFT limit-sell on NYSE is showing pending fills that aren't resolving. The temptation is to treat this as one big outage \u2014 resist. Diagnose each incident independently before touching anything irreversible.",
     "steps": [
       {
-        "n": 1,
-        "action": "Enumerate what's happening across the shop.",
+        "step": 1,
+        "title": "Enumerate what's happening across the shop.",
+        "narrative": "Enumerate what's happening across the shop.",
         "tool": "query_orders",
-        "args": {},
-        "expect": "Two stuck BATS children under ALGO-PARENT-001, one pending-ack NYSE order."
+        "tool_args": {},
+        "expected": "Two stuck BATS children under ALGO-PARENT-001, one pending-ack NYSE order."
       },
       {
-        "n": 2,
-        "action": "Check algo state and schedule deviation.",
+        "step": 2,
+        "title": "Check algo state and schedule deviation.",
+        "narrative": "Check algo state and schedule deviation.",
         "tool": "check_algo_status",
-        "args": { "algo_id": "ALGO-PARENT-001" },
-        "expect": "Running, ~8% behind schedule, md_freshness_gate_ms=100, two stuck children."
+        "tool_args": {
+          "algo_id": "ALGO-PARENT-001"
+        },
+        "expected": "Running, ~8% behind schedule, md_freshness_gate_ms=100, two stuck children."
       },
       {
-        "n": 3,
-        "action": "Confirm MD staleness on the algo's venue.",
+        "step": 3,
+        "title": "Confirm MD staleness on the algo's venue.",
+        "narrative": "Confirm MD staleness on the algo's venue.",
         "tool": "check_market_data_staleness",
-        "args": { "symbol": "AAPL" },
-        "expect": "BATS-side AAPL MD > 100ms stale (trips the algo gate)."
+        "tool_args": {
+          "symbol": "AAPL"
+        },
+        "expected": "BATS-side AAPL MD > 100ms stale (trips the algo gate)."
       },
       {
-        "n": 4,
-        "action": "Check session health for the NYSE pending-ack.",
+        "step": 4,
+        "title": "Check session health for the NYSE pending-ack.",
+        "narrative": "Check session health for the NYSE pending-ack.",
         "tool": "check_fix_sessions",
-        "args": { "venue": "NYSE" },
-        "expect": "NYSE session is active with green heartbeat (MISLEADING)."
+        "tool_args": {
+          "venue": "NYSE"
+        },
+        "expected": "NYSE session is active with green heartbeat (MISLEADING)."
       },
       {
-        "n": 5,
-        "action": "Inspect pending-ack state with duplicate-risk flags.",
+        "step": 5,
+        "title": "Inspect pending-ack state with duplicate-risk flags.",
+        "narrative": "Inspect pending-ack state with duplicate-risk flags.",
         "tool": "check_pending_acks",
-        "args": { "venue": "NYSE" },
-        "expect": "ORD-NYSE-7731 pending > 30s, ack_delay_ms=5000, risk_of_duplicate=true. DO NOT resubmit."
+        "tool_args": {
+          "venue": "NYSE"
+        },
+        "expected": "ORD-NYSE-7731 pending > 30s, ack_delay_ms=5000, risk_of_duplicate=true. DO NOT resubmit."
       },
       {
-        "n": 6,
-        "action": "Resolve Incident A: coordinate upstream MD recovery, then clear the delay.",
+        "step": 6,
+        "title": "Resolve Incident A: coordinate upstream MD recovery, then clear the delay.",
+        "narrative": "Resolve Incident A: coordinate upstream MD recovery, then clear the delay.",
         "tool": "clear_market_data_delay",
-        "args": { "venue": "BATS" },
-        "expect": "previous_delay_ms=600, cleared=true."
+        "tool_args": {
+          "venue": "BATS"
+        },
+        "expected": "previous_delay_ms=600, cleared=true."
       },
       {
-        "n": 7,
-        "action": "Verify MD freshness restored before releasing children.",
+        "step": 7,
+        "title": "Verify MD freshness restored before releasing children.",
+        "narrative": "Verify MD freshness restored before releasing children.",
         "tool": "check_market_data_staleness",
-        "args": { "symbol": "AAPL" },
-        "expect": "staleness_ms < 100 (under the algo gate)."
+        "tool_args": {
+          "symbol": "AAPL"
+        },
+        "expected": "staleness_ms < 100 (under the algo gate)."
       },
       {
-        "n": 8,
-        "action": "Release the stuck children now that the blocker is clear.",
+        "step": 8,
+        "title": "Release the stuck children now that the blocker is clear.",
+        "narrative": "Release the stuck children now that the blocker is clear.",
         "tool": "release_stuck_orders",
-        "args": { "reason_filter": "stale_md" },
-        "expect": "released: [ORD-1005, ORD-1006]."
+        "tool_args": {
+          "reason_filter": "stale_md"
+        },
+        "expected": "released: [ORD-1005, ORD-1006]."
       },
       {
-        "n": 9,
-        "action": "Hold on Incident B. Wait 30s and re-check the pending-ack.",
+        "step": 9,
+        "title": "Hold on Incident B. Wait 30s and re-check the pending-ack.",
+        "narrative": "Hold on Incident B. Wait 30s and re-check the pending-ack.",
         "tool": "check_pending_acks",
-        "args": { "venue": "NYSE" },
-        "expect": "ACK backlog draining; ORD-NYSE-7731 transitioning to partially_filled / filled."
+        "tool_args": {
+          "venue": "NYSE"
+        },
+        "expected": "ACK backlog draining; ORD-NYSE-7731 transitioning to partially_filled / filled."
       }
     ],
     "success_criteria": [
@@ -194,12 +231,21 @@
       "TWAP ALGO-PARENT-001 is behind schedule because two child slices are stuck.",
       "Child slices are stuck due to stale MD on BATS (600ms lag).",
       "ORD-NYSE-7731 looks stuck but is actually in pending_ack from a 5s ACK delay.",
-      "Heartbeat alone does NOT tell you about ACK backlog — use check_pending_acks."
+      "Heartbeat alone does NOT tell you about ACK backlog \u2014 use check_pending_acks."
     ],
+    "flag_meanings": {
+      "md_stale": "Market data feed has exceeded the latency threshold set in the algo. Use check_market_data_staleness to verify, then clear_market_data_delay.",
+      "stuck_child": "Algo child order stuck due to market data issue. Clear the MD delay first, then release stuck orders.",
+      "pending_ack": "Order was sent but exchange ACK is delayed. Use check_pending_acks to see the backlog. Do NOT cancel/replace."
+    },
+    "diagnosis_path": "Start by querying orders to see the big picture. Identify the two root causes (stale MD on BATS, pending ACK on NYSE). Fix MD before touching stuck orders.",
     "common_mistakes": [
-      "Cancel/replace on ORD-NYSE-7731 → duplicate ClOrdID when the backlog clears.",
-      "release_stuck_orders while BATS MD is still stale → children restuck immediately.",
+      "Cancel/replace on ORD-NYSE-7731 \u2192 duplicate ClOrdID when the backlog clears.",
+      "release_stuck_orders while BATS MD is still stale \u2192 children restuck immediately.",
       "Treating the two incidents as correlated and attempting a blanket recovery."
     ]
-  }
+  },
+  "title": "Midday Chaos - TWAP MD Stale + ACK Backlog",
+  "estimated_minutes": 25,
+  "simulated_time": "12:05"
 }

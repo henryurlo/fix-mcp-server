@@ -145,22 +145,32 @@ export default function Home() {
 // ════ MISSION CONTROL ════
 
 function MissionControlTab() {
-  const { scenario, scenarioContext, sessions, controlMode, takeOverAsAgent, releaseToHuman, toggleCollab, trackedSteps, callTool, completeStep, setStepStatus, addHostEvent, addAlert, available_scenarios, locked, startScenario } = useSystem();
+  const { scenario, scenarioContext, scenarioState, sessions, controlMode, takeOverAsAgent, releaseToHuman, toggleCollab, trackedSteps, callTool, completeStep, setStepStatus, addHostEvent, addAlert, available_scenarios, locked, startScenario } = useSystem();
   const { send, isOpen, toggleOpen } = useChat();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [revealedHints, setRevealedHints] = useState<Set<number>>(new Set());
   const [stepResults, setStepResults] = useState<Record<number, string>>({});
 
+  // Preserve scroll position across re-renders
+  const runbookScrollRef = useRef<HTMLDivElement>(null);
+
   // Build steps list: idle → run by user → done/failed
   const runbook = scenarioContext?.runbook;
   const steps = trackedSteps.length > 0
     ? trackedSteps.map(t => ({ ...t, output: t.output || '' }))
-    : (runbook?.steps || []).map((s: RunbookStep, i: number) => ({ ...s, status: 'idle', output: '' }));
+    : (runbook?.steps || []).map((s: RunbookStep, i: number) => ({ ...s, status: 'idle' as const, output: '' }));
 
   const doneCount = trackedSteps.filter(s => s.status === 'done').length;
   const totalSteps = steps.length;
   const allDone = doneCount >= totalSteps && totalSteps > 0;
+
+  // Initialize revealed hints for the current (first) step when scenario changes
+  useEffect(() => {
+    if (scenarioContext && steps.length > 0) {
+      setRevealedHints(new Set([steps[0]?.step]));
+    }
+  }, [scenario?.length ?? 0]); // re-mount when scenario name length changes (safe trigger for scenario switch)
 
   async function runStep(step: typeof steps[0], idx: number) {
     if (step.status === 'running') return;
@@ -186,6 +196,14 @@ function MissionControlTab() {
   function toggleAllHints() {
     if (revealedHints.size >= totalSteps) setRevealedHints(new Set());
     else setRevealedHints(new Set(steps.map(s => s.step)));
+  }
+
+  function handleSidebarScenario(name: string) {
+    if (locked) return;
+    // Immediately show the scenario as selected so UI doesn't flash
+    useSystem.setState({ scenario: name, scenarioState: 'loading', trackedSteps: [], completedSteps: [] });
+    // Then start the scenario
+    startScenario(name);
   }
 
   return (
@@ -247,10 +265,11 @@ function MissionControlTab() {
               {available_scenarios?.map((s: any) => {
                 const isActive = scenario === s.name;
                 return (
-                  <button key={s.name} onClick={() => !isActive && !locked && startScenario(s.name)} disabled={locked}
-                    className={`w-full px-2 py-1 rounded text-left transition-all truncate ${isActive ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/40 text-[var(--cyan)] font-bold text-[11px] font-mono' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[var(--text-secondary)] hover:border-[var(--border-base)] text-[11px] font-mono'}`}>
-                    {isActive ? '● ' : <Play size={7} style={{ display: 'inline', marginRight: 2 }} />}{s.title || s.name}
-                    <span className="float-right text-[8px]" style={{ color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
+                  <button key={s.name} onClick={() => handleSidebarScenario(s.name)} disabled={locked}
+                    className={`w-full px-2 py-1 rounded text-left transition-all truncate flex items-center gap-1.5 ${isActive ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/40 text-[var(--cyan)] font-bold text-[11px] font-mono' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[var(--text-secondary)] hover:border-[var(--border-base)] text-[11px] font-mono'}`}>
+                    <span className="shrink-0">{isActive ? '●' : <Play size={7} />}</span>
+                    <span className="truncate">{s.title || s.name}</span>
+                    <span className="ml-auto text-[8px] shrink-0" style={{ color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
                   </button>
                 );
               })}
@@ -265,19 +284,19 @@ function MissionControlTab() {
       </div>
 
       {/* ═══ BOTTOM: Runbook | Terminal | Audit Log ═══ */}
-      <div className="h-[320px] flex shrink-0">
-        {/* LEFT: Runbook */}
-        <div className="w-[360px] min-w-[250px] max-w-[600px] bg-[var(--bg-base)] border-r border-[var(--border-dim)] flex flex-col overflow-hidden" style={{ resize: 'horizontal', overflow: 'auto' }}>
+      <div className="h-[420px] flex shrink-0">
+        {/* LEFT: Runbook — wider for readability */}
+        <div className="w-[520px] min-w-[300px] max-w-[700px] bg-[var(--bg-base)] border-r border-[var(--border-dim)] flex flex-col overflow-hidden" style={{ resize: 'horizontal', overflow: 'auto' }}>
           {scenarioContext ? (
             <>
-              <div className="px-3 py-1 border-b border-[var(--border-dim)] flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-1">
+              <div className="px-3 py-2 border-b border-[var(--border-dim)] flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-1.5">
                   {allDone
-                    ? <CheckCircle2 size={12} className="text-[var(--green)]" />
-                    : <BookOpen size={12} className="text-[var(--cyan)]" />
+                    ? <CheckCircle2 size={14} className="text-[var(--green)]" />
+                    : <BookOpen size={14} className="text-[var(--cyan)]" />
                   }
-                  <span className="text-[11px] font-bold uppercase">{allDone ? '✅ Resolved' : 'Runbook'}</span>
-                  <span className="text-[10px] font-mono text-[var(--text-muted)] ml-1 truncate">{scenarioContext.title}</span>
+                  <span className="text-[13px] font-bold uppercase">{allDone ? '✅ Resolved' : 'Runbook'}</span>
+                  <span className="text-[11px] font-mono text-[var(--text-muted)] ml-1 truncate">{scenarioContext.title}</span>
                 </div>
                 <Tip text="Each step has a 'Show Solution' button. Click it when you're stuck — it reveals the expected problem, hints, and common mistakes for that step. Use 'Reveal All' to see everything at once.">
                   <button onClick={toggleAllHints}
@@ -286,7 +305,7 @@ function MissionControlTab() {
                   </button>
                 </Tip>
               </div>
-              <div className="flex-1 overflow-y-auto px-2 py-1.5 space-y-1.5">
+              <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2" ref={runbookScrollRef}>
                 {steps.map((step, idx) => {
                   const isDone = step.status === 'done';
                   const isFailed = step.status === 'failed';
@@ -295,37 +314,37 @@ function MissionControlTab() {
                   const result = stepResults[step.step] || step.output || '';
                   return (
                     <div key={step.step}
-                      className={`rounded-md border p-2 ${isDone ? 'border-[var(--green)]/20 bg-[var(--green)]/5' : isFailed ? 'border-[var(--red)]/20 bg-[var(--red)]/5' : isRunning ? 'border-[var(--cyan)]/40 bg-[var(--cyan)]/5' : 'border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--border-base)]'}`}>
+                      className={`rounded-lg border p-3 ${isDone ? 'border-[var(--green)]/20 bg-[var(--green)]/5' : isFailed ? 'border-[var(--red)]/20 bg-[var(--red)]/5' : isRunning ? 'border-[var(--cyan)]/40 bg-[var(--cyan)]/5' : 'border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--border-base)]'}`}>
                       {/* Step header */}
-                      <div className="flex items-center gap-1 mb-0.5">
-                        {isDone && <CheckCircle2 size={11} className="text-[var(--green)]" />}
-                        {isRunning && <Loader2 size={11} className="text-[var(--cyan)] animate-spin" />}
-                        {isFailed && <XCircle size={11} className="text-[var(--red)]" />}
-                        {!isDone && !isRunning && !isFailed && <ChevronRight size={11} className="text-[var(--text-dim)]" />}
-                        <span className="text-[11px] font-bold">#{step.step} {step.title}</span>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        {isDone && <CheckCircle2 size={13} className="text-[var(--green)]" />}
+                        {isRunning && <Loader2 size={13} className="text-[var(--cyan)] animate-spin" />}
+                        {isFailed && <XCircle size={13} className="text-[var(--red)]" />}
+                        {!isDone && !isRunning && !isFailed && <ChevronRight size={13} className="text-[var(--text-dim)]" />}
+                        <span className="text-[14px] font-bold">#{step.step} {step.title}</span>
                       </div>
-                      {/* Narrative — always visible for context */}
-                      <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-0.5">{step.narrative}</div>
+                      {/* Narrative — bigger and more readable */}
+                      <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-1.5">{step.narrative}</div>
                       {/* Expected output */}
-                      <div className="text-[10px] font-mono text-[var(--text-muted)] mb-0.5"><span className="text-[var(--text-dim)]">Expect:</span> {step.expected}</div>
+                      <div className="text-[12px] font-mono text-[var(--text-muted)] mb-1.5"><span className="text-[var(--text-dim)] font-semibold">Expect:</span> {step.expected}</div>
                       {/* Tool command */}
-                      <div className="bg-[var(--bg-void)] rounded px-1.5 py-0.5 mb-1"><code className="text-[10px] font-mono text-[var(--green)]">fix-cli&gt; {step.tool}</code></div>
+                      <div className="bg-[var(--bg-void)] rounded px-2.5 py-1.5 mb-2"><code className="text-[12px] font-mono text-[var(--green)]">fix-cli&gt; {step.tool}</code></div>
                       {/* Run button */}
                       <Tip text={isDone ? 'Step completed successfully. Click Run again to re-execute.' : isFailed ? 'This step failed. Click Run to retry.' : 'Click to execute this runbook step. The tool will run and results appear below.'}>
                         <button onClick={() => runStep(step, idx)} disabled={isRunning}
-                          className={`w-full !text-[10px] !py-0.5 flex items-center justify-center gap-1 disabled:opacity-50 ${isDone ? 'btn-secondary' : isFailed ? 'btn-danger' : 'btn-secondary'}`}>
-                          {isRunning ? <><Loader2 size={9} className="animate-spin" /> Running…</> : <><Activity size={9} /> {isDone ? '✅ Done — Run Again?' : isFailed ? '⚠️ Retry' : 'Run'}</>}
+                          className={`w-full !text-[11px] !py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50 rounded-md ${isDone ? 'btn-secondary' : isFailed ? 'btn-danger' : 'btn-secondary'}`}>
+                          {isRunning ? <><Loader2 size={11} className="animate-spin" /> Running…</> : <><Activity size={11} /> {isDone ? '✅ Done — Run Again?' : isFailed ? '⚠️ Retry' : 'Run'}</>}
                         </button>
                       </Tip>
                       {/* Tool output */}
-                      {result && <div className={`mt-0.5 text-[10px] font-mono ${isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}`}>→ {result.slice(0, 200)}{result.length > 200 ? '…' : ''}</div>}
+                      {result && <div className={`mt-1.5 text-[11px] font-mono leading-relaxed ${isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}`}>→ {result.slice(0, 300)}{result.length > 300 ? '…' : ''}</div>}
                       {/* Per-step hint toggle */}
-                      <button onClick={() => toggleHint(step.step)} className="mt-1 flex items-center gap-1 text-[10px] text-[var(--amber)] hover:text-[var(--amber)]/80 transition-colors">
-                        {isRevealed ? <><EyeOff size={9} /> Hide Solution</> : <><Eye size={9} /> Show Solution</>}
+                      <button onClick={() => toggleHint(step.step)} className="mt-2 flex items-center gap-1 text-[11px] text-[var(--amber)] hover:text-[var(--amber)]/80 transition-colors">
+                        {isRevealed ? <><EyeOff size={10} /> Hide Solution</> : <><Eye size={10} /> Show Solution</>}
                       </button>
                       {/* Revealed hints */}
                       {isRevealed && scenarioContext?.hints && (
-                        <div className="mt-1.5 p-1.5 rounded bg-[var(--amber-dim)]/20 border border-[var(--amber)]/20 text-[10px] space-y-0.5">
+                        <div className="mt-2 p-2 rounded-lg bg-[var(--amber-dim)]/20 border border-[var(--amber)]/20 text-[11px] space-y-1">
                           {scenarioContext.hints.key_problems?.[idx] && <div><span className="text-[var(--red)] font-bold">Problem: </span>{scenarioContext.hints.key_problems[idx]}</div>}
                           {scenarioContext.hints.diagnosis_path && <div><span className="text-[var(--cyan)] font-bold">💡 Hint: </span>{scenarioContext.hints.diagnosis_path}</div>}
                           {scenarioContext.hints.common_mistakes?.[idx] && <div><span className="text-[var(--amber)] font-bold">⚠️ Common mistake: </span>{scenarioContext.hints.common_mistakes[idx]}</div>}
@@ -336,13 +355,34 @@ function MissionControlTab() {
                 })}
                 {/* Success criteria — when all done */}
                 {scenarioContext.success_criteria && allDone && (
-                  <div className="mt-2 p-2 rounded bg-[var(--green-dim)]/10 border border-[var(--green)]/30">
-                    <div className="text-[11px] font-bold text-[var(--green)] mb-1 flex items-center gap-1"><CheckCircle2 size={12} /> All Steps Complete — Success Criteria</div>
-                    {scenarioContext.success_criteria.map((c: string, i: number) => <div key={i} className="text-[10px] font-mono text-[var(--green)]">✓ {c}</div>)}
+                  <div className="mt-2 p-3 rounded-lg bg-[var(--green-dim)]/10 border border-[var(--green)]/30">
+                    <div className="text-[13px] font-bold text-[var(--green)] mb-1.5 flex items-center gap-1.5"><CheckCircle2 size={14} /> All Steps Complete — Success Criteria</div>
+                    {scenarioContext.success_criteria.map((c: string, i: number) => <div key={i} className="text-[12px] font-mono text-[var(--green)] leading-relaxed">✓ {c}</div>)}
                   </div>
                 )}
               </div>
             </>
+          ) : scenario ? (
+            // Scenario is active but context is loading or failed
+            <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+              {scenarioState === 'loading' ? (
+                <>
+                  <Loader2 size={28} className="text-[var(--cyan)] animate-spin mb-3" />
+                  <p className="text-[13px] text-[var(--text-muted)]">Loading scenario…</p>
+                </>
+              ) : (
+                <>
+                  <XCircle size={28} className="text-[var(--amber)] mb-3" />
+                  <p className="text-[13px] text-[var(--text-muted)] mb-1">No runbook available for</p>
+                  <p className="text-[14px] font-mono text-[var(--cyan)] mb-3">{scenario}</p>
+                  <button onClick={() => {
+                    fetch('/api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario: 'clear' }) })
+                      .then(() => useSystem.setState({ scenario: null, scenarioContext: null, scenarioState: 'idle', completedSteps: [], trackedSteps: [], locked: false, alerts: [], error: null, loading: false }))
+                      .catch(() => {});
+                  }} className="px-4 py-2 rounded-md bg-[var(--cyan)] text-black text-[12px] font-bold hover:bg-[var(--cyan)]/80">Reset</button>
+                </>
+              )}
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center p-4">
               <div className="text-center"><BookOpen size={20} className="text-[var(--text-muted)] mx-auto mb-2" /><p className="text-[12px] text-[var(--text-muted)]">Select a scenario to see the runbook</p></div>
