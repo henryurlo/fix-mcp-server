@@ -176,7 +176,6 @@ export const useSystem = create<SystemState>((set, get) => ({
         events: (eventsRes ?? []).slice(0, 50),
         scenario: statusRes.scenario,
         available_scenarios: statusRes.available_scenarios || [],
-        scenarioContext: null,  // will be fetched when a scenario is loaded
         mode: (modeRes?.mode as SystemState['mode']) || 'human',
         open_count: statusRes.orders?.open || 0,
         stuck_count: statusRes.orders?.stuck || 0,
