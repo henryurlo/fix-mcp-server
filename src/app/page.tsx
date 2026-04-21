@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSystem, useChat } from '@/store';
 import { useAuth } from '@/store/auth';
 import { useTelemetry } from '@/store/telemetry';
@@ -11,7 +11,8 @@ import {
   Radio, BookOpen, RotateCcw, BookMarked, MessageSquare,
   Eye, EyeOff, Loader2, ChevronRight, CheckCircle2, XCircle, Info,
   PanelLeftOpen, PanelLeftClose, ArrowRight, FileText, Send, Wrench,
-  ChevronDown, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon,
+  ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon, Star,
+  X, Trophy, Clock, Award,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -25,6 +26,176 @@ const HeartbeatPanel = dynamic(() => import('@/components/HeartbeatPanel'), { ss
 
 const SEV: Record<string, string> = { low: 'var(--green)', medium: 'var(--amber)', high: 'var(--red)', critical: 'var(--purple)' };
 const SEV_BG: Record<string, string> = { low: 'var(--green-dim)', medium: 'var(--amber-dim)', high: 'var(--red-dim)', critical: 'var(--purple-dim)' };
+
+// ═══════════════════════════════════════════════════════════
+// Collapsible Step Output
+// ═══════════════════════════════════════════════════════════
+function CollapsibleStepOutput({ output, isFailed }: { output: string; isFailed: boolean }) {
+  const [collapsed, setCollapsed] = useState(true);
+  const lines = output.split('\n').filter(l => l.trim().length > 0).length;
+
+  return (
+    <div className={`rounded-lg border ${isFailed ? 'border-[var(--red)]/20' : 'border-[var(--border-dim)]'} overflow-hidden`}>
+      {/* Always-visible header with Run button */}
+      <div className="bg-[var(--bg-void)] px-3 py-2 flex items-center gap-2">
+        {collapsed ? (
+          <button onClick={() => setCollapsed(false)}
+            className="flex items-center gap-2 text-[13px] w-full text-left">
+            <ChevronDown size={12} className={`text-[var(--text-dim)] transition-transform`} />
+            <span className={isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}>
+              {isFailed ? '✗ Failed' : '✓ Completed'} — {lines} lines of output
+            </span>
+            <ChevronDown size={12} className="ml-auto text-[var(--text-dim)]" />
+          </button>
+        ) : (
+          <button onClick={() => setCollapsed(true)}
+            className="flex items-center gap-2 text-[13px] w-full text-left">
+            <ChevronDown size={12} className="text-[var(--text-dim)] rotate-180 transition-transform" />
+            <span className={isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}>
+              {isFailed ? '✗ Failed' : '✓ Completed'} — {lines} lines of output
+            </span>
+            <ChevronDown size={12} className="ml-auto text-[var(--text-dim)]" />
+          </button>
+        )}
+      </div>
+      {!collapsed && (
+        <pre className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-all p-3 bg-[var(--bg-void)]"
+          style={{ color: isFailed ? 'var(--red)' : 'var(--green)' }}>
+          {output}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Completion Screen Modal
+// ═══════════════════════════════════════════════════════════
+function CompletionScreen({ steps, hintsUsed, startTime, onClose, onNewScenario }: {
+  steps: TrackedStep[];
+  hintsUsed: number;
+  startTime: number;
+  onClose: () => void;
+  onNewScenario: () => void;
+}) {
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const totalSteps = steps.length;
+  const doneSteps = steps.filter(s => s.status === 'done').length;
+  const hintsUsedCount = hintsUsed;
+  // Rating: clean = 3 stars, 1 hint = 2 stars, 2+ hints = 1 star
+  const rating = hintsUsedCount === 0 ? 3 : hintsUsedCount === 1 ? 2 : 1;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[var(--bg-elevated)] border border-[var(--border-bright)] rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 rounded-full bg-[var(--green-dim)] flex items-center justify-center mx-auto mb-4">
+            <Trophy size={32} className="text-[var(--green)]" />
+          </div>
+          <h2 className="text-[24px] font-bold text-[var(--green)] mb-1">Case Complete!</h2>
+          <p className="text-[15px] text-[var(--text-muted)]">You&#39;ve resolved all {totalSteps} steps successfully.</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 text-center border border-[var(--border-dim)]">
+            <Clock size={20} className="text-[var(--cyan)] mx-auto mb-1" />
+            <div className="text-[18px] font-bold font-mono">{mins > 0 ? `${mins}m ` : ''}{secs}s</div>
+            <div className="text-[12px] text-[var(--text-muted)]">Time Taken</div>
+          </div>
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 text-center border border-[var(--border-dim)]">
+            <CheckCircle2 size={20} className="text-[var(--green)] mx-auto mb-1" />
+            <div className="text-[18px] font-bold font-mono">{doneSteps}/{totalSteps}</div>
+            <div className="text-[12px] text-[var(--text-muted)]">Steps Done</div>
+          </div>
+          <div className="bg-[var(--bg-surface)] rounded-xl p-4 text-center border border-[var(--border-dim)]">
+            <Lightbulb size={20} className="text-[var(--amber)] mx-auto mb-1" />
+            <div className="text-[18px] font-bold font-mono">{hintsUsedCount}</div>
+            <div className="text-[12px] text-[var(--text-muted)]">Hints Used</div>
+          </div>
+        </div>
+
+        <div className="text-center mb-6">
+          <div className="text-[14px] text-[var(--text-muted)] mb-2">Performance Rating</div>
+          <div className="flex items-center justify-center gap-1">
+            {[1, 2, 3].map(i => (
+              <Star key={i} size={28} className={i <= rating ? 'text-[var(--amber)] fill-[var(--amber)]' : 'text-[var(--text-dim)]'} />
+            ))}
+          </div>
+          <div className="text-[14px] text-[var(--text-secondary)] mt-1">
+            {rating === 3 ? '🔥 Clean Completion — No hints needed!' : rating === 2 ? '👍 Good — Used 1 hint' : '💡 Keep practicing — You\'ll get faster!'}
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onNewScenario}
+            className="flex-1 py-3 rounded-lg bg-[var(--cyan)] text-black text-[14px] font-bold hover:bg-[var(--cyan)]/80 transition-colors flex items-center justify-center gap-2">
+            <Play size={16} fill="currentColor" /> New Scenario
+          </button>
+          <button onClick={onClose}
+            className="px-4 py-3 rounded-lg bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-dim)] text-[14px] font-semibold hover:bg-[var(--bg-elevated)] transition-colors flex items-center gap-2">
+            <Activity size={16} /> View Topology
+          </button>
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 justify-center text-[12px] text-[var(--text-dim)]">
+          <span>Press <kbd className="px-1.5 py-0.5 bg-[var(--bg-void)] rounded text-[11px] font-mono border border-[var(--border-dim)]">Esc</kbd> to continue</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Keyboard shortcuts hook
+// ═══════════════════════════════════════════════════════════
+function useKeyboardShortcuts({ onRun, onHint, onToggleCopilot, onNavPrev, onNavNext }: {
+  onRun?: () => void;
+  onHint?: () => void;
+  onToggleCopilot?: () => void;
+  onNavPrev?: () => void;
+  onNavNext?: () => void;
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement).isContentEditable) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          e.preventDefault();
+          onRun?.();
+          break;
+        case 'h':
+          e.preventDefault();
+          onHint?.();
+          break;
+        case 'tab':
+          e.preventDefault();
+          onToggleCopilot?.();
+          break;
+        case 'escape':
+          e.preventDefault();
+          onToggleCopilot?.();
+          break;
+        case 'arrowleft':
+        case 'arrowup':
+          e.preventDefault();
+          onNavPrev?.();
+          break;
+        case 'arrowright':
+        case 'arrowdown':
+          e.preventDefault();
+          onNavNext?.();
+          break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onRun, onHint, onToggleCopilot, onNavPrev, onNavNext]);
+}
 
 // ═══ Scenario Case Brief — the story presentation ═══
 function CaseBrief({ ctx, onStart }: { ctx: ScenarioContext; onStart: () => void }) {
@@ -164,13 +335,10 @@ function FixWireView({ sessions }: { sessions: any[] }) {
 // ═══ Main Page ═══
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'mission-control' | 'telemetry' | 'scenario-library'>('mission-control');
-  const [bottomTab, setBottomTab] = useState<'runbook' | 'terminal' | 'fixwire'>('runbook');
   const { scenario, scenarioContext, scenarioState, available_scenarios, refresh, error, connected, startScenario, sessions, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, locked } = useSystem();
   const { isOpen, toggleOpen } = useChat();
   const { isAuthenticated, user, logout } = useAuth();
   const telemetry = useTelemetry();
-
-  const runbookScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { refresh(); telemetry.refresh(); }, []);
   useEffect(() => {
@@ -256,10 +424,13 @@ export default function Home() {
   );
 }
 
-// ═══ MISSION CONTROL TAB ═══
+// ═══════════════════════════════════════════════════════════
+// Mission Control Tab — main scenario workspace
+// ═══════════════════════════════════════════════════════════
 
 function MissionControlTab({ scenario: parentScenario, available_scenarios: parentScenarios }: { scenario: string | null; available_scenarios: any[] }) {
   const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent } = useSystem();
+  const { isOpen: chatOpen, toggleOpen: toggleChat } = useChat();
   const [bottomTab, setBottomTab] = useState<'case' | 'terminal' | 'fixwire'>('case');
   const activeScenarios = useSystem.getState().available_scenarios || parentScenarios || [];
 
@@ -274,18 +445,48 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
   const [showCaseBrief, setShowCaseBrief] = useState(true);
   const runbookScrollRef = useRef<HTMLDivElement>(null);
 
+  // Focus mode state
+  const [focusMode, setFocusMode] = useState(false);
+  const [topologyCollapsed, setTopologyCollapsed] = useState(false);
+
+  // Completion screen state
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [completionTimer, setCompletionTimer] = useState<number>(0);
+
+  // Hints tracking
+  const [hintsUsedCount, setHintsUsedCount] = useState(0);
+
   // Reset state on scenario change
   useEffect(() => {
     setShowCaseBrief(true);
     setCurrentStep(0);
     setRevealedHints(new Set());
+    setFocusMode(false);
+    setTopologyCollapsed(false);
+    setShowCompletion(false);
+    setCompletionTimer(Date.now());
+    setHintsUsedCount(0);
     runbookScrollRef.current?.scrollTo({ top: 0 });
+  }, [scenario]);
+
+  // Start timer when case study begins
+  useEffect(() => {
+    if (scenario && completionTimer === 0) {
+      setCompletionTimer(Date.now());
+    }
   }, [scenario]);
 
   const doneCount = trackedSteps.filter(s => s.status === 'done').length;
   const totalSteps = steps.length;
   const allDone = doneCount >= totalSteps && totalSteps > 0;
   const progressPct = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
+
+  // Show completion screen when all done
+  useEffect(() => {
+    if (allDone && !showCompletion) {
+      setShowCompletion(true);
+    }
+  }, [allDone]);
 
   async function runStep(step: typeof steps[0], idx: number) {
     if (step.status === 'running') return;
@@ -306,7 +507,34 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
     }
   }
 
+  function toggleHint(stepIdx: number) {
+    setRevealedHints(prev => {
+      const next = new Set(prev);
+      if (next.has(stepIdx)) {
+        next.delete(stepIdx);
+      } else {
+        next.add(stepIdx);
+        setHintsUsedCount(c => c + 1);
+      }
+      return next;
+    });
+  }
+
   const current = steps[currentStep];
+
+  // Count expanded steps (for auto-collapse)
+  const expandedCount = useMemo(() => {
+    return steps.filter((s: any) => s.status === 'done' && stepResults[s.step]).length;
+  }, [steps, stepResults]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onRun: current && scenario ? () => runStep(current, currentStep) : undefined,
+    onHint: current && scenario ? () => toggleHint(currentStep) : undefined,
+    onToggleCopilot: () => toggleChat(),
+    onNavPrev: () => currentStep > 0 ? setCurrentStep(currentStep - 1) : undefined,
+    onNavNext: () => currentStep < steps.length - 1 ? setCurrentStep(currentStep + 1) : undefined,
+  });
 
   if (!scenario) {
     return (
@@ -345,20 +573,36 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
-      {/* ═══ TOP: Compact Topology ═══ */}
-      <div className="h-[180px] min-h-[180px] border-b border-[var(--border-dim)] relative shrink-0">
-        <TopologyGraph />
-        {/* Quick status overlay */}
-        <div className="absolute top-2 left-2 z-10 flex gap-2">
-          <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--cyan)]">● {scenario}</div>
-          <div className="glass-panel px-2.5 py-1 text-[11px] font-mono">{sessions?.length || 0} sessions</div>
-          {doneCount > 0 && <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--green)]">{doneCount}/{totalSteps} · {progressPct}%</div>}
-          {allDone && <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--green)] bg-[var(--green)]/10">✅ Resolved</div>}
+      {/* ═══ TOP: Toggleable Topology ═══ */}
+      <div
+        className={`border-b border-[var(--border-dim)] relative shrink-0 transition-all duration-300 overflow-hidden ${
+          topologyCollapsed ? 'h-[40px] min-h-[40px]' : 'h-[180px] min-h-[180px]'
+        }`}
+        onClick={() => setTopologyCollapsed(!topologyCollapsed)}
+        style={{ cursor: 'pointer' }}
+      >
+        {!topologyCollapsed && <TopologyGraph />}
+        {/* Always-visible status bar */}
+        <div className={`absolute top-1 left-2 z-10 flex gap-2 items-center ${topologyCollapsed ? 'w-full px-4 justify-center' : ''}`}>
+          {!topologyCollapsed && (
+            <>
+              <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--cyan)]">● {scenario}</div>
+              <div className="glass-panel px-2.5 py-1 text-[11px] font-mono">{sessions?.length || 0} sessions</div>
+              {doneCount > 0 && <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--green)]">{doneCount}/{totalSteps} · {progressPct}%</div>}
+              {allDone && <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--green)] bg-[var(--green)]/10">✅ Resolved</div>}
+            </>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); setTopologyCollapsed(!topologyCollapsed); }}
+            className="glass-panel px-2 py-0.5 text-[10px] font-mono text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          >
+            {topologyCollapsed ? <><ChevronDown size={10} /> Expand Topology</> : <><ChevronUp size={10} /> Collapse</>}
+          </button>
         </div>
       </div>
 
       {/* ═══ BOTTOM: Case Study / Runbook ═══ */}
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className={`flex-1 min-h-0 flex flex-col transition-all duration-300 ${focusMode ? 'max-w-5xl mx-auto w-full' : 'flex'}`}>
         {/* Tab bar: Case Study | Terminal | FIX Wire */}
         <div className="flex items-center justify-between px-2 py-1.5 border-b border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
           <div className="flex gap-0.5">
@@ -375,6 +619,13 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
               <Zap size={14} /> FIX Wire
             </button>
           </div>
+          {/* Focus mode toggle */}
+          <button onClick={() => setFocusMode(!focusMode)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${focusMode ? 'bg-[var(--cyan-dim)] text-[var(--cyan)] border border-[var(--cyan)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+            title="Focus mode">
+            {focusMode ? <PanelLeftClose size={12} /> : <PanelLeftOpen size={12} />}
+            {focusMode ? 'Expand' : 'Focus'}
+          </button>
         </div>
 
         {/* Tab content */}
@@ -406,6 +657,8 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
                         const isCurrent = idx === currentStep;
                         const isRevealed = revealedHints.has(step.step);
                         const result = stepResults[step.step] || step.output || '';
+                        const resultLines = result ? result.split('\n').filter((l: string) => l.trim().length > 0).length : 0;
+                        const shouldCollapse = expandedCount > 2;
 
                         return (
                           <div key={step.step} onClick={() => setCurrentStep(idx)}
@@ -428,7 +681,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
                             {/* Instruction narrative */}
                             <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-3">{step.narrative}</p>
 
-                            {/* Command */}
+                            {/* Command + always-visible Run button */}
                             <div className="bg-[var(--bg-void)] rounded-lg px-4 py-2.5 mb-3 flex items-center justify-between">
                               <code className="text-[14px] font-mono text-[var(--green)]">{step.tool}</code>
                               <button onClick={(e) => { e.stopPropagation(); runStep(step, idx); }}
@@ -438,17 +691,23 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
                               </button>
                             </div>
 
-                            {/* Result output */}
-                            {result && (
-                              <pre className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-all p-3 rounded-lg bg-[var(--bg-void)] mb-3"
-                                style={{ color: isFailed ? 'var(--red)' : 'var(--green)' }}>
+                            {/* Result output — collapsible for completed steps */}
+                            {result && isDone && (
+                              <CollapsibleStepOutput output={result} isFailed={false} />
+                            )}
+                            {result && isFailed && (
+                              <CollapsibleStepOutput output={result} isFailed={true} />
+                            )}
+                            {result && !isDone && !isFailed && (
+                              /* Running state — show inline */
+                              <pre className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-all p-3 rounded-lg bg-[var(--bg-void)] mb-3 text-[var(--cyan)]">
                                 {result}
                               </pre>
                             )}
 
                             {/* Hint section */}
                             {!result && !isDone && (
-                              <button onClick={(e) => { e.stopPropagation(); setRevealedHints(prev => { const next = new Set(prev); next.has(step.step) ? next.delete(step.step) : next.add(step.step); return next; }); }}
+                              <button onClick={(e) => { e.stopPropagation(); toggleHint(step.step); }}
                                 className="flex items-center gap-1.5 text-[13px] text-[var(--amber)] hover:text-[var(--amber)]/80 transition-colors">
                                 {isRevealed ? <><EyeOff size={12} /> Hide Hint</> : <><Eye size={12} /> Show Hint</>}
                               </button>
@@ -471,7 +730,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
                         );
                       })}
 
-                      {/* Success message */}
+                      {/* Success message (inline, before completion screen takes over) */}
                       {allDone && (
                         <div className="mt-4 p-4 rounded-lg bg-[var(--green-dim)]/10 border border-[var(--green)]/30 text-center">
                           <CheckCircle2 size={24} className="text-[var(--green)] mx-auto mb-2" />
@@ -484,8 +743,8 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
                 )}
               </div>
 
-              {/* RIGHT: Scenario list sidebar (compact) */}
-              <div className="w-[260px] bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col shrink-0">
+              {/* RIGHT: Scenario list sidebar (hidden in focus mode, shows HeartbeatPanel at bottom) */}
+              <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[260px]'}`}>
                 <div className="px-3 py-2 border-b border-[var(--border-dim)]">
                   <span className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Scenarios</span>
                 </div>
@@ -507,7 +766,11 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
                     );
                   })}
                 </div>
-                <div className="border-t border-[var(--border-dim)] p-2"><HeartbeatPanel onVenueClick={() => {}} /></div>
+                {(!focusMode) && (
+                  <div className="border-t border-[var(--border-dim)] p-2">
+                    <HeartbeatPanel onVenueClick={() => {}} />
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -526,6 +789,27 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
           {bottomTab === 'fixwire' && <FixWireView sessions={sessions || []} />}
         </div>
       </div>
+
+      {/* ── HeartbeatPanel: Always visible at bottom in focus mode ── */}
+      {focusMode && (
+        <div className="border-t border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
+          <HeartbeatPanel onVenueClick={() => {}} />
+        </div>
+      )}
+
+      {/* ── Completion Screen ── */}
+      {showCompletion && (
+        <CompletionScreen
+          steps={trackedSteps}
+          hintsUsed={hintsUsedCount}
+          startTime={completionTimer || Date.now()}
+          onClose={() => setShowCompletion(false)}
+          onNewScenario={() => {
+            setShowCompletion(false);
+            setFocusMode(false);
+          }}
+        />
+      )}
     </div>
   );
 }

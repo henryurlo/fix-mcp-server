@@ -26,6 +26,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from fix_mcp import server
+from fix_mcp.server import get_tcp_integration
+from fix_mcp.metrics import FIX_METRICS
 from fix_mcp.prompts.trading_ops import SCENARIO_PROMPTS
 
 # ---------------------------------------------------------------------------
@@ -294,6 +296,14 @@ def _detail_payload() -> dict:
 
 class APIHandler(BaseHTTPRequestHandler):
 
+    def _send_text(self, body: bytes, content_type: str = "text/plain; charset=utf-8") -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _send_json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = _json_bytes(payload)
         self.send_response(status)
@@ -494,6 +504,10 @@ class APIHandler(BaseHTTPRequestHandler):
             })
             return
 
+        if self.path == "/metrics":
+            self._handle_metrics()
+            return
+
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
@@ -550,6 +564,55 @@ class APIHandler(BaseHTTPRequestHandler):
             return
 
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _handle_metrics(self) -> None:
+        """Serve Prometheus /metrics endpoint in text format.
+
+        Before rendering, refresh live gauges (active orders, venue status,
+        session counts, scenario duration) so the scrape always reflects
+        the current process state.
+        """
+        try:
+            from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, REGISTRY
+        except ImportError:
+            self._send_text(b"# prometheus_client not installed\n")
+            return
+
+        # ── Refresh live gauges ──────────────────────────────────────────
+        open_orders = [
+            o for o in server.oms.orders.values()
+            if o.status not in {"filled", "canceled", "rejected"}
+        ]
+        FIX_METRICS.active_orders.set(len(open_orders))
+
+        sessions = server.session_manager.get_all_sessions()
+        status_counts: dict[str, int] = {}
+        for s in sessions:
+            status_counts[s.status] = status_counts.get(s.status, 0) + 1
+            FIX_METRICS.venue_status.info({
+                "venue": s.venue,
+                "status": s.status,
+                "latency_ms": str(s.latency_ms),
+            })
+        for status, count in status_counts.items():
+            FIX_METRICS.sessions_active.labels(status=status).set(count)
+
+        # Scenario duration — time since oldest active order was created, or 0
+        if server.oms.orders:
+            earliest = 0.0
+            now_ts = datetime.now(timezone.utc).timestamp()
+            for o in server.oms.orders.values():
+                try:
+                    created = datetime.fromisoformat(o.created_at).timestamp()
+                    age = now_ts - created
+                    if age > earliest:
+                        earliest = age
+                except Exception:
+                    pass
+            FIX_METRICS.scenario_duration.set(earliest)
+
+        body = generate_latest(REGISTRY)
+        self._send_text(body, content_type=CONTENT_TYPE_LATEST)
 
     def log_message(self, fmt: str, *args: object) -> None:
         return

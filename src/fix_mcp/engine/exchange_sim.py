@@ -271,28 +271,38 @@ class ExchangeSimulator:
                 return parts[1].strip()
         return None
 
+    @staticmethod
+    def _compute_checksum(msg: str) -> str:
+        """Compute FIX checksum (tag 10) by summing byte values of message body (8=FIX.4.2|... up to before 10=)."""
+        body = msg.split("|10=")[0] if "|10=" in msg else msg
+        cksum = sum(ord(c) for c in body) % 256
+        return f"{cksum:03d}"
+
     def _build_logon_ack(self, request: str) -> str:
         """Acknowledge a FIX 4.2 Logon."""
         self._out_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=A|34={self._out_seq}|49={self.venue_mic}|"
             f"52={self._ts()}|56={self._extract_tag(request, '49') or 'CLIENT'}|"
-            f"98=0|108=30|10=000"
+            f"98=0|108=30|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     def _build_heartbeat_ack(self) -> str:
         self._out_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=0|34={self._out_seq}|49={self.venue_mic}|"
-            f"52={self._ts()}|10=000"
+            f"52={self._ts()}|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     def _build_logout_ack(self) -> str:
         self._out_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=F|34={self._out_seq}|49={self.venue_mic}|"
-            f"52={self._ts()}|10=000"
+            f"52={self._ts()}|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     async def _handle_new_order(self, raw: str) -> str:
         """Accept a NewOrderSingle and immediately fill it."""
@@ -306,12 +316,13 @@ class ExchangeSimulator:
         price = self._markets[symbol].current_mid if symbol in self._markets else 0.0
 
         self._out_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=8|34={self._out_seq}|49={self.venue_mic}|"
             f"52={self._ts()}|56=CLIENT|11={cl_ord_id}|55={symbol}|54={side}|"
             f"38={qty}|40={order_type}|39=1|150=1|31={price:.2f}|"
-            f"14={qty}|550={self.venue_mic}|10=000"
+            f"14={qty}|550={self.venue_mic}|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     @staticmethod
     def _corrupt_bytes(raw: str) -> str:

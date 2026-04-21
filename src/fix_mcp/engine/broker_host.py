@@ -236,23 +236,32 @@ class BrokerHost:
         if self._md is None:
             return None
 
-        quotes = self._md.get_all_quotes()
         best_mic: Optional[str] = None
         best_price: Optional[float] = None
 
-        for sym, book in quotes.items():
+        # Iterate exchanges (venues) and look up the symbol in each one's
+        # market state — mirroring the async route_order pattern.
+        for mic, exchange in self._exchanges.items():
+            venue_sym = symbol
+            if self._resolver:
+                venue_sym = self._resolver.resolve(symbol, mic)
+
+            state = exchange.get_quote(venue_sym)
+            if state is None:
+                continue
+
             if not side or side == "1":
-                price = book.asks[0].price if book.asks else None
+                price = state.asks[0].price if state.asks else None
                 if price is not None:
                     if best_price is None or price < best_price:
                         best_price = price
-                        best_mic = sym if sym in book else None
+                        best_mic = mic
             elif side == "2":
-                price = book.bids[0].price if book.bids else None
+                price = state.bids[0].price if state.bids else None
                 if price is not None:
                     if best_price is None or price > best_price:
                         best_price = price
-                        best_mic = sym
+                        best_mic = mic
 
         result = {
             "ts": datetime.now(timezone.utc).isoformat(),
@@ -294,33 +303,40 @@ class BrokerHost:
                 new_parts.append(p)
         return "|".join(new_parts)
 
+    @staticmethod
+    def _compute_checksum(msg: str) -> str:
+        """Compute FIX checksum (tag 10) by summing byte values of message body (8=FIX.4.2|... up to before 10=)."""
+        body = msg.split("|10=")[0] if "|10=" in msg else msg
+        cksum = sum(ord(c) for c in body) % 256
+        return f"{cksum:03d}"
+
     def _build_acceptor_ack(self, request: str) -> str:
-        self._client_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=A|34={self._client_seq}|49=BROKER|"
-            f"52={self._ts()}|56=CLIENT|98=0|108=30|10=000"
+            f"52={self._ts()}|56=CLIENT|98=0|108=30|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     def _build_heartbeat(self) -> str:
-        self._client_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=0|34={self._client_seq}|49=BROKER|"
-            f"52={self._ts()}|56=CLIENT|10=000"
+            f"52={self._ts()}|56=CLIENT|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     def _build_ack(self) -> str:
-        self._client_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=0|34={self._client_seq}|49=BROKER|"
-            f"52={self._ts()}|56=CLIENT|10=000"
+            f"52={self._ts()}|56=CLIENT|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     def _build_reject(self, raw: str, symbol: str, reason: str) -> str:
-        self._client_seq += 1
-        return (
+        msg = (
             f"8=FIX.4.2|9=0|35=9|34={self._client_seq}|49=BROKER|"
-            f"52={self._ts()}|56=CLIENT|55={symbol}|58={reason}|10=000"
+            f"52={self._ts()}|56=CLIENT|55={symbol}|58={reason}|"
         )
+        return f"{msg}10={self._compute_checksum(msg)}"
 
     @staticmethod
     def _ts() -> str:

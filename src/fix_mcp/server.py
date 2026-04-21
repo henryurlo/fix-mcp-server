@@ -8,6 +8,7 @@ import os
 import threading
 import re
 from datetime import datetime, timezone, timedelta
+from typing import Optional, Dict, Any
 from pathlib import Path
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -21,6 +22,8 @@ from fix_mcp.engine.algos import AlgoEngine, AlgoOrder, ALGO_TYPES
 from fix_mcp.fix.messages import FIXMessageBuilder
 from fix_mcp.fix.protocol import SequenceManager, format_fix_timestamp
 from fix_mcp.engine.market_data import MarketDataHub
+from fix_mcp.engine.tcp_integration import TCPIntegration
+from fix_mcp.metrics import FIX_METRICS
 
 # ---------------------------------------------------------------------------
 # Attempt to import the trading ops prompt; fall back to a stub if the module
@@ -110,6 +113,25 @@ msg_builder = FIXMessageBuilder(
     session_manager=SequenceManager(),
 )
 
+# TCP integration singleton — starts on scenario load if enabled, routes
+# orders via real BrokerHost ↔ ExchangeSimulator FIX TCP.
+_tcp: Optional[TCPIntegration] = None
+_USE_TCP = os.environ.get("FIX_MCP_USE_TCP", "").lower() in ("1", "true", "yes")
+
+
+def _ensure_tcp() -> Any:
+    """Lazily start and return the TCP integration singleton."""
+    global _tcp
+    if _tcp is None and _USE_TCP:
+        _tcp = TCPIntegration()
+        _tcp.start()
+    return _tcp if _tcp and _tcp.is_running else None
+
+
+def get_tcp_integration() -> Any:
+    """Return the active TCP integration singleton or None."""
+    return _tcp if _tcp and _tcp.is_running else None
+
 
 def reset_runtime(scenario_name: str | None = None) -> str:
     """Reload scenario-backed runtime state in-process (thread-safe)."""
@@ -127,6 +149,7 @@ def reset_runtime(scenario_name: str | None = None) -> str:
             target_comp_id="EXCHANGE_GW",
             session_manager=SequenceManager(),
         )
+        FIX_METRICS.scenario_started.labels(name=SCENARIO).inc()
         return SCENARIO
 
 # ---------------------------------------------------------------------------
@@ -957,6 +980,33 @@ async def _tool_send_order(args: dict) -> list[TextContent]:
         oms.add_order(order)
         oms.add_fix_message(order_id, fix_msg["raw"])
 
+        # ── Metrics: order submitted ─────────────────────────────────────
+        FIX_METRICS.order_submitted.labels(symbol=symbol, side=side_str).inc()
+        order_submit_ts = time.monotonic()
+
+        # ── Try TCP path (BrokerHost + ExchangeSimulators) ──────────────
+        tcp_fix_reply: Optional[str] = None
+        tcp = get_tcp_integration()
+        if tcp is not None:
+            tcp_fix_reply = tcp.submit_order_sync(
+                symbol=symbol,
+                side=fix_side,
+                quantity=quantity,
+                order_type=fix_ord_type,
+                cl_ord_id=cl_ord_id,
+                price=price if order_type_str in {"limit", "stop"} else None,
+            )
+
+            # ── Metrics: TCP path ACK latency ────────────────────────────
+            ack_ms = (time.monotonic() - order_submit_ts) * 1000
+            FIX_METRICS.order_to_ack_latency.labels(venue=venue).observe(ack_ms / 1000)
+            FIX_METRICS.order_ack.labels(venue=venue, status="filled").inc()
+        else:
+            # Dict-based (fallback) path — still record the event
+            FIX_METRICS.fix_session_latency.labels(msg_type="D").observe(
+                (time.monotonic() - order_submit_ts) / 1000
+            )
+
         lines = ["ORDER CONFIRMATION"]
         lines.append(f"  Order ID:     {order_id}")
         lines.append(f"  ClOrdID:      {cl_ord_id}")
@@ -981,6 +1031,9 @@ async def _tool_send_order(args: dict) -> list[TextContent]:
         lines.append("\nFIX MESSAGE (35=D NewOrderSingle):")
         lines.append(fix_msg["formatted"])
         lines.append(f"\nRAW: {fix_msg['raw']}")
+        if tcp_fix_reply:
+            lines.append("\nTCP FIX WIRE RESPONSE (venue ExecutionReport):")
+            lines.append(f"  {tcp_fix_reply}")
         return _tc("\n".join(lines))
     except KeyError as exc:
         return _tc(f"ERROR in send_order: missing required parameter {exc}")
@@ -1864,6 +1917,7 @@ async def _tool_session_heartbeat(args: dict) -> list[TextContent]:
                 hb_age = s.heartbeat_age_seconds
                 hb_str = f"{hb_age:.0f}s ago" if hb_age is not None else "never"
                 lines.append(f"  {icon} {s.venue:<8}  latency={s.latency_ms}ms  hb={hb_str}  seq_out={s.last_sent_seq}  seq_in={s.last_recv_seq}")
+                FIX_METRICS.heartbeat_total.labels(venue=s.venue).inc()
             return _tc("\n".join(lines))
 
         session = session_manager.get_session(venue)
@@ -1873,6 +1927,10 @@ async def _tool_session_heartbeat(args: dict) -> list[TextContent]:
         icon = _session_status_icon(session.status)
         hb_age = session.heartbeat_age_seconds
         hb_str = f"{hb_age:.0f}s ago" if hb_age is not None else "never"
+        FIX_METRICS.heartbeat_total.labels(venue=venue).inc()
+        FIX_METRICS.fix_session_latency.labels(msg_type="heartbeat").observe(
+            hb_age if hb_age is not None else 0
+        )
 
         lines = [
             f"HEARTBEAT — {venue}",

@@ -37,32 +37,51 @@ export default function HeartbeatPanel({ onVenueClick }: HeartbeatPanelProps) {
       </div>
 
       <div className="space-y-0.5">
-        {displaySessions.map((s: SessionInfo & { session_id?: string; last_heartbeat?: string; last_sent_seq?: number; last_recv_seq?: number }) => (
-          <button
-            key={s.venue}
-            onClick={() => handleVenueClick(s.venue)}
-            className="w-full flex items-center gap-2 px-1.5 py-1 rounded hover:bg-[var(--bg-hover)] transition-colors group"
-          >
-            <span className={`status-dot w-[6px] h-[6px] ${
-              s.status === 'active' ? 'healthy' : s.status === 'degraded' ? 'degraded' : 'down'
-            }`} />
-            <span className="text-[13px] font-mono font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
-              {s.venue}
-            </span>
-            <span className="text-[12px] font-mono ml-auto">
-              {s.latency_ms != null ? (
-                <span className={
+        {displaySessions.map((s: SessionInfo & { session_id?: string; last_heartbeat?: string; last_sent_seq?: number; last_recv_seq?: number }) => {
+          // Determine status-based styling
+          const isDown = s.status === 'down';
+          const isDegraded = s.status === 'degraded';
+          const isActive = s.status === 'active';
+
+          // Status dot class
+          const dotClass = isDown ? 'down' : isDegraded ? 'degraded' : isActive ? 'healthy' : 'down';
+
+          // Status text label
+          const statusLabel = isDown ? 'DOWN' : isDegraded ? 'DEGRADED' : '';
+
+          return (
+            <button
+              key={s.venue}
+              onClick={() => handleVenueClick(s.venue)}
+              className="w-full flex items-center gap-2 px-1.5 py-1 rounded hover:bg-[var(--bg-hover)] transition-colors group"
+            >
+              <span className={`status-dot w-[6px] h-[6px] ${dotClass}`} />
+              <span className="text-[13px] font-mono font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
+                {s.venue}
+              </span>
+              {/* Status label for DOWN/DEGRADED — replaces latency */}
+              {isDown && (
+                <span className="text-[11px] font-mono font-bold ml-auto text-[var(--red)]">
+                  DOWN
+                </span>
+              )}
+              {isDegraded && (
+                <span className="text-[11px] font-mono font-bold ml-auto text-[var(--amber)]">
+                  DEGRADED
+                </span>
+              )}
+              {/* Latency only shown for active sessions */}
+              {!isDown && !isDegraded && s.latency_ms != null && (
+                <span className={`text-[12px] font-mono ml-auto ${
                   s.latency_ms > 100 ? 'text-[var(--red)]' :
                   s.latency_ms > 20 ? 'text-[var(--amber)]' : 'text-[var(--green)]'
-                }>
+                }`}>
                   {s.latency_ms.toFixed(0)}ms
                 </span>
-              ) : (
-                <span className="text-[var(--text-dim)]">—</span>
               )}
-            </span>
-          </button>
-        ))}
+            </button>
+          );
+        })}
         {hasMore && (
           <button
             onClick={() => setExpanded(!expanded)}
