@@ -30,7 +30,7 @@ import {
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
 const ChatPanel = dynamic(() => import('@/components/ChatPanel').then(m => ({ default: m.ChatPanel })), { ssr: false });
 const TelemetryDashboard = dynamic(() => import('@/components/TelemetryDashboard'), { ssr: false });
-const ScenarioCreator = dynamic(() => import('@/components/ScenarioCreator'), { ssr: false });
+const ScenarioCreator = dynamic(() => import('@/components/ScenarioCreator').then(m => ({ default: m.ScenarioCreator })), { ssr: false });
 const AuthGate = dynamic(() => import('@/components/AuthGate'), { ssr: false });
 const FixTerminal = dynamic(() => import('@/components/FixTerminal'), { ssr: false });
 const FixWireLog = dynamic(() => import('@/components/McpAuditLog'), { ssr: false });
@@ -473,12 +473,12 @@ function MissionControlTab() {
                   {runbook.successCriteria && runbook.successCriteria.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-[var(--border-dim)]">
                       <div className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                        ✓ Success Criteria ({completedSteps}/{runbook.successCriteria.length} complete)
+                        ✓ Success Criteria ({completedSteps.length}/{runbook.successCriteria.length} complete)
                       </div>
                       <div className="space-y-1">
                         {Object.keys(stepResults).length > 0 && (
                           runbook.successCriteria.map((c, i) => {
-                            const isComplete = i < completedSteps;
+                            const isComplete = i < completedSteps.length;
                             return (
                               <div key={i} className={`text-[14px] font-mono flex items-start gap-1 ${
                                 isComplete ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'

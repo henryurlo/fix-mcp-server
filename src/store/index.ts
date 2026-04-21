@@ -5,7 +5,7 @@ import { SYSTEM_PROMPT, SCENARIO_OVERLAYS, KNOWN_TOOLS } from './prompts';
 // ── Backend URL — Next.js dev server proxies /api/* to the Python backend
 const BACKEND = '';
 
-async function jsonFetch<T>(path: string): Promise<T> {
+async function jsonFetch<T = Record<string, unknown>>(path: string): Promise<T> {
   const res = await fetch(`${BACKEND}${path}`);
   if (!res.ok) throw new Error(`${path}: ${res.status}`);
   return res.json() as Promise<T>;
@@ -155,7 +155,7 @@ export const useSystem = create<SystemState>((set, get) => ({
   refresh: async () => {
     try {
       const [statusRes, ordersRes, eventsRes, modeRes] = await Promise.all([
-        jsonFetch('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),
+        jsonFetch<any>('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),
         jsonFetch<OrderInfo[]>('/api/orders').catch(e => { console.error('/api/orders failed:', e); return null; }),
         jsonFetch<EventEntry[]>('/api/events').catch(e => { console.error('/api/events failed:', e); return null; }),
         jsonFetch('/api/mode').catch(e => { console.error('/api/mode failed:', e); return null; }),
@@ -163,7 +163,7 @@ export const useSystem = create<SystemState>((set, get) => ({
 
       if (!statusRes) { set({ connected: false, error: '/api/status failed', loading: false }); return; }
 
-      const sessions: SessionInfo[] = (statusRes.sessions?.detail || []).map((s) => ({
+      const sessions: SessionInfo[] = (statusRes.sessions?.detail || []).map((s: any) => ({
         venue: s.venue || '',
         status: (s.status || 'active') as SessionInfo['status'],
         latency_ms: s.latency_ms,
@@ -272,7 +272,7 @@ export const useChat = create<ChatState>((set, get) => ({
     set((s) => ({ messages: [...s.messages, userMsg], isTyping: true }));
 
     try {
-      const status = await jsonFetch('/api/status');
+      const status = await jsonFetch<any>('/api/status');
       const events = await jsonFetch<EventEntry[]>('/api/events');
       const { scenarioContext } = useSystem.getState();
 
