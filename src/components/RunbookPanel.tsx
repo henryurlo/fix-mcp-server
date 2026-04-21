@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_CONFIG: Record<StepStatus, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
-  pending: {
+  idle: {
     icon: <ChevronRight size={12} />,
     color: 'var(--text-dim)',
     bg: 'var(--bg-surface)',
@@ -197,7 +197,7 @@ export default function RunbookPanel({ scenarioContext, scenario }: RunbookPanel
       <div className="flex-1 overflow-y-auto p-2">
         <div className="space-y-2">
           {steps.map((step, i) => {
-            const sc = STATUS_CONFIG[step.status] || STATUS_CONFIG.pending;
+            const sc = STATUS_CONFIG[step.status] || STATUS_CONFIG.idle;
             const isActive = activeStepIdx === i;
 
             return (

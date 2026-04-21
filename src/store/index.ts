@@ -65,7 +65,7 @@ export interface ScenarioSummary {
   is_algo: boolean;
   success_criteria_count: number;
   runbook_step_count: number;
-  context: string;  // kept for backward compat
+  context: string;
 }
 
 export interface RunbookStep {
@@ -101,15 +101,12 @@ export interface ScenarioContext {
   orders: unknown[];
 }
 
-type ScenarioDef = ScenarioSummary;  // backward compat alias
+type ScenarioDef = ScenarioSummary;
 
-/** Status for individual runbook steps */
-export type StepStatus = 'pending' | 'running' | 'done' | 'failed';
+export type StepStatus = 'idle' | 'running' | 'done' | 'failed';
 
-/** Which control mode we are in */
-export type ControlMode = 'human' | 'agent' | 'collab';
+export type ControlMode = 'human' | 'collab' | 'agent';
 
-/** Alert that pops on the topology overlay */
 export interface TopologyAlert {
   id: string;
   message: string;
@@ -118,7 +115,6 @@ export interface TopologyAlert {
   autoClear: boolean;
 }
 
-/** Host-level event (scenario lifecycle, resets, errors) */
 export interface HostEvent {
   id: string;
   timestamp: number;
@@ -127,7 +123,6 @@ export interface HostEvent {
   severity: 'info' | 'warning' | 'error';
 }
 
-/** Detailed step tracking with status + output */
 export interface TrackedStep extends RunbookStep {
   status: StepStatus;
   output: string;
@@ -139,33 +134,23 @@ interface SystemState {
   events: EventEntry[];
   scenario: string | null;
   available_scenarios: ScenarioDef[];
-  scenarioContext: ScenarioContext | null;  // Full scenario data for active scenario
+  scenarioContext: ScenarioContext | null;
   scenarioState: 'idle' | 'loading' | 'diagnosing' | 'addressing' | 'validating' | 'resolved' | 'failed';
-  completedSteps: number[];  // step numbers completed
-  /** Detailed tracked steps for the active scenario */
+  completedSteps: number[];
   trackedSteps: TrackedStep[];
-  /** Whether a scenario is locked (mission mode — only Reset exits) */
   locked: boolean;
-  /** Control mode: who's driving the runbook */
   controlMode: ControlMode;
-  /** Alert banners for topology */
   alerts: TopologyAlert[];
-  /** Host-level events */
   hostEvents: HostEvent[];
-  /** Step-by-step status management */
   setStepStatus: (stepNumber: number, status: StepStatus, output?: string) => void;
   advanceStep: (stepNumber: number) => void;
   resetStepsForScenario: (steps: RunbookStep[]) => void;
-  /** Lock/unlock scenario */
   setLocked: (locked: boolean) => void;
-  /** Control mode actions */
   takeOverAsAgent: () => Promise<void>;
   releaseToHuman: () => Promise<void>;
   toggleCollab: () => Promise<void>;
-  /** Alert management */
   addAlert: (message: string, type: TopologyAlert['type'], autoClear?: number) => void;
   clearAlert: (id: string) => void;
-  /** Host event management */
   addHostEvent: (type: string, message: string, severity?: HostEvent['severity']) => void;
   completeStep: (stepNumber: number) => void;
   resetScenarioState: () => void;
@@ -208,7 +193,7 @@ export const useSystem = create<SystemState>((set, get) => ({
   resetScenarioState: () => {
     set({ scenarioState: 'idle', completedSteps: [] });
   },
-  /** Track individual step with status + output */
+
   setStepStatus: (stepNumber: number, status: StepStatus, output?: string) => {
     set((s) => ({
       trackedSteps: s.trackedSteps.map((t) =>
@@ -218,7 +203,7 @@ export const useSystem = create<SystemState>((set, get) => ({
       ),
     }));
   },
-  /** Auto-advance: mark step done, set next step to running */
+
   advanceStep: (stepNumber: number) => {
     set((s) => {
       const idx = s.trackedSteps.findIndex((t) => t.step === stepNumber);
@@ -227,41 +212,44 @@ export const useSystem = create<SystemState>((set, get) => ({
         t.step === stepNumber ? { ...t, status: 'done' as StepStatus } : t
       );
       if (idx + 1 < updated.length) {
-        updated[idx + 1] = { ...updated[idx + 1], status: 'running' as StepStatus };
+        if (updated[idx + 1].status === 'idle') {
+          updated[idx + 1] = { ...updated[idx + 1], status: 'idle' as StepStatus };
+        }
       }
       return { trackedSteps: updated };
     });
   },
-  /** Initialize trackedSteps from a scenario's runbook steps */
+
+  /** Initialize trackedSteps from a scenario's runbook steps — ALL start as idle */
   resetStepsForScenario: (steps: RunbookStep[]) => {
     set({
-      trackedSteps: steps.map((s, i) => ({
+      trackedSteps: steps.map((s) => ({
         ...s,
-        status: (i === 0 ? 'running' : 'pending') as StepStatus,
+        status: 'idle' as StepStatus,
         output: '',
       })),
     });
   },
-  /** Lock/unlock scenario (mission mode) */
+
   setLocked: (locked: boolean) => {
     set({ locked });
   },
-  /** Switch to agent mode */
+
   takeOverAsAgent: async () => {
     await jsonPost('/api/mode', { mode: 'agent' });
     set({ controlMode: 'agent', mode: 'agent' });
   },
-  /** Switch back to human mode */
+
   releaseToHuman: async () => {
     await jsonPost('/api/mode', { mode: 'human' });
     set({ controlMode: 'human', mode: 'human' });
   },
-  /** Toggle collaborative mode */
+
   toggleCollab: async () => {
     await jsonPost('/api/mode', { mode: 'mixed' });
     set({ controlMode: 'collab', mode: 'mixed' });
   },
-  /** Add alert banner */
+
   addAlert: (message: string, type: TopologyAlert['type'], autoClearMs?: number) => {
     const id = `alert-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     set((s) => ({
@@ -273,11 +261,11 @@ export const useSystem = create<SystemState>((set, get) => ({
       }, autoClearMs);
     }
   },
-  /** Clear specific alert */
+
   clearAlert: (id: string) => {
     set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
   },
-  /** Add host-level event */
+
   addHostEvent: (type: string, message: string, severity: HostEvent['severity'] = 'info') => {
     set((s) => ({
       hostEvents: [
@@ -286,6 +274,7 @@ export const useSystem = create<SystemState>((set, get) => ({
       ].slice(-200),
     }));
   },
+
   mode: 'human',
   loading: false,
   connected: false,
@@ -318,26 +307,39 @@ export const useSystem = create<SystemState>((set, get) => ({
         scenario: statusRes.scenario,
         available_scenarios: statusRes.available_scenarios || [],
         mode: (modeRes?.mode as SystemState['mode']) || 'human',
+        controlMode: (modeRes?.mode === 'agent' ? 'agent' : modeRes?.mode === 'mixed' ? 'collab' : 'human') as ControlMode,
         open_count: statusRes.orders?.open || 0,
         stuck_count: statusRes.orders?.stuck || 0,
         connected: true,
         error: null,
         loading: false,
       });
+
+      // Fetch scenario context on first load (Docker-initiated scenario)
+      if (statusRes.scenario && !get().scenarioContext) {
+        try {
+          const ctx = await jsonFetch<ScenarioContext>(`/api/scenario/${statusRes.scenario}`);
+          set({ scenarioContext: ctx, scenarioState: 'diagnosing' });
+          // Only init steps once — all set to 'idle', no auto-run
+          if (!get().trackedSteps.length) {
+            get().resetStepsForScenario(ctx.runbook?.steps || []);
+          }
+        } catch { /* no context available */ }
+      }
     } catch (err: unknown) {
       set({ connected: false, error: (err as Error).message });
     }
   },
 
   startScenario: async (name: string) => {
-    set({ loading: true, scenarioState: 'loading', completedSteps: [] });
+    set({ loading: true, scenarioState: 'loading', completedSteps: [], trackedSteps: [], alerts: [] });
     try {
       await jsonPost('/api/reset', { scenario: name });
       await get().refresh();
-      // Fetch full scenario context from the backend
       try {
         const ctx = await jsonFetch<ScenarioContext>(`/api/scenario/${name}`);
         set({ scenarioContext: ctx, scenarioState: 'diagnosing', locked: true });
+        // All steps 'idle' — user clicks Run for each
         get().resetStepsForScenario(ctx.runbook?.steps || []);
         get().addHostEvent('scenario_start', `Scenario "${ctx.title}" activated`, 'info');
         get().addAlert(`Scenario: ${ctx.title}`, 'info', 5000);
@@ -350,7 +352,6 @@ export const useSystem = create<SystemState>((set, get) => ({
     }
   },
 
-  /** Full reset: clear scenario, locked state, chat, tracked steps, alerts */
   resetScenario: async () => {
     const { scenario } = get();
     if (!scenario) return;
@@ -358,7 +359,6 @@ export const useSystem = create<SystemState>((set, get) => ({
     try {
       await jsonPost('/api/reset', { scenario: 'clear' });
       await get().refresh();
-      // Clear everything
       set({
         scenario: null,
         scenarioContext: null,
@@ -453,8 +453,6 @@ export const useChat = create<ChatState>((set, get) => ({
         `Recent events: ${JSON.stringify(events.slice(0, 5))}`,
       ].join('\n');
 
-      // Build focused scenario context from the loaded scenario JSON
-      // Only inject what the LLM needs — no fluff
       let scenarioContextMsg = '';
       if (scenarioContext) {
         const ctx = scenarioContext;
@@ -499,7 +497,6 @@ export const useChat = create<ChatState>((set, get) => ({
       const data: { choices?: { message?: { content: string } }[] } = await resp.json();
       const reply = data.choices?.[0]?.message?.content || 'I could not process that request.';
 
-      // Detect tool call proposals (names must match src/fix_mcp/server.py).
       const toolCalls: ToolCallTrace[] = KNOWN_TOOLS
         .filter((t) => reply.includes(t))
         .map((t) => ({ tool: t, args: {}, status: 'proposed' as const }));

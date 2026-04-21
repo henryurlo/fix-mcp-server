@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSystem, useChat } from '@/store';
 import { useAuth } from '@/store/auth';
 import { useTelemetry } from '@/store/telemetry';
 import dynamic from 'next/dynamic';
-import type { RunbookStep } from '@/store';
+import type { ScenarioContext, RunbookStep } from '@/store';
 import {
   Activity, Terminal, BarChart3, PlusCircle, LogOut, Play, Layers,
   Radio, BookOpen, Bot, Users, Hand, Lock, Unlock, RotateCcw,
-  Eye, EyeOff, Loader2, ChevronRight, CheckCircle2, XCircle,
-  PanelLeftOpen, PanelLeftClose,
+  Eye, EyeOff, Loader2, ChevronRight, CheckCircle2, XCircle, Info,
+  PanelLeftOpen, PanelLeftClose, ChevronDown, ChevronUp,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -23,6 +23,21 @@ const AuditLog = dynamic(() => import('@/components/AuditLog'), { ssr: false });
 const HeartbeatPanel = dynamic(() => import('@/components/HeartbeatPanel'), { ssr: false });
 
 const SEV: Record<string, string> = { low: 'var(--green)', medium: 'var(--amber)', high: 'var(--red)', critical: 'var(--purple)' };
+
+// ── Tooltip on hover ──
+function Tip({ text, children }: { text: string; children: React.ReactNode }) {
+  return (
+    <div className="relative group">
+      {children}
+      <div className="invisible group-hover:visible absolute left-0 top-full mt-2 z-[100] w-72 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+        <div className="flex items-center gap-1 mb-1 text-[10px] text-[var(--cyan)] font-bold uppercase">
+          <Info size={9} /> How it works
+        </div>
+        <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">{text}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'mission-control' | 'telemetry' | 'scenario-library'>('mission-control');
@@ -47,44 +62,40 @@ export default function Home() {
 
   const handleToggleLock = useCallback(() => {
     useSystem.setState(s => ({ locked: !s.locked }));
-    useSystem.getState().addHostEvent(
-      locked ? 'scenario_unlocked' : 'scenario_locked',
-      locked ? `Scenario "${scenario}" unlocked` : `Scenario "${scenario}" locked`,
-      'warning'
-    );
-    useSystem.getState().addAlert(locked ? 'Unlocked' : 'Scenario locked', locked ? 'info' : 'warning', 3000);
-  }, [locked, scenario]);
+    const s = useSystem.getState();
+    s.addHostEvent(locked ? 'unlocked' : 'locked', locked ? 'Scenario unlocked' : 'Scenario locked', 'warning');
+    s.addAlert(locked ? 'Scenario unlocked — free to switch' : 'Scenario locked', locked ? 'info' : 'warning', 4000);
+  }, [locked]);
 
   if (!isAuthenticated) return <AuthGate />;
 
   const name = scenarioContext?.title ?? (scenario ? scenario.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : '');
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--bg-void)] text-[var(--text-primary)] overflow-hidden">
+    <div className="h-screen flex flex-col bg-[var(--bg-void)] text-[var(--text-primary)]">
       {/* ═══ HEADER ═══ */}
-      <header className={`h-11 border-b flex items-center justify-between px-4 shrink-0 transition-all ${locked ? 'bg-[var(--amber-dim)]/20 border-[var(--amber)]/50' : 'bg-[var(--bg-base)] border-[var(--border-dim)]'}`}>
+      <header className={`h-11 border-b flex items-center justify-between px-4 shrink-0 ${locked ? 'bg-[var(--amber-dim)]/20 border-[var(--amber)]/50' : 'bg-[var(--bg-base)] border-[var(--border-dim)]'}`}>
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold tracking-wider">FIX-MCP</span>
           {scenario && (
-            <div className={`flex items-center gap-2 px-2.5 py-1 rounded-md border ${locked ? 'bg-[var(--amber-dim)]/30 border-[var(--amber)]/50' : 'bg-[var(--cyan-dim)] border-[var(--cyan)]/30'}`}>
+            <div className={`flex items-center gap-2 px-2 py-1 rounded-md border ${locked ? 'bg-[var(--amber-dim)]/30 border-[var(--amber)]/50' : 'bg-[var(--cyan-dim)] border-[var(--cyan)]/30'}`}>
               {locked ? <Lock size={11} className="text-[var(--amber)]" /> : <Radio size={8} className="text-[var(--cyan)] animate-pulse" />}
               <span className={`text-[12px] font-mono font-bold ${locked ? 'text-[var(--amber)]' : 'text-[var(--cyan)]'}`}>{name}</span>
             </div>
           )}
         </div>
-
         <nav className="flex gap-0.5 bg-[var(--bg-surface)] rounded-lg p-0.5 border border-[var(--border-dim)]">
-          {[
-            { id: 'mission-control' as const, label: 'Mission Control', Icon: Layers },
-            { id: 'telemetry' as const, label: 'Telemetry', Icon: BarChart3 },
-            { id: 'scenario-library' as const, label: 'Scenarios', Icon: PlusCircle },
-          ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1 px-3 py-1 rounded-md text-[12px] font-semibold transition-all ${activeTab === tab.id ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <tab.Icon size={12} /> {tab.label}
+          {([
+            ['mission-control', 'Mission Control', Layers],
+            ['telemetry', 'Telemetry', BarChart3],
+            ['scenario-library', 'Scenario Library', PlusCircle],
+          ] as const).map(([id, label, Icon]) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-1 px-3 py-1 rounded-md text-[12px] font-semibold transition-all ${activeTab === id ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              <Icon size={12} /> {label}
             </button>
           ))}
         </nav>
-
         <div className="flex items-center gap-2">
           <span className={`text-[11px] font-mono ${connected ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>{connected ? '● LIVE' : '● OFFLINE'}</span>
           <select value={scenario || ''} onChange={(e) => e.target.value && !locked && startScenario(e.target.value)} disabled={locked}
@@ -94,27 +105,33 @@ export default function Home() {
           </select>
           {scenario && (
             <>
-              <button onClick={handleToggleLock}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold transition-all ${locked ? 'bg-[var(--green-dim)] text-[var(--green)] border-[var(--green)]/30' : 'bg-[var(--amber-dim)]/30 text-[var(--amber)] border-[var(--amber)]/30'}`}>
-                {locked ? <><Unlock size={11} /> Unlock</> : <><Lock size={11} /> Lock</>}
-              </button>
-              <button onClick={handleReset}
-                className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--red-dim)]/50 text-[var(--red)] border border-[var(--red)]/30 text-[11px] font-semibold hover:bg-[var(--red-dim)] transition-all">
-                <RotateCcw size={10} /> Reset
-              </button>
+              <Tip text={locked ? 'Scenario is locked. You cannot switch scenarios. Click Reset to clear this scenario and unlock.' : 'Lock this scenario so you cannot accidentally switch away. Only Reset can exit.'}>
+                <button onClick={handleToggleLock}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold transition-all ${locked ? 'bg-[var(--green-dim)] text-[var(--green)] border-[var(--green)]/30 hover:bg-[var(--green-dim)]/80' : 'bg-[var(--amber-dim)]/30 text-[var(--amber)] border-[var(--amber)]/30 hover:bg-[var(--amber-dim)]/50'}`}>
+                  {locked ? <><Unlock size={11} /> Unlock</> : <><Lock size={11} /> Lock</>}
+                </button>
+              </Tip>
+              <Tip text="Reset clears the current scenario, all runbook progress, chat history, and returns you to a clean state so you can launch a new scenario.">
+                <button onClick={handleReset}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--red-dim)]/50 text-[var(--red)] border border-[var(--red)]/30 text-[11px] font-semibold hover:bg-[var(--red-dim)] transition-all">
+                  <RotateCcw size={10} /> Reset
+                </button>
+              </Tip>
             </>
           )}
-          <button onClick={toggleOpen} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border transition-all ${isOpen ? 'bg-[var(--green-dim)] text-[var(--green)] border-[var(--green)]/30' : 'text-[var(--text-muted)] border-[var(--border-dim)] hover:text-[var(--text-secondary)]'}`}>
-            <Terminal size={10} /> Copilot
-          </button>
+          <Tip text="Open the AI SRE Copilot — a chat interface that can diagnose issues, suggest fixes, and (in Co-Pilot mode) run tools for you.">
+            <button onClick={toggleOpen}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border transition-all ${isOpen ? 'bg-[var(--green-dim)] text-[var(--green)] border-[var(--green)]/30' : 'text-[var(--text-muted)] border-[var(--border-dim)] hover:text-[var(--text-secondary)]'}`}>
+              <Terminal size={10} /> Copilot
+            </button>
+          </Tip>
           <span className="text-[11px] font-mono text-[var(--text-muted)]">{user?.username || 'anon'}</span>
           <button onClick={logout} className="text-[var(--text-muted)] hover:text-[var(--red)]"><LogOut size={11} /></button>
         </div>
       </header>
 
-      {/* ═══ CONTENT ═══ */}
       <div className="flex-1 flex overflow-hidden">
-        <main className="flex-1 overflow-hidden tab-content-enter">
+        <main className="flex-1 overflow-hidden">
           {activeTab === 'mission-control' && <MissionControlTab />}
           {activeTab === 'telemetry' && <TelemetryDashboard />}
           {activeTab === 'scenario-library' && <ScenarioCreator />}
@@ -129,89 +146,98 @@ export default function Home() {
 
 function MissionControlTab() {
   const { scenario, scenarioContext, sessions, controlMode, takeOverAsAgent, releaseToHuman, toggleCollab, trackedSteps, callTool, completeStep, setStepStatus, addHostEvent, addAlert, available_scenarios, locked, startScenario } = useSystem();
-  const { send } = useChat();
+  const { send, isOpen, toggleOpen } = useChat();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [revealedHints, setRevealedHints] = useState<Set<number>>(new Set());
   const [stepResults, setStepResults] = useState<Record<number, string>>({});
-  const [activeStepIdx, setActiveStepIdx] = useState(0);
 
+  // Build steps list: idle → run by user → done/failed
   const runbook = scenarioContext?.runbook;
   const steps = trackedSteps.length > 0
-    ? trackedSteps
-    : (runbook?.steps || []).map((s: RunbookStep, i: number) => ({ ...s, status: (i === 0 ? 'running' : 'pending'), output: '' }));
+    ? trackedSteps.map(t => ({ ...t, output: t.output || '' }))
+    : (runbook?.steps || []).map((s: RunbookStep, i: number) => ({ ...s, status: 'idle', output: '' }));
 
   const doneCount = trackedSteps.filter(s => s.status === 'done').length;
   const totalSteps = steps.length;
+  const allDone = doneCount >= totalSteps && totalSteps > 0;
 
-  const runStep = async (step: typeof steps[0], idx: number) => {
+  async function runStep(step: typeof steps[0], idx: number) {
     if (step.status === 'running') return;
     setStepStatus(step.step, 'running');
-    setActiveStepIdx(idx);
     try {
       const result = await callTool(step.tool, step.tool_args);
       setStepStatus(step.step, 'done', result);
       setStepResults(prev => ({ ...prev, [step.step]: result }));
       completeStep(step.step);
-      addHostEvent('step_complete', `Step ${step.step} "${step.title}" done ✓`, 'info');
-      if (idx + 1 < steps.length) { setActiveStepIdx(idx + 1); setStepStatus(steps[idx + 1].step, 'running'); }
+      addHostEvent('step_complete', `Step ${step.step} done ✓`, 'info');
+      if (allDone) addAlert('🎉 All runbook steps complete!', 'success', 8000);
     } catch (err: any) {
       setStepStatus(step.step, 'failed', err.message);
       setStepResults(prev => ({ ...prev, [step.step]: `Error: ${err.message}` }));
-      addHostEvent('step_failed', `Step ${step.step} failed: ${err.message}`, 'error');
+      addHostEvent('step_failed', `Step ${step.step} failed`, 'error');
     }
-  };
+  }
 
-  const toggleHint = (n: number) => setRevealedHints(prev => { const next = new Set(prev); next.has(n) ? next.delete(n) : next.add(n); return next; });
+  function toggleHint(n: number) {
+    setRevealedHints(prev => { const next = new Set(prev); next.has(n) ? next.delete(n) : next.add(n); return next; });
+  }
+
+  function toggleAllHints() {
+    if (revealedHints.size >= totalSteps) setRevealedHints(new Set());
+    else setRevealedHints(new Set(steps.map(s => s.step)));
+  }
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
-      {/* ═══ TOP: Topology graph + optional sidebar ═══ */}
+      {/* ═══ TOP: Topology ═══ */}
       <div className="flex-1 min-h-0 border-b border-[var(--border-dim)] relative">
         <TopologyGraph />
         {!scenario && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-void)]/80 backdrop-blur z-10">
-            <div className="text-center">
-              <h2 className="text-[16px] font-bold mb-1 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">FIX-MCP Mission Control</h2>
-              <p className="text-[12px] text-[var(--text-muted)] font-mono">Select a scenario to begin</p>
-            </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--bg-void)]/80 backdrop-blur z-10">
+            <h2 className="text-[16px] font-bold mb-1 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">FIX-MCP Mission Control</h2>
+            <p className="text-[12px] text-[var(--text-muted)] font-mono">Select a scenario to begin</p>
           </div>
         )}
-
-        {/* Scenario info overlay */}
         {scenario && (
           <div className="absolute top-2 left-2 z-10 flex gap-1.5">
             <div className="glass-panel px-2 py-0.5 text-[10px] font-mono text-[var(--cyan)]">● {scenario}</div>
-            <div className="glass-panel px-2 py-0.5 text-[10px] font-mono">{sessions?.length} sessions</div>
-            {doneCount > 0 && <div className="glass-panel px-2 py-0.5 text-[10px] font-mono text-[var(--green)]">Step {doneCount}/{totalSteps}</div>}
+            <div className="glass-panel px-2 py-0.5 text-[10px] font-mono">{sessions?.length || 0} sessions</div>
+            {doneCount > 0 && <div className="glass-panel px-2 py-0.5 text-[10px] font-mono text-[var(--green)]">{doneCount}/{totalSteps} steps</div>}
+            {allDone && <div className="glass-panel px-2 py-0.5 text-[10px] font-mono text-[var(--green)] bg-[var(--green)]/10">✅ Resolved</div>}
           </div>
         )}
 
-        {/* ── Right sidebar: Control Mode + Scenarios ── */}
+        {/* Sidebar */}
         {sidebarOpen && (
           <div className="absolute top-0 right-0 bottom-0 w-[220px] z-20 bg-[var(--bg-base)]/95 backdrop-blur-md border-l border-[var(--border-dim)] flex flex-col">
-            {/* Toggle button */}
-            <button onClick={() => setSidebarOpen(false)} className="absolute left-0 top-1/2 -translate-x-full bg-[var(--bg-surface)] border border-[var(--border-dim)] border-r-0 rounded-l-md p-0.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Collapse sidebar">
-              <PanelLeftClose size={14} />
-            </button>
+            <button onClick={() => setSidebarOpen(false)} className="absolute left-0 top-1/2 -translate-x-full bg-[var(--bg-surface)] border border-[var(--border-dim)] border-r-0 rounded-l-md p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"><PanelLeftClose size={14} /></button>
+            <button onClick={() => setSidebarOpen(true)} className="absolute right-full top-1/2 -translate-y-1/2 mr-[200px] bg-[var(--bg-surface)] border border-[var(--border-dim)] border-r-0 rounded-r-md p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] hidden"><PanelLeftOpen size={14} /></button>
 
-            {/* Control Mode */}
-            {scenario && (
-              <div className="px-2.5 py-2 border-b border-[var(--border-dim)]">
-                <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Control Mode</div>
-                <div className="flex flex-col gap-1">
+            {/* Control Mode — each button has a tooltip */}
+            <div className="px-2.5 py-2 border-b border-[var(--border-dim)]">
+              <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Control Mode</div>
+              <div className="flex flex-col gap-1">
+                <Tip text="You are in full control. Click 'Run' on each runbook step yourself at your own pace. The Copilot chat can answer questions and suggest actions, but nothing runs automatically.">
                   <button onClick={() => releaseToHuman()} className={`flex items-center gap-2 px-2 py-1.5 rounded-md border text-[11px] font-bold transition-all ${controlMode === 'human' ? 'bg-[var(--green-dim)] border-[var(--green)]/50 text-[var(--green)]' : 'border-[var(--border-dim)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
                     <Hand size={12} /> Human
                   </button>
+                </Tip>
+                <Tip text="You and the AI work together. You can run steps manually, or ask the Copilot in the chat to run tools, diagnose issues, or suggest next steps. The AI proposes actions and you approve them.">
                   <button onClick={() => toggleCollab()} className={`flex items-center gap-2 px-2 py-1.5 rounded-md border text-[11px] font-bold transition-all ${controlMode === 'collab' ? 'bg-[var(--cyan-dim)] border-[var(--cyan)]/50 text-[var(--cyan)]' : 'border-[var(--border-dim)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
                     <Users size={12} /> Co-Pilot
                   </button>
+                </Tip>
+                <Tip text="The AI Agent takes full control. It reads the scenario, diagnoses all issues, runs the runbook steps automatically, and fixes problems without your input. Watch the topology and runbook panels to see it work. Switch back to Human anytime.">
                   <button onClick={() => takeOverAsAgent()} className={`flex items-center gap-2 px-2 py-1.5 rounded-md border text-[11px] font-bold transition-all ${controlMode === 'agent' ? 'bg-[var(--purple-dim)] border-[var(--purple)]/50 text-[var(--purple)]' : 'border-[var(--border-dim)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
                     <Bot size={12} /> Agent
                   </button>
-                </div>
+                </Tip>
               </div>
-            )}
+              <div className="mt-1.5 text-center text-[10px] font-mono" style={{ color: controlMode === 'human' ? 'var(--green)' : controlMode === 'collab' ? 'var(--cyan)' : 'var(--purple)' }}>
+                {controlMode === 'human' ? '🧑 You click Run' : controlMode === 'collab' ? '🤝 You + AI' : '🤖 AI drives'}
+              </div>
+            </div>
 
             {/* Scenario list */}
             <div className="px-2.5 py-1 border-b border-[var(--border-dim)]">
@@ -222,47 +248,55 @@ function MissionControlTab() {
                 const isActive = scenario === s.name;
                 return (
                   <button key={s.name} onClick={() => !isActive && !locked && startScenario(s.name)} disabled={locked}
-                    className={`w-full px-2 py-1 rounded text-left text-[11px] font-mono transition-all truncate ${isActive ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/40 text-[var(--cyan)] font-bold' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[var(--text-secondary)] hover:border-[var(--border-base)]'}`}>
-                    {isActive ? '●' : <Play size={7} className="inline text-[var(--text-muted)]" />} {s.title || s.name}
+                    className={`w-full px-2 py-1 rounded text-left transition-all truncate ${isActive ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/40 text-[var(--cyan)] font-bold text-[11px] font-mono' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[var(--text-secondary)] hover:border-[var(--border-base)] text-[11px] font-mono'}`}>
+                    {isActive ? '● ' : <Play size={7} style={{ display: 'inline', marginRight: 2 }} />}{s.title || s.name}
                     <span className="float-right text-[8px]" style={{ color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
                   </button>
                 );
               })}
             </div>
+
+            <div className="border-t border-[var(--border-dim)]"><HeartbeatPanel onVenueClick={() => {}} /></div>
           </div>
         )}
-
-        {/* Show sidebar button (when collapsed) */}
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} className="absolute left-0 top-1/2 -translate-y-1/2 ml-0 z-20 bg-[var(--bg-surface)] border border-[var(--border-dim)] border-r-0 rounded-r-md p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Show sidebar">
-            <PanelLeftOpen size={14} />
-          </button>
+          <button onClick={() => setSidebarOpen(true)} className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-[var(--bg-surface)] border border-[var(--border-dim)] border-r-0 rounded-r-md p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"><PanelLeftOpen size={14} /></button>
         )}
       </div>
 
       {/* ═══ BOTTOM: Runbook | Terminal | Audit Log ═══ */}
-      <div className="h-[320px] min-h-[200px] flex shrink-0">
+      <div className="h-[320px] flex shrink-0">
         {/* LEFT: Runbook */}
-        <div className="w-[360px] min-w-[250px] bg-[var(--bg-base)] border-r border-[var(--border-dim)] flex flex-col overflow-hidden">
+        <div className="w-[360px] min-w-[250px] max-w-[600px] bg-[var(--bg-base)] border-r border-[var(--border-dim)] flex flex-col overflow-hidden" style={{ resize: 'horizontal', overflow: 'auto' }}>
           {scenarioContext ? (
             <>
               <div className="px-3 py-1 border-b border-[var(--border-dim)] flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-1"><BookOpen size={11} className="text-[var(--cyan)]" /><span className="text-[11px] font-bold text-[var(--cyan)] uppercase">Runbook</span><span className="text-[10px] font-mono text-[var(--text-muted)] ml-1">{scenarioContext.title}</span></div>
-                <button onClick={() => setRevealedHints(prev => prev.size >= totalSteps ? new Set() : new Set(steps.map(s => s.step)))}
-                  className={`flex items-center gap-1 px-1 py-0.5 rounded text-[10px] font-bold ${revealedHints.size >= totalSteps ? 'bg-[var(--amber-dim)] text-[var(--amber)]' : 'bg-[var(--bg-surface)] text-[var(--text-muted)]'}`}>
-                  {revealedHints.size >= totalSteps ? <><EyeOff size={9} /> Hide</> : <><Eye size={9} /> Hints</>}
-                </button>
+                <div className="flex items-center gap-1">
+                  {allDone
+                    ? <CheckCircle2 size={12} className="text-[var(--green)]" />
+                    : <BookOpen size={12} className="text-[var(--cyan)]" />
+                  }
+                  <span className="text-[11px] font-bold uppercase">{allDone ? '✅ Resolved' : 'Runbook'}</span>
+                  <span className="text-[10px] font-mono text-[var(--text-muted)] ml-1 truncate">{scenarioContext.title}</span>
+                </div>
+                <Tip text="Each step has a 'Show Solution' button. Click it when you're stuck — it reveals the expected problem, hints, and common mistakes for that step. Use 'Reveal All' to see everything at once.">
+                  <button onClick={toggleAllHints}
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${revealedHints.size >= totalSteps ? 'bg-[var(--amber-dim)] text-[var(--amber)]' : 'bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                    {revealedHints.size >= totalSteps ? <><EyeOff size={9} /> Reveal All</> : <><Eye size={9} /> Reveal All</>}
+                  </button>
+                </Tip>
               </div>
               <div className="flex-1 overflow-y-auto px-2 py-1.5 space-y-1.5">
                 {steps.map((step, idx) => {
                   const isDone = step.status === 'done';
                   const isFailed = step.status === 'failed';
                   const isRunning = step.status === 'running';
-                  const isActive = activeStepIdx === idx;
                   const isRevealed = revealedHints.has(step.step);
                   const result = stepResults[step.step] || step.output || '';
                   return (
-                    <div key={step.step} className={`rounded-md border p-2 ${isActive ? 'border-[var(--cyan)]/40 bg-[var(--cyan)]/5' : isDone ? 'border-[var(--green)]/20 bg-[var(--green)]/5' : isFailed ? 'border-[var(--red)]/20 bg-[var(--red)]/5' : 'border-[var(--border-dim)] bg-[var(--bg-surface)]'}`}>
+                    <div key={step.step}
+                      className={`rounded-md border p-2 ${isDone ? 'border-[var(--green)]/20 bg-[var(--green)]/5' : isFailed ? 'border-[var(--red)]/20 bg-[var(--red)]/5' : isRunning ? 'border-[var(--cyan)]/40 bg-[var(--cyan)]/5' : 'border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--border-base)]'}`}>
+                      {/* Step header */}
                       <div className="flex items-center gap-1 mb-0.5">
                         {isDone && <CheckCircle2 size={11} className="text-[var(--green)]" />}
                         {isRunning && <Loader2 size={11} className="text-[var(--cyan)] animate-spin" />}
@@ -270,45 +304,57 @@ function MissionControlTab() {
                         {!isDone && !isRunning && !isFailed && <ChevronRight size={11} className="text-[var(--text-dim)]" />}
                         <span className="text-[11px] font-bold">#{step.step} {step.title}</span>
                       </div>
+                      {/* Narrative — always visible for context */}
                       <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-0.5">{step.narrative}</div>
-                      <div className="text-[10px] font-mono text-[var(--text-muted)] mb-0.5">Expect: {step.expected}</div>
+                      {/* Expected output */}
+                      <div className="text-[10px] font-mono text-[var(--text-muted)] mb-0.5"><span className="text-[var(--text-dim)]">Expect:</span> {step.expected}</div>
+                      {/* Tool command */}
                       <div className="bg-[var(--bg-void)] rounded px-1.5 py-0.5 mb-1"><code className="text-[10px] font-mono text-[var(--green)]">fix-cli&gt; {step.tool}</code></div>
-                      <button onClick={() => runStep(step, idx)} disabled={isRunning}
-                        className="w-full btn-secondary !text-[10px] !py-0.5 flex items-center justify-center gap-1 disabled:opacity-50">
-                        {isRunning ? <><Loader2 size={9} className="animate-spin" /> Running…</> : <><Activity size={9} /> Run</>}
-                      </button>
-                      {result && <div className={`mt-0.5 text-[10px] font-mono ${isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}`}>→ {result.slice(0, 200)}</div>}
-                      <button onClick={() => toggleHint(step.step)} className="mt-1 flex items-center gap-1 text-[10px] text-[var(--amber)] hover:underline">
+                      {/* Run button */}
+                      <Tip text={isDone ? 'Step completed successfully. Click Run again to re-execute.' : isFailed ? 'This step failed. Click Run to retry.' : 'Click to execute this runbook step. The tool will run and results appear below.'}>
+                        <button onClick={() => runStep(step, idx)} disabled={isRunning}
+                          className={`w-full !text-[10px] !py-0.5 flex items-center justify-center gap-1 disabled:opacity-50 ${isDone ? 'btn-secondary' : isFailed ? 'btn-danger' : 'btn-secondary'}`}>
+                          {isRunning ? <><Loader2 size={9} className="animate-spin" /> Running…</> : <><Activity size={9} /> {isDone ? '✅ Done — Run Again?' : isFailed ? '⚠️ Retry' : 'Run'}</>}
+                        </button>
+                      </Tip>
+                      {/* Tool output */}
+                      {result && <div className={`mt-0.5 text-[10px] font-mono ${isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}`}>→ {result.slice(0, 200)}{result.length > 200 ? '…' : ''}</div>}
+                      {/* Per-step hint toggle */}
+                      <button onClick={() => toggleHint(step.step)} className="mt-1 flex items-center gap-1 text-[10px] text-[var(--amber)] hover:text-[var(--amber)]/80 transition-colors">
                         {isRevealed ? <><EyeOff size={9} /> Hide Solution</> : <><Eye size={9} /> Show Solution</>}
                       </button>
+                      {/* Revealed hints */}
                       {isRevealed && scenarioContext?.hints && (
-                        <div className="mt-1 p-1.5 rounded bg-[var(--amber-dim)]/20 border border-[var(--amber)]/20 text-[10px] space-y-0.5">
-                          {scenarioContext.hints.key_problems?.[idx] && <div><span className="text-[var(--red)] font-bold">Problem:</span> {scenarioContext.hints.key_problems[idx]}</div>}
-                          {scenarioContext.hints.diagnosis_path && <div><span className="text-[var(--cyan)] font-bold">Hint:</span> {scenarioContext.hints.diagnosis_path}</div>}
-                          {scenarioContext.hints.common_mistakes?.[idx] && <div><span className="text-[var(--amber)] font-bold">Watch:</span> {scenarioContext.hints.common_mistakes[idx]}</div>}
+                        <div className="mt-1.5 p-1.5 rounded bg-[var(--amber-dim)]/20 border border-[var(--amber)]/20 text-[10px] space-y-0.5">
+                          {scenarioContext.hints.key_problems?.[idx] && <div><span className="text-[var(--red)] font-bold">Problem: </span>{scenarioContext.hints.key_problems[idx]}</div>}
+                          {scenarioContext.hints.diagnosis_path && <div><span className="text-[var(--cyan)] font-bold">💡 Hint: </span>{scenarioContext.hints.diagnosis_path}</div>}
+                          {scenarioContext.hints.common_mistakes?.[idx] && <div><span className="text-[var(--amber)] font-bold">⚠️ Common mistake: </span>{scenarioContext.hints.common_mistakes[idx]}</div>}
                         </div>
                       )}
                     </div>
                   );
                 })}
-                {scenarioContext.success_criteria && doneCount >= totalSteps && (
+                {/* Success criteria — when all done */}
+                {scenarioContext.success_criteria && allDone && (
                   <div className="mt-2 p-2 rounded bg-[var(--green-dim)]/10 border border-[var(--green)]/30">
-                    <div className="text-[11px] font-bold text-[var(--green)] mb-1">✅ Success Criteria</div>
+                    <div className="text-[11px] font-bold text-[var(--green)] mb-1 flex items-center gap-1"><CheckCircle2 size={12} /> All Steps Complete — Success Criteria</div>
                     {scenarioContext.success_criteria.map((c: string, i: number) => <div key={i} className="text-[10px] font-mono text-[var(--green)]">✓ {c}</div>)}
                   </div>
                 )}
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center p-4"><p className="text-[12px] text-[var(--text-muted)]">Select a scenario</p></div>
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="text-center"><BookOpen size={20} className="text-[var(--text-muted)] mx-auto mb-2" /><p className="text-[12px] text-[var(--text-muted)]">Select a scenario to see the runbook</p></div>
+            </div>
           )}
         </div>
 
         {/* CENTER: Terminal */}
-        <div className="flex-1 min-w-[300px] overflow-hidden p-1.5"><FixTerminal /></div>
+        <div className="flex-1 min-w-[200px] overflow-hidden p-1.5"><FixTerminal /></div>
 
         {/* RIGHT: Audit Log */}
-        <div className="w-[300px] min-w-[220px] overflow-hidden p-1.5"><AuditLog /></div>
+        <div className="w-[300px] min-w-[220px] max-[500px] overflow-hidden p-1.5" style={{ resize: 'horizontal', overflow: 'auto' }}><AuditLog /></div>
       </div>
     </div>
   );

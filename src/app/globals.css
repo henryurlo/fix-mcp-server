@@ -337,6 +337,20 @@ button, [role="button"], a, select, .scenario-card {
   cursor: pointer;
 }
 
+/* ── Resizable panels ─────────────────────────────────────── */
+
+[style*="resize: horizontal"] {
+  overflow: auto !important;
+}
+[style*="resize: horizontal"]::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+[style*="resize: horizontal"]::-webkit-scrollbar-thumb {
+  background: var(--border-base);
+  border-radius: 2px;
+}
+
 /* ── Tabular numbers for data ─────────────────────────────── */
 
 .font-mono {
