@@ -38,7 +38,7 @@ const SCENARIO_QUICK_ACTION: Record<string, Array<{ icon: string; label: string;
 
 export function ChatPanel() {
   const { messages, isOpen, isTyping, openRouterKey, toggleOpen, send, setKey, clear } = useChat();
-  const { mode, scenario, scenarioContext } = useSystem();
+  const { mode, scenario, scenarioContext, controlMode, takeOverAsAgent, releaseToHuman, toggleCollab, locked } = useSystem();
   const [input, setInput] = useState('');
   const [keyInput, setKeyInput] = useState('');
   const [showKeyModal, setShowKeyModal] = useState(false);
@@ -95,6 +95,32 @@ export function ChatPanel() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Control mode buttons */}
+          {scenario && (
+            <div className="flex items-center gap-0.5 mr-1">
+              <button
+                onClick={() => releaseToHuman()}
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${controlMode === 'human' ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
+                title="Human Mode"
+              >
+                H
+              </button>
+              <button
+                onClick={() => takeOverAsAgent()}
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${controlMode === 'agent' ? 'bg-[var(--purple-dim)] text-[var(--purple)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
+                title="Agent Mode"
+              >
+                A
+              </button>
+              <button
+                onClick={() => toggleCollab()}
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${controlMode === 'collab' ? 'bg-[var(--cyan-dim)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
+                title="Collaborative Mode"
+              >
+                C
+              </button>
+            </div>
+          )}
           {mode === 'agent' && (
             <span className="text-[14px] bg-[var(--purple-dim)] text-[var(--purple)] px-2 py-0.5 rounded-full font-bold font-mono">
               AGENT
@@ -119,17 +145,27 @@ export function ChatPanel() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-        {messages.length === 0 && (
+        {messages.length <= 1 && (
           <div className="text-center py-8">
-            <Terminal size={24} className="text-[var(--text-dim)] mx-auto mb-3" />
+            <Terminal size={24} className="text-[var(--text-muted)] mx-auto mb-3" />
             <p className="text-[14px] text-[var(--text-muted)] mb-1">SRE Copilot Ready</p>
-            <p className="text-[12px] text-[var(--text-dim)]">
+            <p className="text-[12px] text-[var(--text-muted)] mb-2">
               {scenarioContext
-                ? `Scenario: ${scenarioContext.title}. ${scenarioContext.runbook?.steps?.length || 0} runbook steps. Ask me to diagnose or fix issues.`
+                ? `Scenario: ${scenarioContext.title}. ${scenarioContext.runbook?.steps?.length || 0} runbook steps.`
                 : scenario
-                ? `Active scenario: ${scenario}. Ask me to diagnose or fix issues.`
-                : 'No active scenario. Use quick prompts below or ask a question.'}
+                ? `Active scenario: ${scenario}.`
+                : 'No active scenario.'}
             </p>
+            {scenario && (
+              <div className="text-[11px] text-[var(--text-muted)] font-mono space-y-0.5">
+                {controlMode === 'human' && <p>You are driving. Ask the Copilot for guidance.</p>}
+                {controlMode === 'agent' && <p>Agent is driving. Monitor the topology and audit log.</p>}
+                {controlMode === 'collab' && <p>Working together. Both can take action.</p>}
+              </div>
+            )}
+            {!scenario && (
+              <p className="text-[12px] text-[var(--text-muted)]">Select a scenario to start, or ask any question.</p>
+            )}
           </div>
         )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSystem, useChat } from '@/store';
 import { useAuth } from '@/store/auth';
 import { useTelemetry } from '@/store/telemetry';
@@ -25,6 +25,12 @@ import {
   Wrench,
   RotateCcw,
   X,
+  Shield,
+  Bot,
+  Users,
+  Hand,
+  Lock,
+  AlertCircle,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -33,8 +39,9 @@ const TelemetryDashboard = dynamic(() => import('@/components/TelemetryDashboard
 const ScenarioCreator = dynamic(() => import('@/components/ScenarioCreator').then(m => ({ default: m.ScenarioCreator })), { ssr: false });
 const AuthGate = dynamic(() => import('@/components/AuthGate'), { ssr: false });
 const FixTerminal = dynamic(() => import('@/components/FixTerminal'), { ssr: false });
-const FixWireLog = dynamic(() => import('@/components/McpAuditLog'), { ssr: false });
+const AuditLog = dynamic(() => import('@/components/AuditLog'), { ssr: false });
 const HeartbeatPanel = dynamic(() => import('@/components/HeartbeatPanel'), { ssr: false });
+const RunbookPanel = dynamic(() => import('@/components/RunbookPanel'), { ssr: false });
 
 type TabId = 'mission-control' | 'telemetry' | 'scenario-library';
 
@@ -43,8 +50,6 @@ const TABS: { id: TabId; label: string; icon: any }[] = [
   { id: 'telemetry', label: 'Telemetry', icon: BarChart3 },
   { id: 'scenario-library', label: 'Scenario Library', icon: PlusCircle },
 ];
-
-// ── Runbook types (aliased from store for convenience) ─────────────
 
 // Derive a RunbookDef from ScenarioContext for UI rendering
 interface RunbookDef {
@@ -61,7 +66,6 @@ interface RunbookDef {
   };
 }
 
-// Build RunbookDef from loaded scenario context
 function buildRunbook(ctx: ScenarioContext | null): RunbookDef | null {
   if (!ctx) return null;
   return {
@@ -86,20 +90,14 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: 'var(--purple)',
 };
 
-const DIFFICULTY_LABELS: Record<string, string> = {
-  beginner: '●',
-  intermediate: '●●',
-  advanced: '●●●',
-};
-
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>('mission-control');
-  const { scenario, scenarioContext, available_scenarios: available, loading, startScenario, refresh, sessions, events, error, connected } = useSystem();
+  const { scenario, scenarioContext, available_scenarios: available, loading, startScenario, refresh, sessions, events, error, connected, locked, setLocked } = useSystem();
   const { isOpen, toggleOpen } = useChat();
   const { isAuthenticated, user, logout } = useAuth();
   const runbook = buildRunbook(scenarioContext);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Display rich title when available, fallback to formatted name
   const scenarioDisplay = scenarioContext
     ? scenarioContext.title
     : scenario
@@ -113,6 +111,43 @@ export default function Home() {
     return () => clearInterval(iv);
   }, [refresh, telemetry]);
 
+  const handleStartScenario = useCallback((name: string) => {
+    startScenario(name);
+    if (isOpen) {
+      // We import useChat dynamically to avoid SSR issues
+      const chatState = useChat.getState();
+      chatState.send(`Scenario "${name}" has been triggered. Please begin monitoring and guide me through the troubleshooting runbook.`);
+    }
+  }, [startScenario, isOpen]);
+
+  const handleReset = useCallback(async () => {
+    // Reset: clear scenario, unlock, clear state
+    try {
+      await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: 'clear' }),
+      });
+      // Clear local state
+      useSystem.setState({
+        scenario: null,
+        scenarioContext: null,
+        scenarioState: 'idle',
+        completedSteps: [],
+        trackedSteps: [],
+        locked: false,
+        alerts: [],
+        error: null,
+        loading: false,
+      });
+      // Clear chat
+      useChat.getState().clear();
+    } catch (err) {
+      console.error('Reset failed:', err);
+    }
+    setShowResetConfirm(false);
+  }, []);
+
   if (!isAuthenticated) return <AuthGate />;
 
   const activeFaults = events?.filter((e: any) => e.severity === 'critical' || e.severity === 'warning').length || 0;
@@ -120,24 +155,41 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-void)] text-[var(--text-primary)] overflow-hidden">
       {/* ── HEADER ─────────────────────────────────────────── */}
-      <header className="h-12 bg-[var(--bg-base)] border-b border-[var(--border-dim)] flex items-center justify-between px-5 shrink-0">
+      <header className={`h-12 border-b flex items-center justify-between px-5 shrink-0 transition-all ${
+        locked
+          ? 'bg-[var(--cyan-dim)]/30 border-[var(--cyan)]/40'
+          : 'bg-[var(--bg-base)] border-[var(--border-dim)]'
+      }`}>
         <div className="flex items-center gap-4">
           <div>
             <span className="text-sm font-bold tracking-wider">FIX-MCP</span>
             <span className="text-[12px] text-[var(--text-muted)] font-mono ml-2">Mission Control</span>
           </div>
-          {scenarioContext && (
+
+          {/* Locked scenario badge */}
+          {locked && scenario && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--cyan-dim)] border border-[var(--cyan)]/30 animate-pulse">
+              <Lock size={10} className="text-[var(--cyan)]" />
+              <span className="text-[14px] font-mono font-semibold text-[var(--cyan)]">{scenarioDisplay}</span>
+              <span className="text-[10px] font-mono text-[var(--cyan)]/70">LOCKED</span>
+            </div>
+          )}
+
+          {/* Scenario without lock */}
+          {!locked && scenarioContext && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
               <Radio size={10} className="text-[var(--cyan)] animate-pulse" />
               <span className="text-[14px] font-mono font-semibold text-[var(--cyan)]">{scenarioDisplay}</span>
             </div>
           )}
-          {!scenarioContext && scenario && (
+          {!locked && !scenarioContext && scenario && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
               <Radio size={10} className="text-[var(--cyan)] animate-pulse" />
               <span className="text-[14px] font-mono font-semibold text-[var(--cyan)]">{scenario}</span>
             </div>
           )}
+
+          {/* Active faults indicator */}
           {runbook && runbook.hints && runbook.hints.keyProblems.length > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--red-dim)] border border-[var(--red)]/30">
               <AlertTriangle size={11} className="text-[var(--red)]" />
@@ -169,15 +221,32 @@ export default function Home() {
             <span className="flex items-center gap-1 text-[13px] text-[var(--red)] font-mono"><span className="status-dot down" /> OFFLINE</span>
           )}
 
-          <select value={scenario || ''} onChange={(e) => e.target.value && startScenario(e.target.value)}
-            className="input-base !w-auto !py-1 !px-2.5 !text-[13px] !font-mono !rounded-lg max-w-[160px]">
-            <option value="">Launch Scenario…</option>
+          {/* Scenario launch (disabled when locked) */}
+          <select value={scenario || ''} onChange={(e) => e.target.value && !locked && handleStartScenario(e.target.value)}
+            disabled={locked}
+            className={`input-base !w-auto !py-1 !px-2.5 !text-[13px] !font-mono !rounded-lg max-w-[160px] ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <option value="">{locked ? 'Locked — Reset to change' : 'Launch Scenario…'}</option>
             {available?.map((s: any) => (
               <option key={s.name} value={s.name}>
                 [{s.severity?.toUpperCase() || 'MEDIUM'}] {s.title || s.name}{s.is_algo ? ' ⚡' : ''} ({s.estimated_minutes || '?'}m)
               </option>
             ))}
           </select>
+
+          {/* Reset button — only when a scenario is active */}
+          {showResetConfirm ? (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--red-dim)] border border-[var(--red)]/40">
+              <AlertCircle size={10} className="text-[var(--red)]" />
+              <span className="text-[12px] font-mono text-[var(--red)]">Reset?</span>
+              <button onClick={handleReset} className="text-[12px] font-bold text-[var(--red)] hover:underline px-1">Yes</button>
+              <button onClick={() => setShowResetConfirm(false)} className="text-[12px] text-[var(--text-muted)] hover:underline px-1">No</button>
+            </div>
+          ) : scenario ? (
+            <button onClick={() => setShowResetConfirm(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--red-dim)]/50 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-all">
+              <RotateCcw size={12} /> Reset
+            </button>
+          ) : null}
 
           <button onClick={toggleOpen}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold border transition-all ${
@@ -213,21 +282,16 @@ export default function Home() {
 // ── MISSION CONTROL (dynamic runbooks from scenario JSON) ─────────────
 
 function MissionControlTab() {
-  const { scenario, scenarioContext, scenarioState, completedSteps, available_scenarios: available, startScenario, completeStep, sessions, callTool } = useSystem();
+  const { scenario, scenarioContext, sessions, trackedSteps, setStepStatus, completeStep, callTool, controlMode, takeOverAsAgent, releaseToHuman, toggleCollab, mode } = useSystem();
   const { isOpen, toggleOpen, send } = useChat();
-  const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<number>(0);
-  const [stepResults, setStepResults] = useState<Record<number, string>>({});
 
-  const activeScenarioName = scenario || selectedScenario;
-  const activeContext = scenarioContext || null;
-  const runbook = buildRunbook(activeContext);
-
-  // Derive phase from completed steps + total runbook steps
-  const totalSteps = runbook?.steps.length || 0;
-  const doneCount = completedSteps.length;
+  const runbook = buildRunbook(scenarioContext);
+  const totalSteps = trackedSteps.length || scenarioContext?.runbook?.steps?.length || 0;
+  const doneCount = trackedSteps.filter((s) => s.status === 'done').length;
   const pct = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
-  const isResolved = doneCount >= totalSteps && totalSteps > 0;
+  const allDone = doneCount === totalSteps && totalSteps > 0;
+  const isResolved = allDone;
 
   // Phase labels for the lifecycle indicator
   const PHASES = [
@@ -236,38 +300,38 @@ function MissionControlTab() {
     { key: 'validating', label: 'VALIDATE', icon: '✅' },
     { key: 'resolved', label: 'RESOLVED', icon: '🟢' },
   ];
-
   const currentPhaseIdx = isResolved ? 3 : doneCount === 0 ? 0 : doneCount < totalSteps * 0.4 ? 0 : doneCount < totalSteps * 0.8 ? 1 : 2;
   const currentPhase = PHASES[currentPhaseIdx];
 
+  // ── Legacy step runner (for backward compat with old RunbookStep) ──
   const handleRunStep = async (step: RunbookStep) => {
     try {
-      setStepResults((prev) => ({ ...prev, [step.step]: 'Running…' }));
+      setStepStatus(step.step, 'running');
       const result = await callTool(step.tool, step.tool_args);
-      setStepResults((prev) => ({ ...prev, [step.step]: result || 'Done ✓' }));
+      setStepStatus(step.step, 'done', result);
       completeStep(step.step);
+      // Auto-advance to next step
+      const nextIdx = trackedSteps.findIndex((s) => s.step === step.step) + 1;
+      if (nextIdx < trackedSteps.length && trackedSteps[nextIdx].status === 'pending') {
+        setStepStatus(trackedSteps[nextIdx].step, 'running');
+      }
     } catch (err: any) {
-      setStepResults((prev) => ({ ...prev, [step.step]: `Error: ${err.message}` }));
+      setStepStatus(step.step, 'failed', err.message);
     }
   };
 
   const handleStartScenario = (name: string) => {
-    setSelectedScenario(name);
+    // This gets handled in the parent
     setActiveStep(0);
-    setStepResults({});
-    startScenario(name);
-    if (isOpen) {
-      send(`Scenario "${name}" has been triggered. Please begin monitoring and guide me through the troubleshooting runbook.`);
-    }
   };
 
-  const handleVenueClick = (_venue: string) => {
-    // For now — informational only, HeartbeatPanel handles display
+  // Control mode display
+  const controlModeUI = {
+    human: { icon: <Hand size={13} />, label: 'HUMAN', color: 'var(--green)' },
+    agent: { icon: <Bot size={13} />, label: 'AGENT', color: 'var(--purple)' },
+    collab: { icon: <Users size={13} />, label: 'COLLAB', color: 'var(--cyan)' },
   };
-
-  // Check which success criteria are met (heuristic: no errors in step results)
-  const doneCountLocal = Object.keys(stepResults).length;
-  const allStepsComplete = runbook && doneCountLocal === totalSteps && runbook.steps.length > 0;
+  const cm = controlModeUI[controlMode];
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
@@ -278,7 +342,7 @@ function MissionControlTab() {
           {/* Mini Topology (no MiniMap) */}
           <div className="h-[35%] min-h-[100px] border-b border-[var(--border-dim)] relative">
             <TopologyGraph />
-            {!scenario && !selectedScenario && (
+            {!scenario && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--bg-void)]/70 backdrop-blur-sm z-10">
                 <h2 className="text-[14px] font-bold mb-1 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
                   FIX-MCP Mission Control
@@ -286,25 +350,27 @@ function MissionControlTab() {
                 <p className="text-[12px] text-[var(--text-muted)] font-mono">Pick a scenario ↓</p>
               </div>
             )}
+
+            {/* Phase progress overlay */}
             {runbook && totalSteps > 0 && (
               <div className="absolute top-1 left-1 right-1 z-10">
                 <div className="flex items-center gap-1 px-2 py-1 bg-[var(--bg-void)]/90 rounded-md backdrop-blur-sm border border-[var(--border-dim)]">
                   <span className="text-[14px] font-mono">{currentPhase.icon}</span>
                   {PHASES.map((p, i) => (
                     <div key={p.key} className="flex-1 flex flex-col items-center">
-                      <div className={`h-1.5 rounded-full w-full ${
+                      <div className={`h-1.5 rounded-full w-full transition-all ${
                         i <= currentPhaseIdx ? (isResolved ? 'bg-[var(--green)]' : 'bg-[var(--cyan)]') : 'bg-[var(--border-dim)]'
                       }`} />
                     </div>
                   ))}
-                  <span className="text-[13px] font-mono text-[var(--text-dim)]">{pct}%</span>
+                  <span className="text-[13px] font-mono text-[var(--text-muted)]">{pct}%</span>
                 </div>
               </div>
             )}
           </div>
 
           {/* FIX Heartbeat Panel */}
-          <HeartbeatPanel onVenueClick={handleVenueClick} />
+          <HeartbeatPanel onVenueClick={() => {}} />
 
           {/* Scenario Picker */}
           <div className="flex-1 overflow-y-auto p-2">
@@ -312,41 +378,34 @@ function MissionControlTab() {
               <span className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                 <Layers size={9} /> Scenarios
               </span>
-              <span className="text-[14px] font-mono text-[var(--text-dim)]">{available?.length || 0}</span>
+              <span className="text-[14px] font-mono text-[var(--text-muted)]">
+                {/* Scenarios count */}
+              </span>
             </div>
-            <div className="space-y-1">
-              {available?.map((s: any) => {
-                const sevColor = SEVERITY_COLORS[s.severity] || SEVERITY_COLORS.medium;
-                return (
-                  <button
-                    key={s.name}
-                    onClick={() => handleStartScenario(s.name)}
-                    className={`w-full flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-md text-left transition-all ${
-                      scenario === s.name
-                        ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/30'
-                        : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 w-full">
-                      {scenario === s.name
-                        ? <Radio size={9} className="text-[var(--cyan)] animate-pulse shrink-0" />
-                        : <Play size={9} className="text-[var(--text-dim)] shrink-0" />
-                      }
-                      <span className="text-[13px] font-mono font-semibold truncate flex-1">{s.title || s.name}</span>
-                      <span
-                        className="text-[13px] font-bold px-1 py-px rounded shrink-0"
-                        style={{ backgroundColor: sevColor, color: '#0a0b0e' }}
-                      >
-                        {s.severity?.toUpperCase()}
-                      </span>
-                    </div>
-                    {s.description && (
-                      <span className="text-[14px] text-[var(--text-muted)] truncate pl-3.5">{s.description.slice(0, 80)}…</span>
-                    )}
+
+            {/* Control mode indicator */}
+            {scenario && (
+              <div className="mb-2 flex items-center gap-1 px-2 py-1 rounded bg-[var(--bg-surface)] border border-[var(--border-dim)]">
+                {cm.icon}
+                <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded" style={{ color: cm.color, backgroundColor: cm.color + '20' }}>
+                  {cm.label}
+                </span>
+                <div className="flex gap-0.5 ml-auto">
+                  <button onClick={() => releaseToHuman()} className={`text-[10px] px-1.5 py-0.5 rounded ${controlMode === 'human' ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`} title="Human">
+                    <Hand size={9} />
                   </button>
-                );
-              })}
-            </div>
+                  <button onClick={() => takeOverAsAgent()} className={`text-[10px] px-1.5 py-0.5 rounded ${controlMode === 'agent' ? 'bg-[var(--purple-dim)] text-[var(--purple)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`} title="Agent">
+                    <Bot size={9} />
+                  </button>
+                  <button onClick={() => toggleCollab()} className={`text-[10px] px-1.5 py-0.5 rounded ${controlMode === 'collab' ? 'bg-[var(--cyan-dim)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`} title="Collaborate">
+                    <Users size={9} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Scenario list */}
+            <ScenarioList activeScenario={scenario} />
           </div>
         </div>
 
@@ -356,179 +415,61 @@ function MissionControlTab() {
         </div>
       </div>
 
-      {/* ── BOTTOM ROW: Runbook (left) + FIX Wire Log (right) ──── */}
+      {/* ── BOTTOM ROW: Runbook (left) + Audit Log (right) ──── */}
       <div className="h-[38%] min-h-[180px] flex">
         {/* LEFT: Runbook Panel */}
         <div className="w-[30%] min-w-[220px] max-w-[340px] bg-[var(--bg-base)] border-r border-[var(--border-dim)] overflow-hidden flex flex-col">
-          {runbook ? (
-            <>
-              {/* Runbook Scenario Narrative */}
-              <div className="px-3 py-2 border-b border-[var(--border-dim)] shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="status-dot active w-1.5 h-1.5" />
-                  <span className="text-[12px] font-bold text-[var(--cyan)] uppercase tracking-wider">
-                    {scenario ? 'Active' : 'Preview'}
-                  </span>
-                  {allStepsComplete && runbook.successCriteria && runbook.successCriteria.length > 0 && (
-                    <span className="text-[12px] font-bold text-[var(--green)] uppercase tracking-wider flex items-center gap-0.5">
-                      ✓ RESOLVED
-                    </span>
-                  )}
-                </div>
-                <h3 className="text-[14px] font-bold mt-0.5">{runbook.title}</h3>
-                {scenarioContext && (
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <span className="text-[11px] font-mono text-[var(--text-muted)]">
-                      {scenarioContext.simulated_time}
-                    </span>
-                    <span className="text-[11px] font-mono text-[var(--text-dim)]">
-                      {scenarioContext.estimated_minutes}m · {scenarioContext.estimated_minutes < 20 ? 'Quick' : scenarioContext.estimated_minutes < 30 ? 'Moderate' : 'Extended'}
-                    </span>
-                    <span className="text-[11px] font-mono text-[var(--text-dim)]">
-                      {DIFFICULTY_LABELS[scenarioContext.difficulty] || ''} {scenarioContext.difficulty}
-                    </span>
-                    {scenarioContext.categories?.slice(0, 3).map((cat: string) => (
-                      <span key={cat} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-void)] text-[var(--text-dim)] font-mono">
-                        {cat}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Key Problems — show immediately so operator knows what's wrong */}
-                {runbook.hints?.keyProblems && runbook.hints.keyProblems.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {runbook.hints.keyProblems.map((p, i) => (
-                      <div key={i} className="flex items-start gap-1.5 text-[12px] text-[var(--red)] leading-relaxed">
-                        <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-                        <span>{p}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <p className="text-[12px] text-[var(--text-secondary)] mt-2 leading-relaxed">{runbook.narrative}</p>
-              </div>
-
-              {/* Steps */}
-              <div className="flex-1 overflow-y-auto p-2">
-                <div className="space-y-2">
-                  {runbook.steps.map((step, i) => (
-                    <div
-                      key={i}
-                      onClick={() => setActiveStep(i)}
-                      className={`p-2 rounded border transition-all cursor-pointer ${
-                        activeStep === i
-                          ? 'bg-[var(--cyan-dim)] border-[var(--cyan)]/30'
-                          : 'bg-[var(--bg-surface)] border-[var(--border-dim)] hover:border-[var(--border-base)]'
-                      }`}
-                    >
-                      {/* Step # + Title */}
-                      <div className="text-[13px] font-bold text-[var(--text-primary)] mb-0.5">
-                        #{step.step} {step.title}
-                      </div>
-
-                      {/* Narrative */}
-                      <div className="text-[12px] text-[var(--text-secondary)] leading-relaxed mb-1.5">
-                        {step.narrative}
-                      </div>
-
-                      {/* CLI command */}
-                      <div className="bg-[var(--bg-void)] rounded px-2 py-1 mb-1.5">
-                        <code className="text-[12px] font-mono text-[var(--green)]">
-                          fix-cli&gt; {step.tool}{Object.keys(step.tool_args || {}).length ? ` ${JSON.stringify(step.tool_args)}` : ''}
-                        </code>
-                      </div>
-
-                      {/* Run button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRunStep(step);
-                        }}
-                        className="w-full btn-secondary !text-[12px] !py-0.5 !px-2 flex items-center justify-center gap-1"
-                      >
-                        <Activity size={9} /> Run {step.tool}
-                      </button>
-
-                      {/* Step result if available */}
-                      {stepResults[step.step] && (
-                        <div className={`mt-1 text-[14px] font-mono leading-relaxed ${
-                          stepResults[step.step].startsWith('Error:')
-                            ? 'text-[var(--red)]'
-                            : 'text-[var(--green)]'
-                        }`}>
-                          → {stepResults[step.step]}
-                        </div>
-                      )}
-
-                      {/* Expected */}
-                      <p className="text-[14px] text-[var(--text-dim)] mt-1">
-                        Expected: {step.expected}
-                      </p>
-                    </div>
-                  ))}
-
-                  {/* Success Criteria */}
-                  {runbook.successCriteria && runbook.successCriteria.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[var(--border-dim)]">
-                      <div className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                        ✓ Success Criteria ({completedSteps.length}/{runbook.successCriteria.length} complete)
-                      </div>
-                      <div className="space-y-1">
-                        {Object.keys(stepResults).length > 0 && (
-                          runbook.successCriteria.map((c, i) => {
-                            const isComplete = i < completedSteps.length;
-                            return (
-                              <div key={i} className={`text-[14px] font-mono flex items-start gap-1 ${
-                                isComplete ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'
-                              }`}>
-                                <span>{isComplete ? '✓' : '○'}</span>
-                                <span>{c}</span>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Copilot button */}
-              <div className="px-2 py-2 border-t border-[var(--border-dim)] shrink-0">
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => handleRunStep(runbook.steps[activeStep] || runbook.steps[0])}
-                    className="btn-secondary flex-1 flex items-center justify-center gap-1 text-[12px]"
-                  >
-                    <Wrench size={10} /> Run Step
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!isOpen) toggleOpen();
-                      send(`I'm on step ${activeStep + 1} of the ${runbook.title} runbook: "${runbook.steps[activeStep]?.title}"`);
-                    }}
-                    className="btn-primary flex-1 flex items-center justify-center gap-1 text-[12px]"
-                  >
-                    <Terminal size={10} /> Copilot
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
-              <BookOpen size={24} className="text-[var(--text-dim)] mb-2" />
-              <p className="text-[13px] text-[var(--text-muted)]">Select a scenario to see the runbook.</p>
-            </div>
-          )}
+          <RunbookPanel scenarioContext={scenarioContext} scenario={scenario} />
         </div>
 
-        {/* RIGHT: FIX Wire Log */}
+        {/* RIGHT: Unified Audit Log (MCP / HOST / FIX tabs) */}
         <div className="flex-1 min-w-0 overflow-hidden p-2">
-          <FixWireLog />
+          <AuditLog />
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Scenario list (extracted) ─────────────────────────────────────── */
+
+function ScenarioList({ activeScenario }: { activeScenario: string | null }) {
+  const { available_scenarios: available, startScenario } = useSystem();
+
+  return (
+    <div className="space-y-1">
+      {available?.map((s: any) => {
+        const sevColor = SEVERITY_COLORS[s.severity] || SEVERITY_COLORS.medium;
+        const isActive = activeScenario === s.name;
+        return (
+          <button
+            key={s.name}
+            onClick={() => !isActive && startScenario(s.name)}
+            className={`w-full flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-md text-left transition-all ${
+              isActive
+                ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/30'
+                : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 w-full">
+              {isActive
+                ? <Radio size={9} className="text-[var(--cyan)] animate-pulse shrink-0" />
+                : <Play size={9} className="text-[var(--text-muted)] shrink-0" />
+              }
+              <span className="text-[13px] font-mono font-semibold truncate flex-1">{s.title || s.name}</span>
+              <span
+                className="text-[13px] font-bold px-1 py-px rounded shrink-0"
+                style={{ backgroundColor: sevColor, color: '#0a0b0e' }}
+              >
+                {s.severity?.toUpperCase()}
+              </span>
+            </div>
+            {s.description && (
+              <span className="text-[14px] text-[var(--text-muted)] truncate pl-3.5">{s.description.slice(0, 80)}…</span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
