@@ -12,7 +12,7 @@ import {
   Eye, EyeOff, Loader2, ChevronRight, CheckCircle2, XCircle, Info,
   PanelLeftOpen, PanelLeftClose, ArrowRight, FileText, Send, Wrench,
   ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon, Star,
-  X, Trophy, Clock, Award,
+  X, Trophy, Clock, Award, GraduationCap,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -23,6 +23,7 @@ const AuthGate = dynamic(() => import('@/components/AuthGate'), { ssr: false });
 const FixTerminal = dynamic(() => import('@/components/FixTerminal'), { ssr: false });
 const AuditLog = dynamic(() => import('@/components/AuditLog'), { ssr: false });
 const HeartbeatPanel = dynamic(() => import('@/components/HeartbeatPanel'), { ssr: false });
+const TrainingPanel = dynamic(() => import('@/components/TrainingPanel').then(m => ({ default: m.TrainingPanel })), { ssr: false });
 
 const SEV: Record<string, string> = { low: 'var(--green)', medium: 'var(--amber)', high: 'var(--red)', critical: 'var(--purple)' };
 const SEV_BG: Record<string, string> = { low: 'var(--green-dim)', medium: 'var(--amber-dim)', high: 'var(--red-dim)', critical: 'var(--purple-dim)' };
@@ -455,6 +456,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
 
   // Hints tracking
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
+  const [showTraining, setShowTraining] = useState(false);
 
   // Reset state on scenario change
   useEffect(() => {
@@ -466,6 +468,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
     setShowCompletion(false);
     setCompletionTimer(Date.now());
     setHintsUsedCount(0);
+    setShowTraining(false);
     runbookScrollRef.current?.scrollTo({ top: 0 });
   }, [scenario]);
 
@@ -603,7 +606,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
 
       {/* ═══ BOTTOM: Case Study / Runbook ═══ */}
       <div className={`flex-1 min-h-0 flex flex-col transition-all duration-300 ${focusMode ? 'max-w-5xl mx-auto w-full' : 'flex'}`}>
-        {/* Tab bar: Case Study | Terminal | FIX Wire */}
+          {/* Tab bar: Case Study | Terminal | FIX Wire */}
         <div className="flex items-center justify-between px-2 py-1.5 border-b border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
           <div className="flex gap-0.5">
             <button onClick={() => setBottomTab('case')}
@@ -619,13 +622,21 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
               <Zap size={14} /> FIX Wire
             </button>
           </div>
-          {/* Focus mode toggle */}
-          <button onClick={() => setFocusMode(!focusMode)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${focusMode ? 'bg-[var(--cyan-dim)] text-[var(--cyan)] border border-[var(--cyan)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
-            title="Focus mode">
-            {focusMode ? <PanelLeftClose size={12} /> : <PanelLeftOpen size={12} />}
-            {focusMode ? 'Expand' : 'Focus'}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Training infrastructure toggle */}
+            <button onClick={() => setShowTraining(!showTraining)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${showTraining ? 'bg-[var(--green-dim)] text-[var(--green)] border border-[var(--green)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+              title="Training infrastructure: time control, scoring, state snapshots, and event injection">
+              <GraduationCap size={13} /> Training
+            </button>
+            {/* Focus mode toggle */}
+            <button onClick={() => setFocusMode(!focusMode)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${focusMode ? 'bg-[var(--cyan-dim)] text-[var(--cyan)] border border-[var(--cyan)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+              title="Focus mode">
+              {focusMode ? <PanelLeftClose size={12} /> : <PanelLeftOpen size={12} />}
+              {focusMode ? 'Expand' : 'Focus'}
+            </button>
+          </div>
         </div>
 
         {/* Tab content */}
@@ -633,7 +644,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
           {bottomTab === 'case' && activeScenario && (
             <div className="h-full flex">
               {/* LEFT: Step guide (wide) */}
-              <div className="flex-1 min-w-[400px] overflow-y-auto" ref={runbookScrollRef}>
+              <div className={`flex-1 min-w-[400px] overflow-y-auto transition-all duration-300 ${showTraining ? 'mr-0' : ''}`} ref={runbookScrollRef}>
                 {showCaseBrief && (
                   <CaseBrief ctx={activeScenario} onStart={() => setShowCaseBrief(false)} />
                 )}
@@ -775,7 +786,16 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
             </div>
           )}
 
-          {bottomTab === 'case' && !activeScenario && (
+          {/* Training Panel (right sidebar for Case Study) */}
+          {showTraining && bottomTab === 'case' && activeScenario && (
+            <div className="w-[320px] border-l border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0 overflow-hidden">
+              <TrainingPanel onRollback={async (id: string) => {
+                await callTool('rollback_to_snapshot', { snapshot_id: id });
+              }} />
+            </div>
+          )}
+
+          {bottomTab === 'case' && (!activeScenario || scenarioState === 'loading') && (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <Loader2 size={32} className="text-[var(--cyan)] animate-spin mx-auto mb-3" />

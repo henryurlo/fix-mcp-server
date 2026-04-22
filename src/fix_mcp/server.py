@@ -24,6 +24,12 @@ from fix_mcp.fix.protocol import SequenceManager, format_fix_timestamp
 from fix_mcp.engine.market_data import MarketDataHub
 from fix_mcp.engine.tcp_integration import TCPIntegration
 from fix_mcp.metrics import FIX_METRICS
+from fix_mcp.engine.state_snapshots import (
+    save_snapshot, get_all_snapshots, get_snapshot, rollback_to_snapshot,
+    clear_snapshots, compute_diff, StateSnapshot,
+)
+from fix_mcp.engine.scoring import ScoringEngine
+from fix_mcp.engine.time_control import TimeController, check_auto_triggers
 
 # ---------------------------------------------------------------------------
 # Attempt to import the trading ops prompt; fall back to a stub if the module
@@ -118,6 +124,11 @@ msg_builder = FIXMessageBuilder(
 _tcp: Optional[TCPIntegration] = None
 _USE_TCP = os.environ.get("FIX_MCP_USE_TCP", "").lower() in ("1", "true", "yes")
 
+# State snapshots, scoring, and time control singletons
+_state_snapshots: list = []
+_scoring_engine = ScoringEngine()
+_time_controller = TimeController()
+
 
 def _ensure_tcp() -> Any:
     """Lazily start and return the TCP integration singleton."""
@@ -150,6 +161,13 @@ def reset_runtime(scenario_name: str | None = None) -> str:
             session_manager=SequenceManager(),
         )
         FIX_METRICS.scenario_started.labels(name=SCENARIO).inc()
+
+        # Reset training infrastructure on scenario load
+        clear_snapshots()
+        _scoring_engine.start(SCENARIO)
+        _time_controller.reset()
+        _time_controller.start()
+
         return SCENARIO
 
 # ---------------------------------------------------------------------------
@@ -711,6 +729,70 @@ async def list_tools() -> list[Tool]:
                 "required": ["venue"],
             },
         ),
+        Tool(
+            name="save_snapshot",
+            description=("Save a deep-copy snapshot of the current OMS + session state. Use before irreversible actions."),
+            inputSchema={"type": "object", "required": ["label"], "properties": {"label": {"type": "string"}}},
+        ),
+        Tool(
+            name="rollback_to_snapshot",
+            description=("Restore OMS state from a previously saved snapshot."),
+            inputSchema={"type": "object", "required": ["snapshot_id"], "properties": {"snapshot_id": {"type": "string"}}},
+        ),
+        Tool(
+            name="list_snapshots",
+            description="List all saved state snapshots for the current scenario.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="diff_snapshot",
+            description="Compare a saved snapshot against current state. Returns structured diff.",
+            inputSchema={"type": "object", "required": ["snapshot_id"], "properties": {"snapshot_id": {"type": "string"}}},
+        ),
+        Tool(
+            name="approve_action",
+            description="Submit a structured approval payload for an action. Enforces idempotency and risk-flagged audit trail.",
+            inputSchema={
+                "type": "object", "required": ["action", "order_ids", "approved_by"],
+                "properties": {
+                    "action": {"type": "string"}, "order_ids": {"type": "array", "items": {"type": "string"}},
+                    "approved_by": {"type": "string"}, "risk_flag": {"type": "string"},
+                    "tool_name": {"type": "string"}, "reason": {"type": "string"},
+                },
+            },
+        ),
+        Tool(
+            name="advance_time",
+            description="Advance the simulated market clock by N minutes. Auto-pauses on triggers.",
+            inputSchema={"type": "object", "required": ["minutes"], "properties": {"minutes": {"type": "number"}}},
+        ),
+        Tool(
+            name="time_status",
+            description="Return current simulated time, pause state, and trigger history.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="resume_simulation",
+            description="Resume a paused simulation after reviewing the trigger.",
+            inputSchema={"type": "object", "properties": {"notes": {"type": "string"}}},
+        ),
+        Tool(
+            name="inject_event",
+            description=("Inject a simulated market event into the current scenario for training. "
+                         "Supported: venue_outage, luld, reject_spike, client_message, seq_gap, sla_breach."),
+            inputSchema={
+                "type": "object", "required": ["event_type"],
+                "properties": {
+                    "event_type": {"type": "string", "enum": ["venue_outage", "luld", "reject_spike", "client_message", "seq_gap", "sla_breach"]},
+                    "target": {"type": "string"}, "delay_sec": {"type": "number"}, "details": {"type": "string"},
+                },
+            },
+        ),
+        Tool(
+            name="score_scenario",
+            description="Compute and return the full KPI score report for the current scenario.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -763,6 +845,26 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
             return await _tool_check_pending_acks(arguments)
         if name == "clear_market_data_delay":
             return await _tool_clear_market_data_delay(arguments)
+        if name == "save_snapshot":
+            return await _tool_save_snapshot(arguments)
+        if name == "rollback_to_snapshot":
+            return await _tool_rollback_to_snapshot(arguments)
+        if name == "list_snapshots":
+            return await _tool_list_snapshots(arguments)
+        if name == "diff_snapshot":
+            return await _tool_diff_snapshot(arguments)
+        if name == "approve_action":
+            return await _tool_approve_action(arguments)
+        if name == "advance_time":
+            return await _tool_advance_time(arguments)
+        if name == "time_status":
+            return await _tool_time_status(arguments)
+        if name == "resume_simulation":
+            return await _tool_resume_simulation(arguments)
+        if name == "inject_event":
+            return await _tool_inject_event(arguments)
+        if name == "score_scenario":
+            return await _tool_score_scenario(arguments)
         if name == "cancel_order":
             # Alias: cancel_order → cancel_replace with action="cancel"
             args = {**arguments, "action": arguments.get("action", "cancel")}
@@ -2337,6 +2439,284 @@ async def _tool_release_stuck_orders(args: dict) -> list[TextContent]:
         return _tc("\n".join(lines))
     except Exception as exc:  # noqa: BLE001
         return _tc(f"ERROR in release_stuck_orders: {exc!r}")
+
+
+# ---------------------------------------------------------------------------
+# Training infrastructure tool implementations
+# ---------------------------------------------------------------------------
+
+async def _tool_save_snapshot(args: dict) -> list[TextContent]:
+    try:
+        label = args.get("label", "untitled")
+        snap = save_snapshot(oms, session_manager, label=label, scenario=SCENARIO)
+        return _tc(f"SNAPSHOT SAVED: {snap.summary}\n  Checksum: {snap.checksum}\n  Orders: {snap.order_count}, Sessions: {snap.session_count}")
+    except Exception as exc:
+        return _tc(f"ERROR saving snapshot: {exc!r}")
+
+
+async def _tool_rollback_to_snapshot(args: dict) -> list[TextContent]:
+    try:
+        snap_id = args["snapshot_id"]
+        snap = get_snapshot(snap_id)
+        if snap is None:
+            return _tc(f"ERROR: Snapshot {snap_id!r} not found")
+        success, msg = rollback_to_snapshot(snap_id, oms, session_manager)
+        if not success:
+            return _tc(f"ERROR: {msg}")
+        return _tc(f"ROLLBACK SUCCESS: {msg}")
+    except KeyError:
+        return _tc("ERROR: 'snapshot_id' required")
+    except Exception as exc:
+        return _tc(f"ERROR during rollback: {exc!r}")
+
+
+async def _tool_list_snapshots(args: dict) -> list[TextContent]:
+    snaps = get_all_snapshots()
+    if not snaps:
+        return _tc("No snapshots saved for this scenario.")
+    lines = [f"STATE SNAPSHOTS ({len(snaps)} total)", "\u2500" * 60]
+    for snap in snaps:
+        lines.append(f"  {snap.id}  [{snap.label}]  {snap.timestamp}  {snap.order_count} orders, {snap.session_count} sessions")
+    return _tc("\n".join(lines))
+
+
+async def _tool_diff_snapshot(args: dict) -> list[TextContent]:
+    try:
+        snap_id = args["snapshot_id"]
+        snap = get_snapshot(snap_id)
+        if snap is None:
+            return _tc(f"ERROR: Snapshot {snap_id!r} not found")
+        current_orders = [
+            {
+                "order_id": o.order_id, "symbol": o.symbol, "side": o.side,
+                "quantity": o.quantity, "filled_quantity": o.filled_quantity,
+                "price": o.price, "order_type": o.order_type, "status": o.status,
+                "venue": o.venue, "client_name": o.client_name,
+                "created_at": o.created_at, "updated_at": o.updated_at,
+                "reject_reason": o.reject_reason, "flags": list(o.flags),
+                "stuck_reason": getattr(o, "stuck_reason", None),
+                "sla_minutes": o.sla_minutes, "is_institutional": o.is_institutional,
+                "metadata": dict(getattr(o, "metadata", {})),
+            }
+            for o in oms.orders.values()
+        ]
+        current_sessions = [
+            {
+                "venue": s.venue, "session_id": s.session_id, "status": s.status,
+                "fix_version": s.fix_version, "last_sent_seq": s.last_sent_seq,
+                "last_recv_seq": s.last_recv_seq, "expected_recv_seq": s.expected_recv_seq,
+                "latency_ms": s.latency_ms, "last_heartbeat": s.last_heartbeat,
+                "error": s.error, "connected_since": s.connected_since,
+            }
+            for s in session_manager.get_all_sessions()
+        ]
+        diff = compute_diff(snap, current_orders, current_sessions)
+        lines = [f"STATE DIFF: {snap.id} \u2192 current", f"  Summary: {diff.summary}", ""]
+        if diff.orders_added:
+            lines.append(f"  Orders added: {', '.join(diff.orders_added)}")
+        if diff.orders_removed:
+            lines.append(f"  Orders removed: {', '.join(diff.orders_removed)}")
+        if diff.orders_changed:
+            lines.append(f"  Field changes ({len(diff.orders_changed)}):")
+            for ch in diff.orders_changed:
+                lines.append(f"    {ch.order_id}.{ch.field}: {ch.before!r} \u2192 {ch.after!r}")
+        if diff.session_changes:
+            lines.append("  Session changes:")
+            for venue, changes in diff.session_changes.items():
+                for field_name, vals in changes.items():
+                    lines.append(f"    {venue}.{field_name}: {vals['before']!r} \u2192 {vals['after']!r}")
+        if not diff.orders_changed and not diff.orders_added and not diff.orders_removed and not diff.session_changes:
+            lines.append("  No changes detected \u2014 state identical to snapshot.")
+        return _tc("\n".join(lines))
+    except KeyError:
+        return _tc("ERROR: 'snapshot_id' required")
+    except Exception as exc:
+        return _tc(f"ERROR computing diff: {exc!r}")
+
+
+async def _tool_approve_action(args: dict) -> list[TextContent]:
+    try:
+        action = args["action"]
+        order_ids = args["order_ids"]
+        approved_by = args["approved_by"]
+        risk_flag = args.get("risk_flag", "none")
+        tool_name = args.get("tool_name", "unspecified")
+        reason = args.get("reason", "no reason provided")
+        # Idempotency check
+        now = time.time()
+        recent = [a for a in _scoring_engine.actions if a.tool_name == tool_name and set(a.order_ids) == set(order_ids)]
+        if recent:
+            ts = datetime.fromisoformat(recent[-1].timestamp)
+            if (now - ts.timestamp()) < 60:
+                return _tc(f"ERROR: DUPLICATE APPROVAL REJECTED \u2014 same {tool_name} action on {order_ids} approved within last 60s")
+        _scoring_engine.record_action(
+            tool_name=tool_name, action=action, order_ids=order_ids,
+            approved_by=approved_by, risk_flag=risk_flag, result="approved",
+        )
+        return _tc(
+            f"APPROVAL RECORDED\n"
+            f"  Action: {action}\n  Orders: {', '.join(order_ids)}\n"
+            f"  Approved by: {approved_by}\n  Risk flag: {risk_flag}\n"
+            f"  Tool: {tool_name}\n  Reason: {reason}\n"
+            f"  Idempotency: locked for 60s"
+        )
+    except KeyError as e:
+        return _tc(f"ERROR: Missing required field: {e}")
+    except Exception as exc:
+        return _tc(f"ERROR recording approval: {exc!r}")
+
+async def _tool_advance_time(args: dict) -> list[TextContent]:
+    try:
+        minutes = float(args["minutes"])
+        new_time = _time_controller.advance(minutes)
+        trigger = check_auto_triggers(oms, session_manager, _time_controller)
+        if trigger:
+            _time_controller.pause(
+                reason=f"Auto-pause: {trigger.trigger_type}",
+                trigger_type=trigger.trigger_type, venue=trigger.venue,
+                details=trigger.details,
+            )
+            _scoring_engine.track_event(
+                event_type=trigger.trigger_type, venue=trigger.venue,
+                details={"details": trigger.details},
+            )
+            return _tc(
+                f"TIME ADVANCED: {new_time.isoformat()} (+{minutes} min)\n\n"
+                f"[!] AUTO-PAUSE TRIGGERED\n"
+                f"  Type: {trigger.trigger_type}\n  Venue: {trigger.venue or 'global'}\n"
+                f"  Details: {trigger.details}\n\n"
+                f"Resolve the issue and call resume_simulation to continue."
+            )
+        # Track SLA breaches
+        now = datetime.now(timezone.utc)
+        for order in oms.orders.values():
+            if order.is_institutional and order.status in {"new", "stuck", "partially_filled"} and order.sla_minutes:
+                try:
+                    baseline_str = max(order.created_at, order.updated_at)
+                    created = datetime.fromisoformat(baseline_str)
+                    if created.tzinfo is None:
+                        created = created.replace(tzinfo=timezone.utc)
+                    deadline = created + timedelta(minutes=order.sla_minutes)
+                    if now > deadline:
+                        _scoring_engine.mark_sla_breach()
+                except (ValueError, TypeError):
+                    pass
+        status = _time_controller.get_status()
+        return _tc(
+            f"TIME ADVANCED: {new_time.isoformat()} (+{minutes} min)\n"
+            f"  Simulated: {status['simulated_time']}\n"
+            f"  Speed: {status['speed_multiplier']}x\n"
+            f"  Paused: {status['is_paused']}"
+        )
+    except KeyError:
+        return _tc("ERROR: 'minutes' required")
+    except Exception as exc:
+        return _tc(f"ERROR advancing time: {exc!r}")
+
+
+async def _tool_time_status(args: dict) -> list[TextContent]:
+    try:
+        status = _time_controller.get_status()
+        history = _time_controller.get_pause_history()
+        lines = [
+            "TIME CONTROL STATUS", "\u2500" * 40,
+            f"  Simulated time: {status['simulated_time']}",
+            f"  Real time:      {status['real_time']}",
+            f"  Paused:         {status['is_paused']}",
+            f"  Reason:         {status.get('pause_reason', 'N/A')}",
+            f"  Speed:          {status['speed_multiplier']}x",
+            f"  Triggers fired: {status['pause_count']}",
+        ]
+        if history:
+            lines.append("\n  PAUSE HISTORY:")
+            for h in history[-5:]:
+                lines.append(f"    [{h['trigger_type']}] {h['venue']}: {h['details']}")
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR getting time status: {exc!r}")
+
+
+async def _tool_resume_simulation(args: dict) -> list[TextContent]:
+    try:
+        notes = args.get("notes", "")
+        reason = _time_controller.pause_reason
+        if _time_controller._pause_history:
+            last = _time_controller._pause_history[-1]
+            _scoring_engine.resolve_event(event_type=last.trigger_type, venue=last.venue)
+        new_time = _time_controller.resume()
+        msg = f"SIMULATION resumed: {new_time.isoformat()}"
+        if notes:
+            msg += f"\n  Operator notes: {notes}"
+        msg += f"\n  Previous pause: {reason}"
+        return _tc(msg)
+    except Exception as exc:
+        return _tc(f"ERROR resuming simulation: {exc!r}")
+
+
+async def _tool_inject_event(args: dict) -> list[TextContent]:
+    try:
+        event_type = args["event_type"]
+        target = args.get("target", "")
+        delay_sec = args.get("delay_sec", 0)
+        details = args.get("details", "")
+        _scoring_engine.track_event(
+            event_type=event_type, venue=target,
+            details={"injected": True, "details": details, "delay_sec": delay_sec},
+        )
+        effects = []
+        if event_type == "venue_outage" and target:
+            session = session_manager.get_session(target.upper())
+            if session:
+                session.status = "down"
+                session.error = "Injected outage for training"
+                stuck_count = 0
+                for order in oms.orders.values():
+                    if order.venue.upper() == target.upper() and order.status not in {"filled", "canceled", "rejected"}:
+                        order.flags.add("venue_down")
+                        order.status = "stuck"
+                        order.stuck_reason = "venue_down"
+                        stuck_count += 1
+                effects.append(f"{target} set to DOWN, {stuck_count} orders stuck")
+                FIX_METRICS.venue_status.info({"mic_code": target, "status": "down"})
+        elif event_type == "luld" and target:
+            halted = 0
+            for order in oms.orders.values():
+                if order.symbol == target.upper() and order.status not in {"filled", "canceled", "rejected"}:
+                    order.flags.add("luld_halted")
+                    halted += 1
+            effects.append(f"LULD halt on {target}, {halted} orders affected")
+        elif event_type == "reject_spike":
+            effects.append("Reject spike mode activated \u2014 next orders will be rejected")
+        elif event_type == "seq_gap" and target:
+            session = session_manager.get_session(target.upper())
+            if session:
+                session.expected_recv_seq = session.last_recv_seq + 5
+                effects.append(f"Seq gap injected on {target}: expected {session.expected_recv_seq}, got {session.last_recv_seq}")
+        effect_str = "; ".join(effects) if effects else f"Event {event_type} recorded for scoring"
+        if event_type in ("venue_outage", "luld", "seq_gap") and target:
+            _time_controller.pause(
+                reason=f"Injected event: {event_type}", trigger_type=event_type,
+                venue=target, details=effect_str,
+            )
+        return _tc(
+            f"EVENT INJECTED: {event_type}\n"
+            f"  Target: {target or 'global'}\n"
+            f"  Effects: {effect_str}\n"
+            f"  Simulation: {'PAUSED' if _time_controller.is_paused else 'running'}"
+        )
+    except KeyError as e:
+        return _tc(f"ERROR: Missing required field: {e}")
+    except Exception as exc:
+        return _tc(f"ERROR injecting event: {exc!r}")
+
+
+async def _tool_score_scenario(args: dict) -> list[TextContent]:
+    try:
+        report = _scoring_engine.compute_score(oms, session_manager)
+        FIX_METRICS.scenario_duration.set(report.duration_seconds)
+        return _tc(report.format_report())
+    except Exception as exc:
+        return _tc(f"ERROR computing score: {exc!r}")
 
 
 # ---------------------------------------------------------------------------
