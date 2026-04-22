@@ -12,7 +12,7 @@ import {
   Eye, EyeOff, Loader2, ChevronRight, CheckCircle2, XCircle, Info,
   PanelLeftOpen, PanelLeftClose, ArrowRight, FileText, Send, Wrench,
   ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon, Star,
-  X, Trophy, Clock, Award, GraduationCap,
+  X, Trophy, Clock, Award, GraduationCap, HelpCircle, BookOpenCheck,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -24,6 +24,9 @@ const FixTerminal = dynamic(() => import('@/components/FixTerminal'), { ssr: fal
 const AuditLog = dynamic(() => import('@/components/AuditLog'), { ssr: false });
 const HeartbeatPanel = dynamic(() => import('@/components/HeartbeatPanel'), { ssr: false });
 const TrainingPanel = dynamic(() => import('@/components/TrainingPanel').then(m => ({ default: m.TrainingPanel })), { ssr: false });
+const TraceTab = dynamic(() => import('@/components/TraceTab').then(m => ({ default: m.TraceTab })), { ssr: false });
+const OnboardingPanel = dynamic(() => import('@/components/OnboardingPanel').then(m => ({ default: m.OnboardingPanel })), { ssr: false, loading: () => null });
+const ManualRunbookPanel = dynamic(() => import('@/components/ManualRunbookPanel').then(m => ({ default: m.ManualRunbookPanel })), { ssr: false });
 
 const SEV: Record<string, string> = { low: 'var(--green)', medium: 'var(--amber)', high: 'var(--red)', critical: 'var(--purple)' };
 const SEV_BG: Record<string, string> = { low: 'var(--green-dim)', medium: 'var(--amber-dim)', high: 'var(--red-dim)', critical: 'var(--purple-dim)' };
@@ -355,6 +358,15 @@ export default function Home() {
   }, []);
 
   const name = scenarioContext?.title ?? (scenario ? scenario.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : '');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Auto-show onboarding for first-time visitors
+  useEffect(() => {
+    if (!showOnboarding && typeof window !== 'undefined' && !localStorage.getItem('hasSeenOnboarding')) {
+      setShowOnboarding(true);
+      localStorage.setItem('hasSeenOnboarding', 'true');
+    }
+  }, []);
 
   if (!isAuthenticated) return <AuthGate />;
 

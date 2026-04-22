@@ -7,6 +7,7 @@ import json
 import os
 import threading
 import re
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 from pathlib import Path
@@ -30,6 +31,8 @@ from fix_mcp.engine.state_snapshots import (
 )
 from fix_mcp.engine.scoring import ScoringEngine
 from fix_mcp.engine.time_control import TimeController, check_auto_triggers
+from fix_mcp.engine.trace import TraceBuffer, TraceEntry
+from fix_mcp.engine.manual_runbook import MANUAL_RUNBOOK
 
 # ---------------------------------------------------------------------------
 # Attempt to import the trading ops prompt; fall back to a stub if the module
@@ -128,6 +131,7 @@ _USE_TCP = os.environ.get("FIX_MCP_USE_TCP", "").lower() in ("1", "true", "yes")
 _state_snapshots: list = []
 _scoring_engine = ScoringEngine()
 _time_controller = TimeController()
+_trace_buffer = TraceBuffer()
 
 
 def _ensure_tcp() -> Any:
@@ -793,6 +797,32 @@ async def list_tools() -> list[Tool]:
             description="Compute and return the full KPI score report for the current scenario.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="get_trace",
+            description="Get the tool execution trace log with optional filters.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer"},
+                    "tool": {"type": "string"},
+                    "status": {"type": "string"},
+                    "source": {"type": "string"},
+                },
+            },
+        ),
+        Tool(
+            name="get_trace_stats",
+            description="Get summary statistics for the current trace.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="get_manual_runbook",
+            description="Get the manual commands equivalent to MCP tools. Filter by tool name.",
+            inputSchema={
+                "type": "object",
+                "properties": {"tool": {"type": "string"}},
+            },
+        ),
     ]
 
 
@@ -802,7 +832,10 @@ async def list_tools() -> list[Tool]:
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    start_time = time.time()
     result = await _dispatch_tool(name, arguments)
+    latency_ms = (time.time() - start_time) * 1000
+
     if _tool_listeners:
         txt = result[0].text if result else ""
         ok = not txt.startswith("ERROR")
@@ -812,6 +845,22 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 cb(name, arguments, txt, ok, src)
             except Exception:  # noqa: BLE001
                 pass
+
+    # Append to trace buffer
+    _trace_buffer.append(TraceEntry(
+        trace_id=f"trc_{int(time.time()*1000)}",
+        ts=datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        ts_epoch=time.time(),
+        tool=name,
+        arguments=arguments,
+        output=(result[0].text if result else "")[:2000],
+        ok=not (result[0].text.startswith("ERROR") if result else True),
+        source=_call_source.get(),
+        latency_ms=round(latency_ms, 1),
+        scenario=SCENARIO,
+        step_index=None,
+    ))
+
     return result
 
 
@@ -865,6 +914,12 @@ async def _dispatch_tool(name: str, arguments: dict) -> list[TextContent]:
             return await _tool_inject_event(arguments)
         if name == "score_scenario":
             return await _tool_score_scenario(arguments)
+        if name == "get_trace":
+            return await _tool_get_trace(arguments)
+        if name == "get_trace_stats":
+            return await _tool_get_trace_stats(arguments)
+        if name == "get_manual_runbook":
+            return await _tool_get_manual_runbook(arguments)
         if name == "cancel_order":
             # Alias: cancel_order → cancel_replace with action="cancel"
             args = {**arguments, "action": arguments.get("action", "cancel")}
@@ -2717,6 +2772,69 @@ async def _tool_score_scenario(args: dict) -> list[TextContent]:
         return _tc(report.format_report())
     except Exception as exc:
         return _tc(f"ERROR computing score: {exc!r}")
+
+
+async def _tool_get_trace(args: dict) -> list[TextContent]:
+    try:
+        limit = args.get("limit", 100)
+        tool_filter = args.get("tool")
+        status_filter = args.get("status")
+        source_filter = args.get("source")
+        entries = _trace_buffer.get_entries(
+            limit=limit, tool_filter=tool_filter,
+            status_filter=status_filter, source_filter=source_filter,
+        )
+        lines = [f"TRACE LOG ({len(entries)} entries)", "\u2500" * 80]
+        for e in entries:
+            status = "\u2705" if e["ok"] else "\u274c"
+            ts = e["ts"].split("T")[1][:12] if "T" in e["ts"] else e["ts"]
+            lines.append(
+                f"{status} {ts}  {e['tool']:<28}  {e['source']:<12}  {e['latency_ms']:>6.1f}ms  {e['output'][:80]}"
+            )
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR getting trace: {exc!r}")
+
+
+async def _tool_get_trace_stats(args: dict) -> list[TextContent]:
+    try:
+        stats = _trace_buffer.stats()
+        lines = [
+            "TRACE STATISTICS", "\u2500" * 40,
+            f"  Total entries:  {stats['total_entries']}",
+            f"  Successful:     {stats['success_count']}",
+            f"  Errors:         {stats['error_count']}",
+            f"  Avg latency:    {stats['avg_latency_ms']} ms",
+            f"  Tools used:     {len(stats['tools_used'])}",
+        ]
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR getting trace stats: {exc!r}")
+
+
+async def _tool_get_manual_runbook(args: dict) -> list[TextContent]:
+    try:
+        tool_filter = args.get("tool")
+        if tool_filter:
+            matching = {k: v for k, v in MANUAL_RUNBOOK.items() if tool_filter.lower() in k.lower()}
+        else:
+            matching = MANUAL_RUNBOOK
+        if not matching:
+            return _tc(f"No manual runbook entries found for '{tool_filter}'.")
+        lines = [f"MANUAL RUNBOOK ({len(matching)} tools)", "\u2500" * 60]
+        for name, entry in matching.items():
+            lines.append(f"\n{name}: {entry['title']}")
+            lines.append(f"  {entry['description']}")
+            for cmd in entry["commands"]:
+                lang = cmd.get("language", "bash")
+                lines.append(f"\n  [{lang}] {cmd['label']}:")
+                for code_line in cmd["code"].split("\n"):
+                    lines.append(f"    {code_line}")
+                if "notes" in cmd:
+                    lines.append(f"    # Note: {cmd['notes']}")
+        return _tc("\n".join(lines))
+    except Exception as exc:
+        return _tc(f"ERROR getting manual runbook: {exc!r}")
 
 
 # ---------------------------------------------------------------------------

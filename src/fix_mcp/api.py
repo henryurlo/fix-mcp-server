@@ -26,8 +26,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from fix_mcp import server
-from fix_mcp.server import get_tcp_integration
+from fix_mcp.server import get_tcp_integration, _trace_buffer
 from fix_mcp.metrics import FIX_METRICS
+from fix_mcp.engine.manual_runbook import MANUAL_RUNBOOK
 from fix_mcp.prompts.trading_ops import SCENARIO_PROMPTS
 
 # ---------------------------------------------------------------------------
@@ -412,6 +413,47 @@ class APIHandler(BaseHTTPRequestHandler):
         if self.path.startswith("/api/events"):
             with _events_lock:
                 self._send_json(list(_events))
+            return
+
+        if self.path.startswith("/api/trace"):
+            limit = 200
+            tool_filter = None
+            status_filter = None
+            source_filter = None
+            # Parse query params
+            if "?" in self.path:
+                from urllib.parse import parse_qs, urlparse
+                qs = parse_qs(urlparse(self.path).query)
+                limit = int(qs.get("limit", [200])[0])
+                tool_filter = qs.get("tool", [None])[0]
+                status_filter = qs.get("status", [None])[0]
+                source_filter = qs.get("source", [None])[0]
+            entries = _trace_buffer.get_entries(
+                limit=limit, tool_filter=tool_filter,
+                status_filter=status_filter, source_filter=source_filter,
+            )
+            self._send_json(entries)
+            return
+
+        if self.path == "/api/trace/stats":
+            self._send_json(_trace_buffer.stats())
+            return
+
+        if self.path == "/api/runbook":
+            from urllib.parse import parse_qs, urlparse
+            tool_filter = None
+            if "?" in self.path:
+                qs = parse_qs(urlparse(self.path).query)
+                tool_filter = qs.get("tool", [None])[0]
+            if tool_filter:
+                matching = {k: v for k, v in MANUAL_RUNBOOK.items() if tool_filter.lower() in k.lower()}
+            else:
+                matching = MANUAL_RUNBOOK
+            self._send_json(matching)
+            return
+
+        if self.path == "/api/runbook/list":
+            self._send_json({k: {"title": v["title"], "description": v["description"]} for k, v in MANUAL_RUNBOOK.items()})
             return
 
         if self.path == "/api/fix-wire":
