@@ -10,21 +10,20 @@ import useKeyboardShortcuts from '@/hooks/useKeyboardShortcuts';
 
 import { useSystem, useChat } from '@/store';
 import { useAuth } from '@/store/auth';
-import { useTelemetry } from '@/store/telemetry';
 import dynamic from 'next/dynamic';
 import type { ScenarioContext, RunbookStep, TrackedStep } from '@/store';
 import {
-  Activity, Terminal as TerminalIcon, BarChart3, PlusCircle, LogOut, Play, Layers,
+  Activity, Terminal as TerminalIcon, PlusCircle, LogOut, Play, Layers,
   Radio, BookOpen, RotateCcw, BookMarked, MessageSquare,
   Eye, EyeOff, Loader2, ChevronRight, CheckCircle2, XCircle, Info,
   PanelLeftOpen, PanelLeftClose, ArrowRight, FileText, Send, Wrench,
   ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon, Star,
   X, Trophy, Clock, Award, GraduationCap, HelpCircle, BookOpenCheck, FlaskConical,
+  BarChart3,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
 const ChatPanel = dynamic(() => import('@/components/ChatPanel').then(m => ({ default: m.ChatPanel })), { ssr: false });
-const TelemetryDashboard = dynamic(() => import('@/components/TelemetryDashboard'), { ssr: false });
 const ScenarioCreator = dynamic(() => import('@/components/ScenarioCreator').then(m => ({ default: m.ScenarioCreator })), { ssr: false });
 const AuthGate = dynamic(() => import('@/components/AuthGate'), { ssr: false });
 const FixTerminal = dynamic(() => import('@/components/FixTerminal'), { ssr: false });
@@ -84,17 +83,16 @@ const SEV_BG: Record<string, string> = { low: 'var(--green-dim)', medium: 'var(-
 // Keyboard shortcuts hook
 // ═══════════════════════════════════════════════════════════
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'mission-control' | 'telemetry' | 'scenario-library'>('mission-control');
+  const [activeTab, setActiveTab] = useState<'mission-control' | 'scenario-library'>('mission-control');
   const { scenario, scenarioContext, scenarioState, available_scenarios, refresh, error, connected, startScenario, sessions, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, locked } = useSystem();
   const { isOpen, toggleOpen } = useChat();
   const { isAuthenticated, user, logout } = useAuth();
-  const telemetry = useTelemetry();
 
-  useEffect(() => { refresh(); telemetry.refresh(); }, []);
+  useEffect(() => { refresh(); }, []);
   useEffect(() => {
-    const iv = setInterval(() => { refresh(); telemetry.refresh(); }, 5000);
+    const iv = setInterval(() => { refresh(); }, 5000);
     return () => clearInterval(iv);
-  }, [refresh, telemetry]);
+  }, [refresh]);
 
   const handleReset = useCallback(async () => {
     try {
@@ -161,7 +159,6 @@ export default function Home() {
         <nav className="flex gap-0.5 bg-[var(--bg-surface)] rounded-lg p-0.5 border border-[var(--border-dim)]">
           {([
             ['mission-control', 'Mission Control', Layers],
-            ['telemetry', 'Telemetry', BarChart3],
             ['scenario-library', 'Scenario Library', PlusCircle],
           ] as const).map(([id, label, Icon]) => (
             <button key={id} onClick={() => setActiveTab(id)}
@@ -224,12 +221,51 @@ export default function Home() {
               onOpenScenarioBuilder={() => setActiveTab('scenario-library')}
             />
           )}
-          {activeTab === 'telemetry' && <TelemetryDashboard />}
           {activeTab === 'scenario-library' && <ScenarioCreator />}
         </main>
         <aside className={`transition-all duration-300 bg-[var(--bg-base)] border-l border-[var(--border-dim)] ${isOpen ? 'w-[420px]' : 'w-0'} overflow-hidden shrink-0`}><ChatPanel /></aside>
       </div>
       {showOnboarding && <OnboardingPanel onClose={() => setShowOnboarding(false)} />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Live Telemetry Strip — compact system status inside Mission Control
+// ═══════════════════════════════════════════════════════════
+
+function LiveTelemetryStrip() {
+  const { sessions, open_count, stuck_count, trackedSteps, scenarioState } = useSystem();
+  const healthy = sessions.filter((s) => s.status === 'active').length;
+  const degraded = sessions.filter((s) => s.status === 'degraded').length;
+  const down = sessions.filter((s) => s.status === 'down').length;
+  const done = trackedSteps.filter((s) => s.status === 'done').length;
+  const total = trackedSteps.length;
+  const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div className="mt-2 grid grid-cols-3 gap-1.5">
+      <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-1.5 text-center">
+        <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)]">Sessions</div>
+        <div className="flex items-center justify-center gap-1 mt-0.5">
+          <span className="text-[11px] font-mono font-bold text-[var(--green)]">{healthy}</span>
+          {degraded > 0 && <span className="text-[11px] font-mono font-bold text-[var(--amber)]">{degraded}</span>}
+          {down > 0 && <span className="text-[11px] font-mono font-bold text-[var(--red)]">{down}</span>}
+        </div>
+      </div>
+      <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-1.5 text-center">
+        <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)]">Orders</div>
+        <div className="flex items-center justify-center gap-1 mt-0.5">
+          <span className="text-[11px] font-mono font-bold text-[var(--cyan)]">{open_count}</span>
+          {stuck_count > 0 && (
+            <span className="text-[11px] font-mono font-bold text-[var(--red)]">{stuck_count}stk</span>
+          )}
+        </div>
+      </div>
+      <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-1.5 text-center">
+        <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)]">Progress</div>
+        <div className="mt-0.5 text-[11px] font-mono font-bold text-[var(--text-secondary)]">{progress}%</div>
+      </div>
     </div>
   );
 }
@@ -858,6 +894,7 @@ function MissionControlTab({
                 <div className="px-4 py-3 border-b border-[var(--border-dim)]">
                   <div className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Ops Rail</div>
                   <div className="text-[14px] font-semibold text-[var(--text-primary)] mt-1">Stress, launch, switch, create</div>
+                  <LiveTelemetryStrip />
                 </div>
                 <div className="p-3 space-y-3 border-b border-[var(--border-dim)]">
                   <button onClick={startGuidedLaunch} disabled={heroAction !== null}
@@ -894,7 +931,7 @@ function MissionControlTab({
                 </div>
                 {(!focusMode) && (
                   <div className="border-t border-[var(--border-dim)] p-2">
-                    <HeartbeatPanel onVenueClick={() => {}} />
+                    <HeartbeatPanel sessions={sessions} onAction={(tool, args) => callTool(tool, args)} />
                   </div>
                 )}
               </div>
@@ -932,7 +969,7 @@ function MissionControlTab({
       {/* ── HeartbeatPanel: Always visible at bottom in focus mode ── */}
       {focusMode && (
         <div className="border-t border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
-          <HeartbeatPanel onVenueClick={() => {}} />
+          <HeartbeatPanel sessions={sessions} onAction={(tool, args) => callTool(tool, args)} />
         </div>
       )}
 

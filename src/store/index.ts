@@ -28,6 +28,12 @@ export interface SessionInfo {
   status: 'active' | 'degraded' | 'down';
   latency_ms?: number;
   session_id?: string;
+  last_sent_seq?: number;
+  last_recv_seq?: number;
+  expected_recv_seq?: number;
+  seq_gap?: boolean;
+  error?: string;
+  last_heartbeat?: string;
 }
 
 export interface OrderInfo {
@@ -298,6 +304,12 @@ export const useSystem = create<SystemState>((set, get) => ({
         status: (s.status || 'active') as SessionInfo['status'],
         latency_ms: s.latency_ms,
         session_id: s.session_id,
+        last_sent_seq: s.last_sent_seq,
+        last_recv_seq: s.last_recv_seq,
+        expected_recv_seq: s.expected_recv_seq,
+        seq_gap: s.seq_gap,
+        error: s.error,
+        last_heartbeat: s.last_heartbeat,
       }));
 
       const normalizedScenario = statusRes.scenario && statusRes.scenario !== 'clear'
