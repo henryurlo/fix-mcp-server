@@ -28,45 +28,99 @@ const TraceTab = dynamic(() => import('@/components/TraceTab').then(m => ({ defa
 const OnboardingPanel = dynamic(() => import('@/components/OnboardingPanel').then(m => ({ default: m.OnboardingPanel })), { ssr: false, loading: () => null });
 const ManualRunbookPanel = dynamic(() => import('@/components/ManualRunbookPanel').then(m => ({ default: m.ManualRunbookPanel })), { ssr: false });
 
+const MANUAL_RUNBOOK_MAP: Record<string, Array<{ label: string; language: string; code: string }>> = {
+  check_fix_sessions: [
+    { label: 'Tail FIX session logs', language: 'bash', code: 'tail -n 50 /opt/fix/logs/<VENUE>-PROD-01.log' },
+    { label: 'Probe heartbeat', language: 'bash', code: 'fix-cli heartbeat <VENUE>' },
+  ],
+  fix_session_issue: [
+    { label: 'Reconnect session', language: 'bash', code: 'fix-cli fix <VENUE>' },
+    { label: 'Dump session state', language: 'bash', code: 'fix-cli dump <VENUE>' },
+  ],
+  query_orders: [
+    { label: 'Query open orders', language: 'bash', code: 'fix-cli show orders --open' },
+    { label: 'Filter by venue', language: 'bash', code: 'fix-cli show orders --venue <VENUE>' },
+  ],
+  send_order: [
+    { label: 'Submit NewOrderSingle', language: 'fix', code: '35=D | 55=<SYMBOL> | 54=<SIDE> | 38=<QTY> | 40=<TYPE> | 100=<VENUE>' },
+  ],
+  cancel_replace: [
+    { label: 'Cancel or replace order', language: 'fix', code: '35=F / 35=G | 41=<OrigClOrdID> | 11=<NewClOrdID>' },
+  ],
+  update_ticker: [
+    { label: 'Update reference symbol mapping', language: 'sql', code: 'UPDATE reference_symbols SET symbol = <NEW> WHERE symbol = <OLD>;' },
+  ],
+  load_ticker: [
+    { label: 'Load new listing/IPO', language: 'sql', code: 'INSERT INTO reference_symbols (symbol, venue, status) VALUES (...);' },
+  ],
+  release_stuck_orders: [
+    { label: 'Release stuck queue', language: 'bash', code: 'fix-cli release stuck' },
+  ],
+  inject_event: [
+    { label: 'Inject desk stress event', language: 'mcp', code: 'inject_event(event_type=<TYPE>, target=<TARGET>, details=<DETAILS>)' },
+  ],
+  score_scenario: [
+    { label: 'Score the scenario', language: 'mcp', code: 'score_scenario()' },
+  ],
+};
+
 const SEV: Record<string, string> = { low: 'var(--green)', medium: 'var(--amber)', high: 'var(--red)', critical: 'var(--purple)' };
 const SEV_BG: Record<string, string> = { low: 'var(--green-dim)', medium: 'var(--amber-dim)', high: 'var(--red-dim)', critical: 'var(--purple-dim)' };
 
 // ═══════════════════════════════════════════════════════════
 // Collapsible Step Output
 // ═══════════════════════════════════════════════════════════
-function CollapsibleStepOutput({ output, isFailed }: { output: string; isFailed: boolean }) {
+function EvidencePanel({
+  output,
+  isFailed,
+  manualCommands,
+}: {
+  output: string;
+  isFailed: boolean;
+  manualCommands: Array<{ label: string; language: string; code: string }>;
+}) {
   const [collapsed, setCollapsed] = useState(true);
   const lines = output.split('\n').filter(l => l.trim().length > 0).length;
 
   return (
     <div className={`rounded-lg border ${isFailed ? 'border-[var(--red)]/20' : 'border-[var(--border-dim)]'} overflow-hidden`}>
-      {/* Always-visible header with Run button */}
       <div className="bg-[var(--bg-void)] px-3 py-2 flex items-center gap-2">
-        {collapsed ? (
-          <button onClick={() => setCollapsed(false)}
-            className="flex items-center gap-2 text-[13px] w-full text-left">
-            <ChevronDown size={12} className={`text-[var(--text-dim)] transition-transform`} />
-            <span className={isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}>
-              {isFailed ? '✗ Failed' : '✓ Completed'} — {lines} lines of output
-            </span>
-            <ChevronDown size={12} className="ml-auto text-[var(--text-dim)]" />
-          </button>
-        ) : (
-          <button onClick={() => setCollapsed(true)}
-            className="flex items-center gap-2 text-[13px] w-full text-left">
-            <ChevronDown size={12} className="text-[var(--text-dim)] rotate-180 transition-transform" />
-            <span className={isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}>
-              {isFailed ? '✗ Failed' : '✓ Completed'} — {lines} lines of output
-            </span>
-            <ChevronDown size={12} className="ml-auto text-[var(--text-dim)]" />
-          </button>
-        )}
+        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 text-[13px] w-full text-left">
+          <ChevronDown size={12} className={`text-[var(--text-dim)] transition-transform ${collapsed ? '' : 'rotate-180'}`} />
+          <span className={isFailed ? 'text-[var(--red)]' : 'text-[var(--green)]'}>
+            {isFailed ? '✗ Evidence captured with failure' : '✓ Evidence captured'} — {lines} lines
+          </span>
+          <span className="ml-auto text-[11px] text-[var(--text-dim)]">MCP + FIX proof</span>
+        </button>
       </div>
       {!collapsed && (
-        <pre className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-all p-3 bg-[var(--bg-void)]"
-          style={{ color: isFailed ? 'var(--red)' : 'var(--green)' }}>
-          {output}
-        </pre>
+        <div className="divide-y divide-[var(--border-dim)] bg-[var(--bg-void)]">
+          <div className="p-3">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] mb-2">MCP result</div>
+            <pre className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-all"
+              style={{ color: isFailed ? 'var(--red)' : 'var(--green)' }}>
+              {output}
+            </pre>
+          </div>
+          <div className="p-3">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] mb-2">Human/FIX commands that correspond to this step</div>
+            {manualCommands.length === 0 ? (
+              <div className="text-[12px] text-[var(--text-muted)]">No mapped manual commands for this tool yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {manualCommands.map((cmd, idx) => (
+                  <div key={`${cmd.label}-${idx}`} className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[var(--cyan)]/20 text-[var(--cyan)]">{cmd.language}</span>
+                      <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{cmd.label}</span>
+                    </div>
+                    <pre className="text-[11px] font-mono whitespace-pre-wrap break-all text-[var(--cyan)]">{cmd.code}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -75,12 +129,14 @@ function CollapsibleStepOutput({ output, isFailed }: { output: string; isFailed:
 // ═══════════════════════════════════════════════════════════
 // Completion Screen Modal
 // ═══════════════════════════════════════════════════════════
-function CompletionScreen({ steps, hintsUsed, startTime, onClose, onNewScenario }: {
+function CompletionScreen({ steps, hintsUsed, startTime, summary, onClose, onNewScenario, onReviewEvidence }: {
   steps: TrackedStep[];
   hintsUsed: number;
   startTime: number;
+  summary: string;
   onClose: () => void;
   onNewScenario: () => void;
+  onReviewEvidence: () => void;
 }) {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const mins = Math.floor(elapsed / 60);
@@ -120,7 +176,7 @@ function CompletionScreen({ steps, hintsUsed, startTime, onClose, onNewScenario 
           </div>
         </div>
 
-        <div className="text-center mb-6">
+        <div className="text-center mb-5">
           <div className="text-[14px] text-[var(--text-muted)] mb-2">Performance Rating</div>
           <div className="flex items-center justify-center gap-1">
             {[1, 2, 3].map(i => (
@@ -132,7 +188,15 @@ function CompletionScreen({ steps, hintsUsed, startTime, onClose, onNewScenario 
           </div>
         </div>
 
+        <div className="mb-5 rounded-xl border border-[var(--green)]/30 bg-[var(--green-dim)]/10 p-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+          {summary}
+        </div>
+
         <div className="flex gap-3">
+          <button onClick={onReviewEvidence}
+            className="flex-1 py-3 rounded-lg bg-[var(--green)] text-black text-[14px] font-bold hover:bg-[var(--green)]/80 transition-colors flex items-center justify-center gap-2">
+            <FileText size={16} /> Review Evidence
+          </button>
           <button onClick={onNewScenario}
             className="flex-1 py-3 rounded-lg bg-[var(--cyan)] text-black text-[14px] font-bold hover:bg-[var(--cyan)]/80 transition-colors flex items-center justify-center gap-2">
             <Play size={16} fill="currentColor" /> New Scenario
@@ -564,6 +628,9 @@ function MissionControlTab({
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [showTraining, setShowTraining] = useState(false);
   const [heroAction, setHeroAction] = useState<'launching' | 'stressing' | null>(null);
+  const [showEvidenceBoard, setShowEvidenceBoard] = useState(false);
+  const [completedStepAudit, setCompletedStepAudit] = useState<Array<{ step: number; title: string; tool: string; output: string; commands: Array<{ label: string; language: string; code: string }> }>>([]);
+  const [completionSummary, setCompletionSummary] = useState('');
 
   // Reset state on scenario change
   useEffect(() => {
@@ -573,6 +640,9 @@ function MissionControlTab({
     setFocusMode(false);
     setTopologyCollapsed(false);
     setShowCompletion(false);
+    setShowEvidenceBoard(false);
+    setCompletedStepAudit([]);
+    setCompletionSummary('');
     setCompletionTimer(Date.now());
     setHintsUsedCount(0);
     setShowTraining(false);
@@ -602,20 +672,30 @@ function MissionControlTab({
   // Show completion screen when all done
   useEffect(() => {
     if (allDone && !showCompletion) {
+      const summary = completedStepAudit.length > 0
+        ? `Scenario completed successfully. ${completedStepAudit.length} runbook steps executed with visible MCP evidence and mapped FIX/manual commands.`
+        : 'Scenario completed successfully.';
+      setCompletionSummary(summary);
       setShowCompletion(true);
+      setShowEvidenceBoard(true);
     }
-  }, [allDone]);
+  }, [allDone, completedStepAudit, showCompletion]);
 
   async function runStep(step: typeof steps[0], idx: number) {
     if (step.status === 'running') return;
     setStepStatus(step.step, 'running');
     try {
       const result = await callTool(step.tool, step.tool_args);
+      const manualCommands = MANUAL_RUNBOOK_MAP[step.tool] || [];
       setStepStatus(step.step, 'done', result);
       setStepResults(prev => ({ ...prev, [step.step]: result }));
+      setCompletedStepAudit(prev => {
+        const next = prev.filter(entry => entry.step !== step.step);
+        next.push({ step: step.step, title: step.title, tool: step.tool, output: result, commands: manualCommands });
+        return next.sort((a, b) => a.step - b.step);
+      });
       completeStep(step.step);
       addAlert(`Step ${step.step} complete`, 'success', 3000);
-      // Auto-advance to next step
       if (idx + 1 < steps.length) {
         setCurrentStep(idx + 1);
       }
@@ -895,6 +975,18 @@ function MissionControlTab({
               <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Most important first</div>
               <div className="mt-2 text-[13px] leading-relaxed text-[var(--text-secondary)]">{activeScenario?.hints?.diagnosis_path || 'Use the copilot to summarize the blast radius, then follow the runbook.'}</div>
             </div>
+            <div className="mt-3 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Resolution board</div>
+                  <div className="text-[13px] text-[var(--text-secondary)] mt-1">See finished steps with MCP output and mapped FIX/manual commands.</div>
+                </div>
+                <button onClick={() => setShowEvidenceBoard(v => !v)}
+                  className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                  {showEvidenceBoard ? 'Hide' : 'Show'} Evidence
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -955,6 +1047,36 @@ function MissionControlTab({
         <div className="flex-1 min-h-0 overflow-hidden">
           {bottomTab === 'case' && activeScenario && (
             <div className="h-full flex">
+              {showEvidenceBoard && (
+                <div className="w-[420px] border-r border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0 overflow-y-auto">
+                  <div className="px-4 py-3 border-b border-[var(--border-dim)]">
+                    <div className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Resolution Evidence</div>
+                    <div className="text-[15px] font-semibold text-[var(--text-primary)] mt-1">What ran, what proved success</div>
+                    <div className="text-[12px] text-[var(--text-secondary)] mt-1">Every completed step shows MCP evidence plus mapped FIX/manual commands.</div>
+                  </div>
+                  <div className="p-3 space-y-3">
+                    {completedStepAudit.length === 0 ? (
+                      <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-surface)] p-4 text-[13px] text-[var(--text-muted)]">
+                        Run scenario steps to populate evidence.
+                      </div>
+                    ) : (
+                      completedStepAudit.map((entry) => (
+                        <div key={entry.step} className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                              <div className="text-[12px] font-mono text-[var(--text-dim)]">STEP {entry.step}</div>
+                              <div className="text-[14px] font-bold text-[var(--text-primary)]">{entry.title}</div>
+                            </div>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--green-dim)] text-[var(--green)]">DONE</span>
+                          </div>
+                          <div className="text-[12px] text-[var(--text-muted)] mb-2">Tool: {entry.tool}</div>
+                          <EvidencePanel output={entry.output} isFailed={false} manualCommands={entry.commands} />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
               {/* LEFT: Step guide (wide) */}
               <div className={`flex-1 min-w-[400px] overflow-y-auto transition-all duration-300`} ref={runbookScrollRef}>
                 {showCaseBrief && (
@@ -980,92 +1102,103 @@ function MissionControlTab({
 
                     {/* Step cards */}
                     <div className="space-y-3">
-                      {steps.map((step: any, idx: number) => {
-                        const isDone = step.status === 'done';
-                        const isFailed = step.status === 'failed';
-                        const isRunning = step.status === 'running';
-                        const isCurrent = idx === currentStep;
-                        const isRevealed = revealedHints.has(step.step);
-                        const result = stepResults[step.step] || step.output || '';
-                        const resultLines = result ? result.split('\n').filter((l: string) => l.trim().length > 0).length : 0;
-                        const shouldCollapse = expandedCount > 2;
+                      <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div>
+                            <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Case study steps</div>
+                            <div className="text-[14px] text-[var(--text-secondary)] mt-1">These are the exact visible steps the chatbot should guide. The runbook and the copilot now stay aligned.</div>
+                          </div>
+                          <div className="text-[12px] font-mono text-[var(--text-dim)]">{doneCount}/{totalSteps} complete</div>
+                        </div>
+                        <div className="grid gap-2">
+                          {steps.map((step: any, idx: number) => {
+                            const isDone = step.status === 'done';
+                            const isFailed = step.status === 'failed';
+                            const isRunning = step.status === 'running';
+                            const isCurrent = idx === currentStep;
+                            const isRevealed = revealedHints.has(step.step);
+                            const result = stepResults[step.step] || step.output || '';
+                            const manualCommands = MANUAL_RUNBOOK_MAP[step.tool] || [];
 
-                        return (
-                          <div key={step.step} onClick={() => setCurrentStep(idx)}
-                            className={`rounded-lg border p-4 cursor-pointer transition-all ${
-                              isCurrent ? 'border-[var(--cyan)]/50 bg-[var(--cyan)]/5' :
-                              isDone ? 'border-[var(--green)]/20 bg-[var(--green)]/5' :
-                              isFailed ? 'border-[var(--red)]/20 bg-[var(--red)]/5' :
-                              'border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--border-base)]'
-                            }`}>
-                            {/* Step header */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-[12px] font-mono text-[var(--text-muted)]">#{idx + 1}</span>
-                              {isDone && <CheckCircle2 size={16} className="text-[var(--green)]" />}
-                              {isRunning && <Loader2 size={16} className="text-[var(--cyan)] animate-spin" />}
-                              {isFailed && <XCircle size={16} className="text-[var(--red)]" />}
-                              {!isDone && !isRunning && !isFailed && <ChevronRight size={16} className={`text-[var(--text-dim)] transition-transform ${isCurrent ? 'text-[var(--cyan)]' : ''}`} />}
-                              <span className={`text-[16px] font-bold ${isCurrent ? 'text-[var(--text-primary)]' : isDone ? 'text-[var(--green)]' : 'text-[var(--text-secondary)]'}`}>{step.title}</span>
-                            </div>
-
-                            {/* Instruction narrative */}
-                            <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-3">{step.narrative}</p>
-
-                            {/* Command + always-visible Run button */}
-                            <div className="bg-[var(--bg-void)] rounded-lg px-4 py-2.5 mb-3 flex items-center justify-between">
-                              <code className="text-[14px] font-mono text-[var(--green)]">{step.tool}</code>
-                              <button onClick={(e) => { e.stopPropagation(); runStep(step, idx); }}
-                                disabled={isRunning}
-                                className="px-4 py-1.5 rounded-md bg-[var(--cyan)] text-black text-[13px] font-bold hover:bg-[var(--cyan)]/80 transition-colors disabled:opacity-50 flex items-center gap-1.5">
-                                {isRunning ? <><Loader2 size={12} className="animate-spin" /> Running</> : isDone ? 'Rerun' : <><Play size={12} fill="currentColor" /> Run</>}
-                              </button>
-                            </div>
-
-                            {/* Result output — collapsible for completed steps */}
-                            {result && isDone && (
-                              <CollapsibleStepOutput output={result} isFailed={false} />
-                            )}
-                            {result && isFailed && (
-                              <CollapsibleStepOutput output={result} isFailed={true} />
-                            )}
-                            {result && !isDone && !isFailed && (
-                              /* Running state — show inline */
-                              <pre className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap break-all p-3 rounded-lg bg-[var(--bg-void)] mb-3 text-[var(--cyan)]">
-                                {result}
-                              </pre>
-                            )}
-
-                            {/* Hint section */}
-                            {!result && !isDone && (
-                              <button onClick={(e) => { e.stopPropagation(); toggleHint(step.step); }}
-                                className="flex items-center gap-1.5 text-[13px] text-[var(--amber)] hover:text-[var(--amber)]/80 transition-colors">
-                                {isRevealed ? <><EyeOff size={12} /> Hide Hint</> : <><Eye size={12} /> Show Hint</>}
-                              </button>
-                            )}
-                            {isRevealed && activeScenario.hints && !result && !isDone && (
-                              <div className="mt-2 p-3 rounded-lg bg-[var(--amber-dim)]/10 border border-[var(--amber)]/20">
-                                <div className="flex items-start gap-1.5 text-[14px] text-[var(--text-secondary)] leading-relaxed">
-                                  <Lightbulb size={14} className="text-[var(--amber)] shrink-0 mt-0.5" />
-                                  <span>{activeScenario.hints.diagnosis_path}</span>
+                            return (
+                              <div key={step.step} onClick={() => setCurrentStep(idx)}
+                                className={`rounded-xl border p-4 cursor-pointer transition-all ${
+                                  isCurrent ? 'border-[var(--cyan)]/50 bg-[var(--cyan)]/5' :
+                                  isDone ? 'border-[var(--green)]/20 bg-[var(--green)]/5' :
+                                  isFailed ? 'border-[var(--red)]/20 bg-[var(--red)]/5' :
+                                  'border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--border-base)]'
+                                }`}>
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <div className="flex items-start gap-2 min-w-0">
+                                    <div className="mt-0.5 text-[12px] font-mono text-[var(--text-muted)]">#{idx + 1}</div>
+                                    {isDone && <CheckCircle2 size={16} className="text-[var(--green)] mt-0.5" />}
+                                    {isRunning && <Loader2 size={16} className="text-[var(--cyan)] animate-spin mt-0.5" />}
+                                    {isFailed && <XCircle size={16} className="text-[var(--red)] mt-0.5" />}
+                                    {!isDone && !isRunning && !isFailed && <ChevronRight size={16} className={`text-[var(--text-dim)] mt-0.5 ${isCurrent ? 'text-[var(--cyan)]' : ''}`} />}
+                                    <div className="min-w-0">
+                                      <div className={`text-[16px] font-bold ${isCurrent ? 'text-[var(--text-primary)]' : isDone ? 'text-[var(--green)]' : 'text-[var(--text-secondary)]'}`}>{step.title}</div>
+                                      <div className="mt-1 text-[13px] text-[var(--text-secondary)] leading-relaxed">{step.narrative}</div>
+                                    </div>
+                                  </div>
+                                  <div className="shrink-0 flex flex-col items-end gap-2">
+                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${isDone ? 'bg-[var(--green-dim)] text-[var(--green)]' : isRunning ? 'bg-[var(--cyan-dim)] text-[var(--cyan)]' : isFailed ? 'bg-[var(--red-dim)] text-[var(--red)]' : 'bg-[var(--bg-elevated)] text-[var(--text-dim)]'}`}>
+                                      {isDone ? 'Done' : isRunning ? 'Running' : isFailed ? 'Failed' : isCurrent ? 'Current' : 'Pending'}
+                                    </span>
+                                    <button onClick={(e) => { e.stopPropagation(); runStep(step, idx); }}
+                                      disabled={isRunning}
+                                      className="px-4 py-2 rounded-md bg-[var(--cyan)] text-black text-[13px] font-bold hover:bg-[var(--cyan)]/80 transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                                      {isRunning ? <><Loader2 size={12} className="animate-spin" /> Running</> : isDone ? 'Rerun' : <><Play size={12} fill="currentColor" /> Run Step</>}
+                                    </button>
+                                  </div>
                                 </div>
-                                {activeScenario.hints.common_mistakes?.[idx] && (
-                                  <div className="mt-2 flex items-start gap-1.5 text-[13px] text-[var(--red)]">
-                                    <XCircle size={12} className="shrink-0 mt-0.5" />
-                                    <span><b>Avoid:</b> {activeScenario.hints.common_mistakes[idx]}</span>
+
+                                <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr] mb-3">
+                                  <div className="rounded-lg bg-[var(--bg-void)] border border-[var(--border-dim)] p-3">
+                                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] mb-1">MCP tool</div>
+                                    <code className="text-[13px] font-mono text-[var(--green)]">{step.tool}</code>
+                                    <pre className="mt-2 text-[11px] font-mono whitespace-pre-wrap break-all text-[var(--text-secondary)]">{JSON.stringify(step.tool_args ?? {}, null, 2)}</pre>
+                                  </div>
+                                  <div className="rounded-lg bg-[var(--bg-void)] border border-[var(--border-dim)] p-3">
+                                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] mb-1">Expected result</div>
+                                    <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{step.expected}</div>
+                                  </div>
+                                </div>
+
+                                {result && (
+                                  <EvidencePanel output={result} isFailed={isFailed} manualCommands={manualCommands} />
+                                )}
+
+                                {!result && !isDone && (
+                                  <button onClick={(e) => { e.stopPropagation(); toggleHint(step.step); }}
+                                    className="mt-3 flex items-center gap-1.5 text-[13px] text-[var(--amber)] hover:text-[var(--amber)]/80 transition-colors">
+                                    {isRevealed ? <><EyeOff size={12} /> Hide Hint</> : <><Eye size={12} /> Show Hint</>}
+                                  </button>
+                                )}
+                                {isRevealed && activeScenario.hints && !result && !isDone && (
+                                  <div className="mt-2 p-3 rounded-lg bg-[var(--amber-dim)]/10 border border-[var(--amber)]/20">
+                                    <div className="flex items-start gap-1.5 text-[14px] text-[var(--text-secondary)] leading-relaxed">
+                                      <Lightbulb size={14} className="text-[var(--amber)] shrink-0 mt-0.5" />
+                                      <span>{activeScenario.hints.diagnosis_path}</span>
+                                    </div>
+                                    {activeScenario.hints.common_mistakes?.[idx] && (
+                                      <div className="mt-2 flex items-start gap-1.5 text-[13px] text-[var(--red)]">
+                                        <XCircle size={12} className="shrink-0 mt-0.5" />
+                                        <span><b>Avoid:</b> {activeScenario.hints.common_mistakes[idx]}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                      {/* Success message (inline, before completion screen takes over) */}
                       {allDone && (
                         <div className="mt-4 p-4 rounded-lg bg-[var(--green-dim)]/10 border border-[var(--green)]/30 text-center">
                           <CheckCircle2 size={24} className="text-[var(--green)] mx-auto mb-2" />
                           <p className="text-[18px] font-bold text-[var(--green)] mb-1">Case Resolved!</p>
-                          <p className="text-[14px] text-[var(--text-secondary)]">All {totalSteps} steps completed successfully.</p>
+                          <p className="text-[14px] text-[var(--text-secondary)]">All {totalSteps} steps completed successfully. Review the evidence board for the commands and proof.</p>
                         </div>
                       )}
                     </div>
@@ -1162,6 +1295,12 @@ function MissionControlTab({
           steps={trackedSteps}
           hintsUsed={hintsUsedCount}
           startTime={completionTimer || Date.now()}
+          summary={completionSummary}
+          onReviewEvidence={() => {
+            setShowCompletion(false);
+            setShowEvidenceBoard(true);
+            setBottomTab('case');
+          }}
           onClose={() => setShowCompletion(false)}
           onNewScenario={() => {
             setShowCompletion(false);
