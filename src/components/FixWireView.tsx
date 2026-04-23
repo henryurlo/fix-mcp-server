@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Zap } from 'lucide-react';
 
 function FixWireView({ sessions }: { sessions: any[] }) {
   const [messages, setMessages] = useState<any[]>([]);
@@ -16,8 +16,14 @@ function FixWireView({ sessions }: { sessions: any[] }) {
 
   if (messages.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-[14px] text-[var(--text-muted)]">
-        No FIX wire messages yet. Run a scenario step to generate traffic.
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center max-w-md px-4">
+          <Zap size={32} className="text-[var(--text-dim)] mx-auto mb-3" />
+          <p className="text-[14px] text-[var(--text-muted)] mb-2">No FIX wire messages yet</p>
+          <p className="text-[12px] text-[var(--text-dim)] leading-relaxed">
+            This tab shows raw FIX protocol messages — New Order Singles (35=D), Execution Reports (35=8), and Rejects (35=3) — as they flow between the desk and exchanges. Run a scenario step to generate traffic.
+          </p>
+        </div>
       </div>
     );
   }

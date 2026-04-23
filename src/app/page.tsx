@@ -650,9 +650,12 @@ function MissionControlTab({
                 <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Inject failure pressure and force the chatbot + operator workflow to react.</div>
               </button>
               <button onClick={() => setShowTraining(true)}
-                className="rounded-xl border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--green-dim)]/30">
-                <div className="flex items-center gap-2 text-[var(--green)] font-bold text-[14px]"><GraduationCap size={15} /> Open Stress Controls</div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Time control, snapshots, scoring, and event injection are available here.</div>
+                className="rounded-xl border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--green-dim)]/30 group relative">
+                <div className="flex items-center gap-2 text-[var(--green)] font-bold text-[14px]"><GraduationCap size={15} /> Chaos Engineering Panel</div>
+                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Manually inject failures — venue outages, reject spikes, LULD halts. Test how the system and operator respond under pressure.</div>
+                <div className="pointer-events-none invisible group-hover:visible absolute left-0 bottom-full mb-2 z-50 w-72 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+                  <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Opens the resilience panel with 4 tools: (1) Time Control — fast-forward the simulation clock, (2) Score — grade your incident response, (3) Snapshots — save/restore system state, (4) Inject — trigger chaos events like venue outages or reject spikes.</p>
+                </div>
               </button>
               <button onClick={() => setBottomTab('trace')}
                 className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-4 py-4 text-left transition-colors hover:border-[var(--cyan)]/30">
@@ -694,35 +697,63 @@ function MissionControlTab({
           {/* Tab bar: Case Study | Terminal | FIX Wire */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
           <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setBottomTab('case')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[13px] font-semibold transition-all ${bottomTab === 'case' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <BookOpen size={13} /> Case Study
-            </button>
-            <button onClick={() => setBottomTab('terminal')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'terminal' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <TerminalIcon size={14} /> Terminal
-            </button>
-            <button onClick={() => setBottomTab('fixwire')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'fixwire' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <Zap size={14} /> FIX Wire
-            </button>
-            <button onClick={() => setBottomTab('trace')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'trace' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <FileText size={14} /> Trace
-            </button>
-            <button onClick={() => setBottomTab('runbook')}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'runbook' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <BookOpenCheck size={14} /> Manual Runbook
-            </button>
+            <div className="relative group">
+              <button onClick={() => setBottomTab('case')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[13px] font-semibold transition-all ${bottomTab === 'case' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                <BookOpen size={13} /> Case Study
+              </button>
+              <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">The scenario narrative and runbook steps. This is your main workspace — read the incident, then click Run on each step.</p>
+              </div>
+            </div>
+            <div className="relative group">
+              <button onClick={() => setBottomTab('terminal')}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'terminal' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                <TerminalIcon size={14} /> Terminal
+              </button>
+              <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">A simulated FIX CLI. Type commands like `fix-cli show orders` or `fix-cli heartbeat NYSE` to inspect the system manually.</p>
+              </div>
+            </div>
+            <div className="relative group">
+              <button onClick={() => setBottomTab('fixwire')}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'fixwire' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                <Zap size={14} /> FIX Wire
+              </button>
+              <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">Raw FIX protocol messages (New Order Single, Execution Reports, Rejects) with timestamps. For developers who need to see the wire-level traffic.</p>
+              </div>
+            </div>
+            <div className="relative group">
+              <button onClick={() => setBottomTab('trace')}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'trace' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                <FileText size={14} /> Trace
+              </button>
+              <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">Audit log of every MCP tool call: what tool ran, what arguments were passed, the output, latency, and whether it succeeded. Filterable and exportable.</p>
+              </div>
+            </div>
+            <div className="relative group">
+              <button onClick={() => setBottomTab('runbook')}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'runbook' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                <BookOpenCheck size={14} /> Manual Runbook
+              </button>
+              <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">The equivalent manual commands an SRE would run on a real desk. Shows bash commands, SQL queries, and FIX messages for each runbook step.</p>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Training infrastructure toggle */}
-            <button onClick={() => setShowTraining(!showTraining)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${showTraining ? 'bg-[var(--green-dim)] text-[var(--green)] border border-[var(--green)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
-              title="Training infrastructure: time control, scoring, state snapshots, and event injection">
-              <GraduationCap size={13} /> Training
-            </button>
-            {/* Focus mode toggle */}
+            <div className="relative group">
+              <button onClick={() => setShowTraining(!showTraining)}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${showTraining ? 'bg-[var(--green-dim)] text-[var(--green)] border border-[var(--green)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                <GraduationCap size={13} /> Resilience
+              </button>
+              <div className="pointer-events-none invisible group-hover:visible absolute right-0 top-full mt-2 z-50 w-64 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+                <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Opens the chaos engineering panel: inject failures (venue outage, reject spike, LULD halt), fast-forward time, compute performance scores, and save/restore system snapshots.</p>
+              </div>
+            </div>
             <button onClick={() => setFocusMode(!focusMode)}
               className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${focusMode ? 'bg-[var(--cyan-dim)] text-[var(--cyan)] border border-[var(--cyan)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
               title="Focus mode">

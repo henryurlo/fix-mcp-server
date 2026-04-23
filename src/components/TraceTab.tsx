@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   ChevronDown, ChevronRight, Search, Download, RotateCcw,
-  CheckCircle2, XCircle, Clock, Filter, X
+  CheckCircle2, XCircle, Clock, Filter, X, FileText
 } from 'lucide-react';
 
 interface TraceEntry {
@@ -189,10 +189,12 @@ export function TraceTab() {
       <div className="flex-1 overflow-y-auto">
         {entries.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Clock size={32} className="text-[var(--text-dim)] mx-auto mb-2" />
-              <p className="text-[14px] text-[var(--text-muted)]">No trace entries yet</p>
-              <p className="text-[12px] text-[var(--text-dim)]">Run a scenario or call a tool to start the trace.</p>
+            <div className="text-center max-w-md px-4">
+              <FileText size={32} className="text-[var(--text-dim)] mx-auto mb-3" />
+              <p className="text-[14px] text-[var(--text-muted)] mb-2">No trace entries yet</p>
+              <p className="text-[12px] text-[var(--text-dim)] leading-relaxed">
+                This tab is an audit log of every MCP tool call made by the dashboard, copilot, or scenario engine. It shows the tool name, arguments, output, latency, and success/failure status. Run a scenario or call a tool to start the trace.
+              </p>
             </div>
           </div>
         ) : (
