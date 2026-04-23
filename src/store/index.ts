@@ -484,12 +484,21 @@ export const useChat = create<ChatState>((set, get) => ({
       let scenarioContextMsg = '';
       if (scenarioContext) {
         const ctx = scenarioContext;
+        const { trackedSteps } = useSystem.getState();
+        const stepSummary = trackedSteps.map((t, i) => {
+          const statusEmoji = t.status === 'done' ? '✅' : t.status === 'running' ? '⏳' : t.status === 'failed' ? '❌' : '○';
+          return `${statusEmoji} Step ${t.step}: ${t.title} [${t.status}]`;
+        }).join('\n');
+        const nextStep = trackedSteps.find((t) => t.status === 'idle');
+
         const parts = [
           `## Active Scenario: ${ctx.title}`,
-          ctx.runbook?.narrative ? `### Situation\n${ctx.runbook.narrative.slice(0, 200)}` : '',
+          ctx.runbook?.narrative ? `### Situation\n${ctx.runbook.narrative.slice(0, 300)}` : '',
           `### Key Problems: ${ctx.hints?.key_problems?.join('; ') || 'None'}`,
           `### Start: ${ctx.hints?.diagnosis_path || 'Check session health.'}`,
           `### Success Criteria: ${ctx.success_criteria?.length || 0} conditions`,
+          `### Runbook Steps:\n${stepSummary}`,
+          nextStep ? `### NEXT ACTION: The user should click "Run" on Step ${nextStep.step}: ${nextStep.title}. Guide them to do this.` : '### All steps completed.',
         ].filter(Boolean);
         scenarioContextMsg = parts.join('\n');
       }
