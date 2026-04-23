@@ -51,7 +51,8 @@
     {"symbol": "QQQ", "cusip": "46090E103", "name": "Invesco QQQ Trust", "listing_exchange": "NASDAQ", "lot_size": 100, "tick_size": 0.01, "status": "active"},
     {"symbol": "IWM", "cusip": "464287655", "name": "iShares Russell 2000 ETF", "listing_exchange": "NYSE", "lot_size": 100, "tick_size": 0.01, "status": "active"},
     {"symbol": "ACME", "cusip": "004930432", "name": "Acme Corporation", "listing_exchange": "NYSE", "lot_size": 100, "tick_size": 0.01, "status": "active"},
-    {"symbol": "ZEPH", "cusip": "98765X101", "name": "Zephyr Technologies Inc", "listing_exchange": "NYSE", "lot_size": 100, "tick_size": 0.01, "status": "pending_ipo"}
+    {"symbol": "ZEPH", "cusip": "98765X101", "name": "Zephyr Technologies Inc", "listing_exchange": "NYSE", "lot_size": 100, "tick_size": 0.01, "status": "pending_ipo"},
+    {"symbol": "RDSA", "cusip": "822582790", "name": "Royal Dutch Shell PLC ADR", "listing_exchange": "NYSE", "lot_size": 100, "tick_size": 0.01, "status": "active"}
   ],
   "corporate_actions": [
     {
@@ -71,6 +72,15 @@
       "new_symbol": "ZEPH",
       "ratio": null,
       "description": "Zephyr Technologies Inc initial public offering on NYSE. Symbol ZEPH, CUSIP 98765X101. IPO price range $22-26. First trading day 2026-03-28."
+    },
+    {
+      "action_id": "CA-2026-0328-003",
+      "action_type": "ticker_change",
+      "effective_date": "2026-03-28",
+      "old_symbol": "RDSA",
+      "new_symbol": "SHEL",
+      "ratio": null,
+      "description": "Royal Dutch Shell PLC ADR rebranding. Ticker changes from RDSA to SHEL effective market open 2026-03-28."
     }
   ]
 }

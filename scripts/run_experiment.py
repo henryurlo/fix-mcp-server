@@ -80,8 +80,9 @@ def run_scenario(scenario_name):
         if err:
             step_result["error"] = err
         else:
-            step_result["success"] = True
-            step_result["output"] = str(out.get("output", ""))[:500] if out else ""
+            output_text = str(out.get("output", "")) if out else ""
+            step_result["success"] = not output_text.startswith("ERROR")
+            step_result["output"] = output_text[:500]
 
         results["steps"].append(step_result)
 

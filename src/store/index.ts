@@ -454,9 +454,6 @@ export const useChat = create<ChatState>((set, get) => ({
   },
 
   send: async (content: string) => {
-    const { openRouterKey } = get();
-    if (!openRouterKey) return;
-
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: 'user', content, timestamp: Date.now() };
     set((s) => ({ messages: [...s.messages, userMsg], isTyping: true }));
 
@@ -493,14 +490,9 @@ export const useChat = create<ChatState>((set, get) => ({
         { role: 'user', content },
       ];
 
-      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const resp = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openRouterKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'FIX MCP Console',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'openai/gpt-5.4',
           messages: msgs,

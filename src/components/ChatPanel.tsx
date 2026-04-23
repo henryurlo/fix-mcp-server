@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChat, ChatMessage } from '@/store';
 import { useSystem } from '@/store';
-import { Send, X, Key, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Shield, Terminal, Zap, Radio, Wrench } from 'lucide-react';
+import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench } from 'lucide-react';
 
 // Quick-prompt buttons — context-aware
 const QUICK_PROMPTS = [
@@ -38,11 +38,9 @@ const SCENARIO_QUICK_ACTION: Record<string, Array<{ icon: string; label: string;
 const COPILOT_MODEL_LABEL = 'GPT-5.4 via OpenRouter';
 
 export function ChatPanel() {
-  const { messages, isOpen, isTyping, openRouterKey, toggleOpen, send, setKey, clear } = useChat();
+  const { messages, isOpen, isTyping, toggleOpen, send, clear } = useChat();
   const { mode, scenario, scenarioContext, controlMode, takeOverAsAgent, releaseToHuman, toggleCollab, locked } = useSystem();
   const [input, setInput] = useState('');
-  const [keyInput, setKeyInput] = useState('');
-  const [showKeyModal, setShowKeyModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,14 +53,6 @@ export function ChatPanel() {
     if (!input.trim()) return;
     send(input.trim());
     setInput('');
-  };
-
-  const handleKeySubmit = () => {
-    if (keyInput.trim().startsWith('sk-or-') || keyInput.trim().startsWith('sk-')) {
-      setKey(keyInput.trim());
-      setShowKeyModal(false);
-      setKeyInput('');
-    }
   };
 
   // Context-aware prompts: prefer runbook steps from loaded scenarioContext,
@@ -152,13 +142,6 @@ export function ChatPanel() {
               AGENT
             </span>
           )}
-          <button
-            onClick={() => setShowKeyModal(true)}
-            className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-            title="Set OpenRouter API Key"
-          >
-            <Key size={13} />
-          </button>
           <button
             onClick={clear}
             className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
@@ -262,50 +245,17 @@ export function ChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder={openRouterKey ? 'Ask about system state, diagnose issues...' : 'Set your OpenRouter key first (🔑)'}
-            disabled={!openRouterKey}
+            placeholder='Ask about system state, diagnose issues...'
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || !openRouterKey || isTyping}
+            disabled={!input.trim() || isTyping}
             className="btn-primary !px-3 !py-2"
           >
             <Send size={14} />
           </button>
         </div>
       </div>
-
-      {/* API Key Modal */}
-      {showKeyModal && (
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="glass-panel-bright p-5 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex items-center gap-2 mb-3">
-              <Shield size={16} className="text-[var(--green)]" />
-              <h3 className="text-sm font-bold">OpenRouter API Key</h3>
-            </div>
-            <p className="text-[13px] text-[var(--text-muted)] mb-3">
-              Your key stays in this browser session — never sent anywhere except OpenRouter's API.
-            </p>
-            <input
-              type="password"
-              className="input-base font-mono !text-[14px] mb-3"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              placeholder="sk-or-v1-..."
-              onKeyDown={(e) => { if (e.key === 'Enter') handleKeySubmit(); }}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button onClick={handleKeySubmit} className="btn-primary flex-1">
-                Activate Copilot
-              </button>
-              <button onClick={() => setShowKeyModal(false)} className="btn-secondary">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

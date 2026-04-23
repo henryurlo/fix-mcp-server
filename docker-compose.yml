@@ -46,8 +46,9 @@ services:
       - SCENARIO=${SCENARIO:-morning_triage}
       - FIX_MCP_CONFIG_DIR=/app/config
       - OTEL_SERVICE_NAME=fix-mcp-api
-      - DATABASE_URL=postgresql://trading:trading@postgres:5432/trading
+      - DATABASE_URL=postgresql://trading:***@postgres:5432/trading
       - REDIS_URL=redis://redis:6379/0
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:

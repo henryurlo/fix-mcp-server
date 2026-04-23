@@ -350,7 +350,7 @@
         "narrative": "Get the MSFT IS algo details \u2014 shortfall, remaining quantity, time remaining.",
         "tool": "check_algo_status",
         "tool_args": {
-          "algo_id": "ALGO-20260328-005"
+          "algo_id": "ALGO-20260328-021"
         },
         "expected": "MSFT IS 66.8bps shortfall, 60K remaining, 15 min to close"
       },
@@ -360,7 +360,7 @@
         "narrative": "Get the NVDA dark aggregator details \u2014 dark fill rate, lit fallback activity.",
         "tool": "check_algo_status",
         "tool_args": {
-          "algo_id": "ALGO-20260328-006"
+          "algo_id": "ALGO-20260328-022"
         },
         "expected": "NVDA dark agg zero dark fills, 110K unexecuted, routing via BATS lit"
       },
@@ -370,7 +370,7 @@
         "narrative": "Dark venues are illiquid for NVDA at current size. Cancel the dark algo and re-submit as TWAP on lit venues.",
         "tool": "cancel_algo",
         "tool_args": {
-          "algo_id": "ALGO-20260328-006"
+          "algo_id": "ALGO-20260328-022"
         },
         "expected": "NVDA dark aggregator canceled, orders released"
       },
@@ -390,7 +390,7 @@
         "narrative": "If the shortfall exceeds the 30bps limit and cannot recover, escalate or pause the IS to prevent further damage.",
         "tool": "modify_algo",
         "tool_args": {
-          "algo_id": "ALGO-20260328-005",
+          "algo_id": "ALGO-20260328-021",
           "action": "pause"
         },
         "expected": "MSFT IS paused pending decision \u2014 escalate to desk head"

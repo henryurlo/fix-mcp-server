@@ -374,7 +374,7 @@
         "tool_args": {
           "algo_id": "ALGO-20260328-011",
           "action": "update_pov_rate",
-          "pov_rate": 0.08
+          "new_pov_rate": 0.08
         },
         "expected": "TSLA VWAP POV rate reduced to 8%"
       },

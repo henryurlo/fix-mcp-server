@@ -3,7 +3,6 @@
   "severity": "Critical",
   "difficulty": "advanced",
   "time": "12:05",
-  "est_minutes": 25,
   "description": "Two unrelated concurrent incidents at midday: an algo with stuck child orders from stale BATS market data, and a pending-ack NYSE order threatened by a delayed-ACK backlog. Tests the operator's ability to triage, prioritize, and resolve without making things worse.",
   "sessions": [
     {

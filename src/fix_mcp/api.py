@@ -21,9 +21,12 @@ import re
 import threading
 from collections import deque
 from datetime import datetime, timezone
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, Request, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse
 
 from fix_mcp import server
 from fix_mcp.server import get_tcp_integration, _trace_buffer
@@ -292,372 +295,377 @@ def _detail_payload() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Request handler
+# FastAPI app
 # ---------------------------------------------------------------------------
 
-class APIHandler(BaseHTTPRequestHandler):
+app = FastAPI(title="fix-mcp-api", version="0.1.0")
 
-    def _send_text(self, body: bytes, content_type: str = "text/plain; charset=utf-8") -> None:
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(body)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
 
-    def _send_json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
-        body = _json_bytes(payload)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(body)
 
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length", "0"))
-        raw = self.rfile.read(length)
-        return json.loads(raw.decode("utf-8") or "{}")
-
-    def do_OPTIONS(self) -> None:  # noqa: N802
-        self.send_response(HTTPStatus.NO_CONTENT)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
-
-    def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/" or self.path == "":
-            # Serve the AI Operations Theater frontend
-            html_path = Path(__file__).parent.parent / 'ui' / 'index.html'
-            if html_path.exists():
-                body = html_path.read_bytes()
-                self.send_response(HTTPStatus.OK)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(body)
-                return
-            self._send_json({"api": "fix-mcp", "version": "0.1.0", "endpoints": ["/health", "/api/status", "/api/detail", "/api/sessions", "/api/orders", "/api/algos", "/api/scenarios", "/api/events", "/api/mode", "/api/simulation", "/api/tool (POST)", "/api/reset (POST)", "/api/mode (POST)", "/api/simulation (POST)"]})
-            return
-
-        if self.path == "/health":
-            self._send_json({"status": "ok", "scenario": server.SCENARIO})
-            return
-
-        if self.path == "/api/status":
-            sessions = server.session_manager.get_all_sessions()
-            algos = server.algo_engine.get_all()
-            active_algos = [a for a in algos if a.status in {"running", "paused", "stuck", "halted"}]
-            open_orders = [
-                o for o in server.oms.orders.values()
-                if o.status not in {"filled", "canceled", "rejected"}
-            ]
-            stuck_orders = [o for o in open_orders if o.status == "stuck"]
-            self._send_json({
-                "scenario": server.SCENARIO,
-                "is_algo_scenario": _is_algo_scenario(server.SCENARIO),
-                "available_scenarios": _scenario_metadata(),
-                "sessions": {
-                    "total": len(sessions),
-                    "active": sum(1 for s in sessions if s.status == "active"),
-                    "degraded": sum(1 for s in sessions if s.status == "degraded"),
-                    "down": sum(1 for s in sessions if s.status == "down"),
-                    "detail": _session_summary(),
-                },
-                "orders": {
-                    "open": len(open_orders),
-                    "stuck": len(stuck_orders),
-                },
-                "algos": {
-                    "active": len(active_algos),
-                    "total": len(algos),
-                },
-            })
-            return
-
-        if self.path == "/api/sessions":
-            self._send_json(_session_summary())
-            return
-
-        if self.path == "/api/orders":
-            self._send_json(_order_summary())
-            return
-
-        if self.path == "/api/algos":
-            self._send_json(_algo_summary())
-            return
-
-        if self.path == "/api/scenarios":
-            self._send_json(_scenario_metadata())
-            return
-
-        if self.path.startswith("/api/scenario/"):
-            name = self.path[len("/api/scenario/"):]
-            ctx = _scenario_context(name)
-            if ctx is None:
-                self._send_json({"error": f"Scenario '{name}' not found"}, HTTPStatus.NOT_FOUND)
-            else:
-                self._send_json(ctx)
-            return
-
-        if self.path == "/api/detail":
-            self._send_json(_detail_payload())
-            return
-
-        if self.path == "/api/mode":
-            self._send_json({"mode": _mode})
-            return
-
-        if self.path.startswith("/api/events"):
-            with _events_lock:
-                self._send_json(list(_events))
-            return
-
-        if self.path.startswith("/api/trace"):
-            limit = 200
-            tool_filter = None
-            status_filter = None
-            source_filter = None
-            # Parse query params
-            if "?" in self.path:
-                from urllib.parse import parse_qs, urlparse
-                qs = parse_qs(urlparse(self.path).query)
-                limit = int(qs.get("limit", [200])[0])
-                tool_filter = qs.get("tool", [None])[0]
-                status_filter = qs.get("status", [None])[0]
-                source_filter = qs.get("source", [None])[0]
-            entries = _trace_buffer.get_entries(
-                limit=limit, tool_filter=tool_filter,
-                status_filter=status_filter, source_filter=source_filter,
-            )
-            self._send_json(entries)
-            return
-
-        if self.path == "/api/trace/stats":
-            self._send_json(_trace_buffer.stats())
-            return
-
-        if self.path == "/api/runbook":
-            from urllib.parse import parse_qs, urlparse
-            tool_filter = None
-            if "?" in self.path:
-                qs = parse_qs(urlparse(self.path).query)
-                tool_filter = qs.get("tool", [None])[0]
-            if tool_filter:
-                matching = {k: v for k, v in MANUAL_RUNBOOK.items() if tool_filter.lower() in k.lower()}
-            else:
-                matching = MANUAL_RUNBOOK
-            self._send_json(matching)
-            return
-
-        if self.path == "/api/runbook/list":
-            self._send_json({k: {"title": v["title"], "description": v["description"]} for k, v in MANUAL_RUNBOOK.items()})
-            return
-
-        if self.path == "/api/fix-wire":
-            # Aggregate FIX wire messages from all orders + session-level events
-            wire_events = []
-            
-            # FIX messages from orders
-            for o in server.oms.orders.values():
-                for i, msg in enumerate(o.fix_messages):
-                    # Parse key fields from the raw FIX message
-                    parts = {}
-                    for seg in msg.split('|'):
-                        if '=' in seg:
-                            k, v = seg.split('=', 1)
-                            parts[k] = v
-                    msg_type = parts.get('35', '?')
-                    msg_type_name = {
-                        'A': 'Logon', '0': 'Heartbeat', 'D': 'NewOrderSingle',
-                        '8': 'ExecutionReport', 'F': 'OrderCancel', 'G': 'CancelReplace',
-                        '2': 'ResendRequest', '5': 'Logout', '4': 'SeqReset',
-                        '1': 'TestRequest', '3': 'Reject', '9': 'OrderCancelAck',
-                    }.get(msg_type, f'Unknown({msg_type})')
-                    symbol = parts.get('55', '')
-                    side = parts.get('54', '')
-                    qty = parts.get('38', '')
-                    venue = o.venue if hasattr(o, 'venue') else ''
-                    wire_events.append({
-                        'ts': parts.get('52', ''),
-                        'type': msg_type_name,
-                        'msg_type': msg_type,
-                        'venue': venue,
-                        'symbol': symbol,
-                        'side': 'Buy' if side == '1' else 'Sell' if side == '2' else '',
-                        'qty': qty,
-                        'cl_ord_id': parts.get('11', ''),
-                        'raw': msg,
-                    })
-            
-            # Session-level heartbeat events
-            for s in server.session_manager.get_all_sessions():
-                wire_events.append({
-                    'ts': s.last_heartbeat or '',
-                    'type': 'SessionState',
-                    'msg_type': 'HB',
-                    'venue': s.venue,
-                    'symbol': '',
-                    'side': '',
-                    'qty': '',
-                    'cl_ord_id': '',
-                    'raw': f'{s.venue} status={s.status} latency={s.latency_ms}ms seq={s.last_sent_seq}/{s.last_recv_seq}',
-                })
-            
-            # Sort by timestamp descending, keep most recent
-            wire_events.sort(key=lambda e: e['ts'], reverse=True)
-            self._send_json(wire_events[:200])
-            return
-
-        if self.path == "/api/mcp/schema":
-            tools = asyncio.run(server.list_tools())
-            resources = asyncio.run(server.list_resources())
-            prompts = asyncio.run(server.list_prompts())
-            self._send_json({
-                "server": {
-                    "name": "fix-trading-ops",
-                    "version": "0.1.0",
-                    "protocolVersion": "2024-11-05",
-                },
-                "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
-                "tools": [
-                    {
-                        "name": t.name,
-                        "description": t.description or "",
-                        "inputSchema": t.inputSchema if isinstance(t.inputSchema, dict) else {},
-                    }
-                    for t in tools
-                ],
-                "resources": [
-                    {
-                        "uri": str(r.uri),
-                        "name": r.name,
-                        "description": r.description or "",
-                        "mimeType": r.mimeType or "",
-                    }
-                    for r in resources
-                ],
-                "prompts": [
-                    {"name": p.name, "description": p.description or ""}
-                    for p in prompts
-                ],
-            })
-            return
-
-        if self.path == "/metrics":
-            self._handle_metrics()
-            return
-
-        self.send_error(HTTPStatus.NOT_FOUND)
-
-    def do_POST(self) -> None:  # noqa: N802
-        if self.path == "/api/tool":
-            payload = self._read_json()
-            tool = payload.get("tool", "")
-            arguments = payload.get("arguments", {})
-            # Tag this call as "dashboard" so the Activity tab can distinguish it
-            # from Claude's MCP HTTP calls (which default to "claude").
-            token = server._call_source.set("dashboard")
-            try:
-                result = asyncio.run(server.call_tool(tool, arguments))
-                result_text = result[0].text
-                # _publish_event is called via _on_tool_call listener in server.call_tool
-                self._send_json({"output": result_text, "ok": True})
-            except Exception as exc:
-                # Fallback publish for catastrophic errors that bypass the listener
-                _publish_event(tool, arguments, str(exc), False, "dashboard")
-                self._send_json({"output": str(exc), "ok": False}, HTTPStatus.BAD_REQUEST)
-            finally:
-                server._call_source.reset(token)
-            return
-
-        if self.path == "/api/mode":
-            global _mode
-            payload = self._read_json()
-            new_mode = payload.get("mode", "human")
-            if new_mode in ("human", "agent", "mixed"):
-                _mode = new_mode
-            self._send_json({"mode": _mode, "ok": True})
-            return
-
-        if self.path == "/api/reset":
-            payload = self._read_json()
-            scenario = payload.get("scenario") or None
-            active = server.reset_runtime(scenario)
-            self._send_json({"output": f"Scenario loaded: {active}", "scenario": active, "ok": True})
-            return
-
-        if self.path == "/api/scenario":
-            payload = self._read_json()
-            name = payload.get("name", "").strip()
-            if not name:
-                self._send_json({"error": "Scenario 'name' is required"}, HTTPStatus.BAD_REQUEST)
-                return
-            # Sanitize name for filename
-            safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", name).lower()
-            config_dir = Path(server.engine.config_dir) / "scenarios"
-            config_dir.mkdir(parents=True, exist_ok=True)
-            filepath = config_dir / f"{safe_name}.json"
-            with open(filepath, "w", encoding="utf-8") as fh:
-                json.dump(payload, fh, indent=2)
-            self._send_json({"output": f"Scenario saved: {safe_name}", "name": safe_name, "ok": True})
-            return
-
-        self.send_error(HTTPStatus.NOT_FOUND)
-
-    def _handle_metrics(self) -> None:
-        """Serve Prometheus /metrics endpoint in text format.
-
-        Before rendering, refresh live gauges (active orders, venue status,
-        session counts, scenario duration) so the scrape always reflects
-        the current process state.
-        """
-        try:
-            from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, REGISTRY
-        except ImportError:
-            self._send_text(b"# prometheus_client not installed\n")
-            return
-
-        # ── Refresh live gauges ──────────────────────────────────────────
-        open_orders = [
-            o for o in server.oms.orders.values()
-            if o.status not in {"filled", "canceled", "rejected"}
+@app.get("/")
+async def root():
+    html_path = Path(__file__).parent.parent / "ui" / "index.html"
+    if html_path.exists():
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    return JSONResponse({
+        "api": "fix-mcp",
+        "version": "0.1.0",
+        "endpoints": [
+            "/health", "/api/status", "/api/detail", "/api/sessions",
+            "/api/orders", "/api/algos", "/api/scenarios", "/api/events",
+            "/api/mode", "/api/simulation", "/api/tool (POST)",
+            "/api/reset (POST)", "/api/mode (POST)", "/api/simulation (POST)"
         ]
-        FIX_METRICS.active_orders.set(len(open_orders))
+    })
 
-        sessions = server.session_manager.get_all_sessions()
-        status_counts: dict[str, int] = {}
-        for s in sessions:
-            status_counts[s.status] = status_counts.get(s.status, 0) + 1
-            FIX_METRICS.venue_status.info({
-                "venue": s.venue,
-                "status": s.status,
-                "latency_ms": str(s.latency_ms),
+
+@app.get("/health")
+async def health():
+    return JSONResponse({"status": "ok", "scenario": server.SCENARIO})
+
+
+@app.get("/api/status")
+async def api_status():
+    sessions = server.session_manager.get_all_sessions()
+    algos = server.algo_engine.get_all()
+    active_algos = [a for a in algos if a.status in {"running", "paused", "stuck", "halted"}]
+    open_orders = [
+        o for o in server.oms.orders.values()
+        if o.status not in {"filled", "canceled", "rejected"}
+    ]
+    stuck_orders = [o for o in open_orders if o.status == "stuck"]
+    return JSONResponse({
+        "scenario": server.SCENARIO,
+        "is_algo_scenario": _is_algo_scenario(server.SCENARIO),
+        "available_scenarios": _scenario_metadata(),
+        "sessions": {
+            "total": len(sessions),
+            "active": sum(1 for s in sessions if s.status == "active"),
+            "degraded": sum(1 for s in sessions if s.status == "degraded"),
+            "down": sum(1 for s in sessions if s.status == "down"),
+            "detail": _session_summary(),
+        },
+        "orders": {
+            "open": len(open_orders),
+            "stuck": len(stuck_orders),
+        },
+        "algos": {
+            "active": len(active_algos),
+            "total": len(algos),
+        },
+    })
+
+
+@app.get("/api/sessions")
+async def api_sessions():
+    return JSONResponse(_session_summary())
+
+
+@app.get("/api/orders")
+async def api_orders():
+    return JSONResponse(_order_summary())
+
+
+@app.get("/api/algos")
+async def api_algos():
+    return JSONResponse(_algo_summary())
+
+
+@app.get("/api/scenarios")
+async def api_scenarios():
+    return JSONResponse(_scenario_metadata())
+
+
+@app.get("/api/scenario/{name}")
+async def api_scenario(name: str):
+    ctx = _scenario_context(name)
+    if ctx is None:
+        return JSONResponse({"error": f"Scenario '{name}' not found"}, status_code=404)
+    return JSONResponse(ctx)
+
+
+@app.get("/api/detail")
+async def api_detail():
+    return JSONResponse(_detail_payload())
+
+
+@app.get("/api/mode")
+async def api_mode_get():
+    return JSONResponse({"mode": _mode})
+
+
+@app.get("/api/events")
+async def api_events():
+    with _events_lock:
+        return JSONResponse(list(_events))
+
+
+@app.get("/api/trace")
+async def api_trace(
+    limit: int = Query(default=200),
+    tool: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    source: str | None = Query(default=None),
+):
+    entries = _trace_buffer.get_entries(
+        limit=limit,
+        tool_filter=tool,
+        status_filter=status,
+        source_filter=source,
+    )
+    return JSONResponse(entries)
+
+
+@app.get("/api/trace/stats")
+async def api_trace_stats():
+    return JSONResponse(_trace_buffer.stats())
+
+
+@app.get("/api/runbook")
+async def api_runbook(tool: str | None = Query(default=None)):
+    if tool:
+        matching = {k: v for k, v in MANUAL_RUNBOOK.items() if tool.lower() in k.lower()}
+    else:
+        matching = MANUAL_RUNBOOK
+    return JSONResponse(matching)
+
+
+@app.get("/api/runbook/list")
+async def api_runbook_list():
+    return JSONResponse({k: {"title": v["title"], "description": v["description"]} for k, v in MANUAL_RUNBOOK.items()})
+
+
+@app.get("/api/fix-wire")
+async def api_fix_wire():
+    # Aggregate FIX wire messages from all orders + session-level events
+    wire_events = []
+    
+    # FIX messages from orders
+    for o in server.oms.orders.values():
+        for i, msg in enumerate(o.fix_messages):
+            # Parse key fields from the raw FIX message
+            parts = {}
+            for seg in msg.split("|"):
+                if "=" in seg:
+                    k, v = seg.split("=", 1)
+                    parts[k] = v
+            msg_type = parts.get("35", "?")
+            msg_type_name = {
+                "A": "Logon", "0": "Heartbeat", "D": "NewOrderSingle",
+                "8": "ExecutionReport", "F": "OrderCancel", "G": "CancelReplace",
+                "2": "ResendRequest", "5": "Logout", "4": "SeqReset",
+                "1": "TestRequest", "3": "Reject", "9": "OrderCancelAck",
+            }.get(msg_type, f"Unknown({msg_type})")
+            symbol = parts.get("55", "")
+            side = parts.get("54", "")
+            qty = parts.get("38", "")
+            venue = o.venue if hasattr(o, "venue") else ""
+            wire_events.append({
+                "ts": parts.get("52", ""),
+                "type": msg_type_name,
+                "msg_type": msg_type,
+                "venue": venue,
+                "symbol": symbol,
+                "side": "Buy" if side == "1" else "Sell" if side == "2" else "",
+                "qty": qty,
+                "cl_ord_id": parts.get("11", ""),
+                "raw": msg,
             })
-        for status, count in status_counts.items():
-            FIX_METRICS.sessions_active.labels(status=status).set(count)
+    
+    # Session-level heartbeat events
+    for s in server.session_manager.get_all_sessions():
+        wire_events.append({
+            "ts": s.last_heartbeat or "",
+            "type": "SessionState",
+            "msg_type": "HB",
+            "venue": s.venue,
+            "symbol": "",
+            "side": "",
+            "qty": "",
+            "cl_ord_id": "",
+            "raw": f"{s.venue} status={s.status} latency={s.latency_ms}ms seq={s.last_sent_seq}/{s.last_recv_seq}",
+        })
+    
+    # Sort by timestamp descending, keep most recent
+    wire_events.sort(key=lambda e: e["ts"], reverse=True)
+    return JSONResponse(wire_events[:200])
 
-        # Scenario duration — time since oldest active order was created, or 0
-        if server.oms.orders:
-            earliest = 0.0
-            now_ts = datetime.now(timezone.utc).timestamp()
-            for o in server.oms.orders.values():
-                try:
-                    created = datetime.fromisoformat(o.created_at).timestamp()
-                    age = now_ts - created
-                    if age > earliest:
-                        earliest = age
-                except Exception:
-                    pass
-            FIX_METRICS.scenario_duration.set(earliest)
 
-        body = generate_latest(REGISTRY)
-        self._send_text(body, content_type=CONTENT_TYPE_LATEST)
+@app.get("/api/mcp/schema")
+async def api_mcp_schema():
+    tools = await server.list_tools()
+    resources = await server.list_resources()
+    prompts = await server.list_prompts()
+    return JSONResponse({
+        "server": {
+            "name": "fix-trading-ops",
+            "version": "0.1.0",
+            "protocolVersion": "2024-11-05",
+        },
+        "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
+        "tools": [
+            {
+                "name": t.name,
+                "description": t.description or "",
+                "inputSchema": t.inputSchema if isinstance(t.inputSchema, dict) else {},
+            }
+            for t in tools
+        ],
+        "resources": [
+            {
+                "uri": str(r.uri),
+                "name": r.name,
+                "description": r.description or "",
+                "mimeType": r.mimeType or "",
+            }
+            for r in resources
+        ],
+        "prompts": [
+            {"name": p.name, "description": p.description or ""}
+            for p in prompts
+        ],
+    })
 
-    def log_message(self, fmt: str, *args: object) -> None:
-        return
+
+@app.get("/metrics")
+async def metrics():
+    """Serve Prometheus /metrics endpoint in text format.
+
+    Before rendering, refresh live gauges (active orders, venue status,
+    session counts, scenario duration) so the scrape always reflects
+    the current process state.
+    """
+    try:
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, REGISTRY
+    except ImportError:
+        return PlainTextResponse("# prometheus_client not installed\n")
+
+    # ── Refresh live gauges ──────────────────────────────────────────
+    open_orders = [
+        o for o in server.oms.orders.values()
+        if o.status not in {"filled", "canceled", "rejected"}
+    ]
+    FIX_METRICS.active_orders.set(len(open_orders))
+
+    sessions = server.session_manager.get_all_sessions()
+    status_counts: dict[str, int] = {}
+    for s in sessions:
+        status_counts[s.status] = status_counts.get(s.status, 0) + 1
+        FIX_METRICS.venue_status.info({
+            "venue": s.venue,
+            "status": s.status,
+            "latency_ms": str(s.latency_ms),
+        })
+    for status, count in status_counts.items():
+        FIX_METRICS.sessions_active.labels(status=status).set(count)
+
+    # Scenario duration — time since oldest active order was created, or 0
+    if server.oms.orders:
+        earliest = 0.0
+        now_ts = datetime.now(timezone.utc).timestamp()
+        for o in server.oms.orders.values():
+            try:
+                created = datetime.fromisoformat(o.created_at).timestamp()
+                age = now_ts - created
+                if age > earliest:
+                    earliest = age
+            except Exception:
+                pass
+        FIX_METRICS.scenario_duration.set(earliest)
+
+    body = generate_latest(REGISTRY)
+    return PlainTextResponse(content=body, media_type=CONTENT_TYPE_LATEST)
+
+
+@app.post("/api/tool")
+async def api_tool_post(request: Request):
+    payload = await request.json()
+    tool = payload.get("tool", "")
+    arguments = payload.get("arguments", {})
+    # Tag this call as "dashboard" so the Activity tab can distinguish it
+    # from Claude's MCP HTTP calls (which default to "claude").
+    token = server._call_source.set("dashboard")
+    try:
+        result = await server.call_tool(tool, arguments)
+        result_text = result[0].text
+        # _publish_event is called via _on_tool_call listener in server.call_tool
+        return JSONResponse({"output": result_text, "ok": True})
+    except Exception as exc:
+        # Fallback publish for catastrophic errors that bypass the listener
+        _publish_event(tool, arguments, str(exc), False, "dashboard")
+        return JSONResponse({"output": str(exc), "ok": False}, status_code=400)
+    finally:
+        server._call_source.reset(token)
+
+
+@app.post("/api/mode")
+async def api_mode_post(request: Request):
+    global _mode
+    payload = await request.json()
+    new_mode = payload.get("mode", "human")
+    if new_mode in ("human", "agent", "mixed"):
+        _mode = new_mode
+    return JSONResponse({"mode": _mode, "ok": True})
+
+
+@app.post("/api/reset")
+async def api_reset(request: Request):
+    payload = await request.json()
+    scenario = payload.get("scenario") or None
+    active = server.reset_runtime(scenario)
+    return JSONResponse({"output": f"Scenario loaded: {active}", "scenario": active, "ok": True})
+
+
+@app.post("/api/scenario")
+async def api_scenario_post(request: Request):
+    payload = await request.json()
+    name = payload.get("name", "").strip()
+    if not name:
+        return JSONResponse({"error": "Scenario 'name' is required"}, status_code=400)
+    # Sanitize name for filename
+    safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", name).lower()
+    config_dir = Path(server.engine.config_dir) / "scenarios"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    filepath = config_dir / f"{safe_name}.json"
+    with open(filepath, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+    return JSONResponse({"output": f"Scenario saved: {safe_name}", "name": safe_name, "ok": True})
+
+
+@app.post("/api/chat")
+async def api_chat(request: Request):
+    """Proxy chat completions to OpenRouter so the API key stays server-side."""
+    payload = await request.json()
+    messages = payload.get("messages", [])
+    model = payload.get("model", "openai/gpt-5.4")
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        return JSONResponse({"error": "OPENROUTER_API_KEY not configured"}, status_code=500)
+
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://fix-mcp.local",
+                    "X-Title": "FIX MCP Console",
+                },
+                json={"model": model, "messages": messages, "max_tokens": 2048},
+            ) as resp:
+                data = await resp.json()
+                return JSONResponse(data)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=502)
 
 
 # ---------------------------------------------------------------------------
@@ -669,9 +677,8 @@ def main() -> None:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
-    httpd = ThreadingHTTPServer((args.host, args.port), APIHandler)
-    print(f"FIX MCP API running at http://{args.host}:{args.port}")
-    httpd.serve_forever()
+    import uvicorn
+    uvicorn.run("fix_mcp.api:app", host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
