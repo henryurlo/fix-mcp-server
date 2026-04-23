@@ -574,107 +574,95 @@ function MissionControlTab({
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
-      <div className="border-b border-[var(--border-dim)] bg-[var(--bg-base)] px-4 py-4">
-        <div className="grid gap-4 xl:grid-cols-[1.45fr_0.95fr]">
-          <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 shadow-2xl">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="rounded-full border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2.5 py-1 text-[11px] font-mono text-[var(--cyan)]">LIVE INCIDENT</span>
-              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-mono text-[var(--text-dim)]">{scenario}</span>
-              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-mono text-[var(--text-dim)]">{activeScenario?.simulated_time || '—'}</span>
+      {/* ── Compact Hero ── */}
+      <div className="border-b border-[var(--border-dim)] bg-[var(--bg-base)] px-4 py-3">
+        <div className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
+          <div className="rounded-xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4 shadow-lg">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="rounded-full border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-0.5 text-[10px] font-mono text-[var(--cyan)]">LIVE INCIDENT</span>
+              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{scenario}</span>
+              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{activeScenario?.simulated_time || '—'}</span>
             </div>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <h1 className="text-[28px] leading-tight font-bold text-[var(--text-primary)]">{activeTitle}</h1>
-                <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-[var(--text-secondary)]">
+                <h1 className="text-[22px] leading-tight font-bold text-[var(--text-primary)]">{activeTitle}</h1>
+                <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-[var(--text-secondary)]">
                   {activeScenario?.description || activeScenario?.runbook?.narrative || 'Live trading operations incident loaded.'}
                 </p>
               </div>
-              <div className="hidden xl:flex flex-col gap-2 min-w-[180px]">
-                <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2">
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Scenario lens</div>
-                  <div className="text-[13px] font-semibold text-[var(--text-primary)]">{activeScenario?.categories?.join(' · ') || 'ops incident'}</div>
+              <div className="hidden xl:flex flex-col gap-1.5 min-w-[160px]">
+                <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Lens</div>
+                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">{activeScenario?.categories?.join(' · ') || 'ops incident'}</div>
                 </div>
-                <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2">
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Guided by</div>
-                  <div className="text-[13px] font-semibold text-[var(--text-primary)]">Chatbot + MCP tools</div>
+                <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Guided by</div>
+                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">Chatbot + MCP tools</div>
                 </div>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Notional pressure</div>
-                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{open_count}</div>
-                <div className="text-[12px] text-[var(--text-muted)]">open orders at risk</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Notional pressure</div>
+                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{open_count}</div>
+                <div className="text-[11px] text-[var(--text-muted)]">open orders at risk</div>
               </div>
-              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Venue health</div>
-                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{downCount + degradedCount}</div>
-                <div className="text-[12px] text-[var(--text-muted)]">{downCount} down · {degradedCount} degraded</div>
+              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Venue health</div>
+                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{downCount + degradedCount}</div>
+                <div className="text-[11px] text-[var(--text-muted)]">{downCount} down · {degradedCount} degraded</div>
               </div>
-              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Runbook</div>
-                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{totalSteps}</div>
-                <div className="text-[12px] text-[var(--text-muted)]">explainable recovery steps</div>
+              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Runbook</div>
+                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{totalSteps}</div>
+                <div className="text-[11px] text-[var(--text-muted)]">recovery steps</div>
               </div>
-              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Current progress</div>
-                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{progressPct}%</div>
-                <div className="text-[12px] text-[var(--text-muted)]">{doneCount}/{totalSteps} steps complete</div>
+              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Progress</div>
+                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{progressPct}%</div>
+                <div className="text-[11px] text-[var(--text-muted)]">{doneCount}/{totalSteps} done</div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 shadow-2xl">
-            <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="rounded-xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4 shadow-lg">
+            <div className="flex items-center justify-between gap-3 mb-3">
               <div>
-                <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Scenario Ops</div>
-                <div className="text-[18px] font-bold text-[var(--text-primary)]">Run the desk</div>
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Scenario Ops</div>
+                <div className="text-[16px] font-bold text-[var(--text-primary)]">Run the desk</div>
               </div>
-              <button onClick={onOpenScenarioBuilder} className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
-                Create / Load Scenarios
+              <button onClick={onOpenScenarioBuilder} className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                Create / Load
               </button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <button onClick={startGuidedLaunch} disabled={heroAction !== null}
-                className="rounded-xl border border-[var(--cyan)]/30 bg-[var(--cyan-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--cyan-dim)]/30 disabled:opacity-50">
-                <div className="flex items-center gap-2 text-[var(--cyan)] font-bold text-[14px]">
-                  {heroAction === 'launching' ? <Loader2 size={15} className="animate-spin" /> : <MessageSquare size={15} />} Launch in Chatbot
+                className="rounded-lg border border-[var(--cyan)]/30 bg-[var(--cyan-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--cyan-dim)]/30 disabled:opacity-50">
+                <div className="flex items-center gap-1.5 text-[var(--cyan)] font-bold text-[13px]">
+                  {heroAction === 'launching' ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Launch in Chatbot
                 </div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Open the copilot, brief the incident, and start the guided response immediately.</div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Open copilot and start guided response.</div>
               </button>
               <button onClick={startGuidedStress} disabled={heroAction !== null}
-                className="rounded-xl border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
-                <div className="flex items-center gap-2 text-[var(--amber)] font-bold text-[14px]">
-                  {heroAction === 'stressing' ? <Loader2 size={15} className="animate-spin" /> : <FlaskConical size={15} />} Stress Test Now
+                className="rounded-lg border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
+                <div className="flex items-center gap-1.5 text-[var(--amber)] font-bold text-[13px]">
+                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Stress Test Now
                 </div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Inject failure pressure and force the chatbot + operator workflow to react.</div>
-              </button>
-              <button onClick={() => setShowTraining(true)}
-                className="rounded-xl border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--green-dim)]/30 group relative">
-                <div className="flex items-center gap-2 text-[var(--green)] font-bold text-[14px]"><GraduationCap size={15} /> Chaos Engineering Panel</div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Manually inject failures — venue outages, reject spikes, LULD halts. Test how the system and operator respond under pressure.</div>
-                <div className="pointer-events-none invisible group-hover:visible absolute left-0 bottom-full mb-2 z-50 w-72 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
-                  <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Opens the resilience panel with 4 tools: (1) Time Control — fast-forward the simulation clock, (2) Score — grade your incident response, (3) Snapshots — save/restore system state, (4) Inject — trigger chaos events like venue outages or reject spikes.</p>
-                </div>
-              </button>
-              <button onClick={() => setBottomTab('trace')}
-                className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-4 py-4 text-left transition-colors hover:border-[var(--cyan)]/30">
-                <div className="flex items-center gap-2 text-[var(--text-primary)] font-bold text-[14px]"><FileText size={15} /> Audit the MCP Trace</div>
-                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Show every tool call, argument, latency, and outcome like a real incident desk.</div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject reject spike and force triage.</div>
               </button>
             </div>
-            <div className="mt-4 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3">
-              <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Most important first</div>
-              <div className="mt-2 text-[13px] leading-relaxed text-[var(--text-secondary)]">{activeScenario?.hints?.diagnosis_path || 'Use the copilot to summarize the blast radius, then follow the runbook.'}</div>
+            <div className="mt-3 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-2.5">
+              <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Most important first</div>
+              <div className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">{activeScenario?.hints?.diagnosis_path || 'Use the copilot to summarize the blast radius, then follow the runbook.'}</div>
             </div>
-            <div className="mt-3 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3">
+            <div className="mt-2 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Resolution board</div>
-                  <div className="text-[13px] text-[var(--text-secondary)] mt-1">See finished steps with MCP output and mapped FIX/manual commands.</div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Resolution board</div>
+                  <div className="text-[12px] text-[var(--text-secondary)] mt-0.5">See finished steps with MCP output and mapped FIX/manual commands.</div>
                 </div>
                 <button onClick={() => setShowEvidenceBoard(v => !v)}
-                  className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                  className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
                   {showEvidenceBoard ? 'Hide' : 'Show'} Evidence
                 </button>
               </div>
@@ -940,60 +928,67 @@ function MissionControlTab({
               </div>
 
               {/* RIGHT: Ops rail */}
-              <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[320px]'}`}>
-                <div className="px-4 py-3 border-b border-[var(--border-dim)]">
-                  <div className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Ops Rail</div>
-                  <div className="text-[14px] font-semibold text-[var(--text-primary)] mt-1">Stress, launch, switch, create</div>
+              <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[340px]'}`}>
+                <div className="px-3 py-2.5 border-b border-[var(--border-dim)]">
+                  <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Ops Rail</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">{showTraining ? 'Chaos Engineering' : 'Stress, launch, switch'}</div>
                   <LiveTelemetryStrip />
                 </div>
-                <div className="p-3 space-y-3 border-b border-[var(--border-dim)]">
+                <div className="p-2.5 space-y-2 border-b border-[var(--border-dim)]">
                   <button onClick={startGuidedLaunch} disabled={heroAction !== null}
-                    className="w-full rounded-xl bg-[var(--cyan)] text-black text-[13px] font-bold py-2.5 px-3 flex items-center justify-center gap-2 hover:bg-[var(--cyan)]/80 disabled:opacity-50">
-                    {heroAction === 'launching' ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Launch in Chatbot
+                    className="w-full rounded-lg bg-[var(--cyan)] text-black text-[12px] font-bold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--cyan)]/80 disabled:opacity-50">
+                    {heroAction === 'launching' ? <Loader2 size={12} className="animate-spin" /> : <MessageSquare size={12} />} Launch in Chatbot
                   </button>
                   <button onClick={startGuidedStress} disabled={heroAction !== null}
-                    className="w-full rounded-xl border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[13px] font-semibold py-2.5 px-3 flex items-center justify-center gap-2 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50">
-                    {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Stress Test Active Scenario
-                  </button>
-                  <button onClick={onOpenScenarioBuilder}
-                    className="w-full rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] text-[13px] font-semibold py-2.5 px-3 hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
-                    Create / Load / Test Scenarios
+                    className="w-full rounded-lg border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50">
+                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Stress Test Active
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
-                  {activeScenarios?.map((s: any) => {
-                    const isActive = scenario === s.name;
-                    return (
-                      <button key={s.name} onClick={() => startScenario(s.name)}
-                        className={`w-full px-3 py-3 rounded-xl text-left transition-all ${
-                          isActive ? 'bg-[var(--cyan-dim)]/20 border border-[var(--cyan)]/40' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
-                        }`}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className={`text-[13px] font-semibold leading-snug ${isActive ? 'text-[var(--cyan)]' : 'text-[var(--text-secondary)]'}`}>{s.title || s.name}</div>
-                            <div className="mt-1 text-[11px] text-[var(--text-dim)] font-mono">{s.estimated_minutes}m · {(s.runbook_step_count || '?')} steps</div>
-                          </div>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0" style={{ backgroundColor: SEV_BG[s.severity], color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {(!focusMode) && (
-                  <div className="border-t border-[var(--border-dim)]">
-                    <button
-                      onClick={() => setHbExpanded(v => !v)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-secondary)] transition-colors"
-                    >
-                      <span className="flex items-center gap-1.5"><Activity size={12} /> FIX Sessions</span>
-                      <span>{hbExpanded ? '▲' : '▼'}</span>
-                    </button>
-                    {hbExpanded && (
-                      <div className="px-2 pb-2">
-                        <HeartbeatPanel sessions={sessions} onAction={(tool, args) => callTool(tool, args)} />
-                      </div>
-                    )}
+
+                {/* TrainingPanel renders HERE when toggled */}
+                {showTraining ? (
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <TrainingPanel onRollback={(id) => {
+                      callTool('rollback_to_snapshot', { snapshot_id: id });
+                      addAlert('Rolled back to snapshot ' + id, 'info', 3000);
+                    }} />
                   </div>
+                ) : (
+                  <>
+                    <div className="flex-1 min-h-0 overflow-y-auto px-2.5 py-2.5 space-y-2">
+                      {activeScenarios?.map((s: any) => {
+                        const isActive = scenario === s.name;
+                        return (
+                          <button key={s.name} onClick={() => startScenario(s.name)}
+                            className={`w-full px-2.5 py-2.5 rounded-lg text-left transition-all ${
+                              isActive ? 'bg-[var(--cyan-dim)]/20 border border-[var(--cyan)]/40' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
+                            }`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className={`text-[12px] font-semibold leading-snug ${isActive ? 'text-[var(--cyan)]' : 'text-[var(--text-secondary)]'}`}>{s.title || s.name}</div>
+                                <div className="mt-0.5 text-[10px] text-[var(--text-dim)] font-mono">{s.estimated_minutes}m · {(s.runbook_step_count || '?')} steps</div>
+                              </div>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0" style={{ backgroundColor: SEV_BG[s.severity], color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="border-t border-[var(--border-dim)]">
+                      <button
+                        onClick={() => setHbExpanded(v => !v)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-secondary)] transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5"><Activity size={12} /> FIX Sessions</span>
+                        <span>{hbExpanded ? '▲' : '▼'}</span>
+                      </button>
+                      {hbExpanded && (
+                        <div className="px-2 pb-2">
+                          <HeartbeatPanel sessions={sessions} onAction={(tool, args) => callTool(tool, args)} />
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
