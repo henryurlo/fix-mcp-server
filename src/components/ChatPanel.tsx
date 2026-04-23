@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChat, ChatMessage } from '@/store';
 import { useSystem } from '@/store';
-import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench } from 'lucide-react';
+import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench, Key, Shield } from 'lucide-react';
 
 // Quick-prompt buttons — context-aware
 const QUICK_PROMPTS = [
@@ -38,9 +38,11 @@ const SCENARIO_QUICK_ACTION: Record<string, Array<{ icon: string; label: string;
 const COPILOT_MODEL_LABEL = 'GPT-5.4 via OpenRouter';
 
 export function ChatPanel() {
-  const { messages, isOpen, isTyping, toggleOpen, send, clear } = useChat();
+  const { messages, isOpen, isTyping, toggleOpen, send, clear, openRouterKey, setKey } = useChat();
   const { mode, scenario, scenarioContext, controlMode, takeOverAsAgent, releaseToHuman, toggleCollab, locked } = useSystem();
   const [input, setInput] = useState('');
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -142,6 +144,13 @@ export function ChatPanel() {
               AGENT
             </span>
           )}
+          <button
+            onClick={() => setShowKeyModal(true)}
+            className={`p-1.5 rounded hover:bg-[var(--bg-hover)] transition-colors ${openRouterKey ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-[var(--text-primary)]'}`}
+            title={openRouterKey ? 'API key set (click to change)' : 'Set OpenRouter API key'}
+          >
+            {openRouterKey ? <Shield size={13} /> : <Key size={13} />}
+          </button>
           <button
             onClick={clear}
             className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
@@ -256,6 +265,55 @@ export function ChatPanel() {
           </button>
         </div>
       </div>
+      {/* Key Modal */}
+      {showKeyModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowKeyModal(false)}>
+          <div className="bg-[var(--bg-elevated)] border border-[var(--border-bright)] rounded-xl p-5 w-[340px] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-bold text-[var(--text-primary)]">OpenRouter API Key</h3>
+              <button onClick={() => setShowKeyModal(false)} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={14} /></button>
+            </div>
+            <p className="text-[12px] text-[var(--text-muted)] mb-3">
+              {openRouterKey
+                ? 'A custom key is active. Chat calls OpenRouter directly from the browser.'
+                : 'Leave empty to use the server-side proxy (default). Enter your own key to call OpenRouter directly.'}
+            </p>
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="sk-or-v1-..."
+              className="input-base w-full !text-[13px] !py-2 mb-3"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (keyInput.trim()) {
+                    setKey(keyInput.trim());
+                  }
+                  setShowKeyModal(false);
+                  setKeyInput('');
+                }}
+                className="flex-1 py-2 rounded-lg bg-[var(--cyan)] text-black text-[13px] font-bold hover:bg-[var(--cyan)]/80 transition-colors"
+              >
+                Save
+              </button>
+              {openRouterKey && (
+                <button
+                  onClick={() => {
+                    setKey(null);
+                    setShowKeyModal(false);
+                    setKeyInput('');
+                  }}
+                  className="flex-1 py-2 rounded-lg bg-[var(--red-dim)]/40 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -502,15 +502,32 @@ export const useChat = create<ChatState>((set, get) => ({
         { role: 'user', content },
       ];
 
-      const resp = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'openai/gpt-5.4',
-          messages: msgs,
-          max_tokens: 2048,
-        }),
-      });
+      const key = get().openRouterKey;
+
+      const resp = key
+        ? await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${key}`,
+              'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : '',
+              'X-Title': 'FIX-MCP',
+            },
+            body: JSON.stringify({
+              model: 'openai/gpt-5.4',
+              messages: msgs,
+              max_tokens: 2048,
+            }),
+          })
+        : await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'openai/gpt-5.4',
+              messages: msgs,
+              max_tokens: 2048,
+            }),
+          });
 
       if (!resp.ok) {
         const e = await resp.text();

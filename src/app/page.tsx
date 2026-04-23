@@ -283,7 +283,7 @@ function MissionControlTab({
   available_scenarios: any[];
   onOpenScenarioBuilder: () => void;
 }) {
-  const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, open_count, stuck_count } = useSystem();
+  const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, open_count, stuck_count, resetScenario } = useSystem();
   const { isOpen: chatOpen, toggleOpen: toggleChat } = useChat();
   const [bottomTab, setBottomTab] = useState<'case' | 'terminal' | 'fixwire' | 'trace' | 'runbook'>('case');
   const activeScenarios = useSystem.getState().available_scenarios || parentScenarios || [];
@@ -989,6 +989,8 @@ function MissionControlTab({
           onNewScenario={() => {
             setShowCompletion(false);
             setFocusMode(false);
+            resetScenario();
+            onOpenScenarioBuilder();
           }}
         />
       )}
