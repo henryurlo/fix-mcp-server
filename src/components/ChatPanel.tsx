@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChat, ChatMessage } from '@/store';
 import { useSystem } from '@/store';
-import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench, Key, Shield, Trash2 } from 'lucide-react';
+import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench, Key, Shield, Trash2, Copy, Check } from 'lucide-react';
 
 // Quick-prompt buttons — context-aware
 const QUICK_PROMPTS = [
@@ -36,6 +36,38 @@ const SCENARIO_QUICK_ACTION: Record<string, Array<{ icon: string; label: string;
 };
 
 const COPILOT_MODEL_LABEL = 'GPT-5.4 via OpenRouter';
+
+// Copy button for chat messages
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] hover:text-[var(--cyan)] transition-colors"
+      title="Copy message"
+    >
+      {copied ? <Check size={10} /> : <Copy size={10} />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
 
 export function ChatPanel() {
   const { messages, isOpen, isTyping, toggleOpen, send, clear, openRouterKey, setKey } = useChat();
@@ -198,13 +230,19 @@ export function ChatPanel() {
           <div key={msg.id} className={`animate-fade-in ${msg.role === 'user' ? 'ml-6' : 'mr-2'}`}>
             {msg.role === 'user' && (
               <div className="bg-[var(--bg-elevated)] rounded-xl px-3 py-2 border border-[var(--border-dim)]">
-                <p className="text-[14px] text-[var(--text-primary)] whitespace-pre-wrap">{msg.content}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[14px] text-[var(--text-primary)] whitespace-pre-wrap flex-1 select-text">{msg.content}</p>
+                  <CopyButton text={msg.content} />
+                </div>
               </div>
             )}
 
             {msg.role === 'assistant' && (
               <div className="bg-[var(--bg-surface)] rounded-xl px-3 py-2 border border-[var(--border-dim)]">
-                <p className="text-[14px] text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[14px] text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed flex-1 select-text">{msg.content}</p>
+                  <CopyButton text={msg.content} />
+                </div>
 
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
                   <div className="mt-2 space-y-1 border-t border-[var(--border-dim)] pt-2">

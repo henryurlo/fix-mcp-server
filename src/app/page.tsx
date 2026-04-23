@@ -306,6 +306,7 @@ function MissionControlTab({
   // Completion screen state
   const [showCompletion, setShowCompletion] = useState(false);
   const [completionTimer, setCompletionTimer] = useState<number>(0);
+  const [completionDismissed, setCompletionDismissed] = useState(false);
 
   // Hints tracking
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
@@ -333,6 +334,7 @@ function MissionControlTab({
     setShowTraining(false);
     setHbExpanded(false);
     setExpandedSteps(new Set());
+    setCompletionDismissed(false);
     runbookScrollRef.current?.scrollTo({ top: 0 });
   }, [scenario]);
 
@@ -358,7 +360,7 @@ function MissionControlTab({
 
   // Show completion screen when all done
   useEffect(() => {
-    if (allDone && !showCompletion) {
+    if (allDone && !showCompletion && !completionDismissed) {
       const summary = completedStepAudit.length > 0
         ? `Scenario completed successfully. ${completedStepAudit.length} runbook steps executed with visible MCP evidence and mapped FIX/manual commands.`
         : 'Scenario completed successfully.';
@@ -366,7 +368,7 @@ function MissionControlTab({
       setShowCompletion(true);
       setShowEvidenceBoard(true);
     }
-  }, [allDone, completedStepAudit, showCompletion]);
+  }, [allDone, completedStepAudit, showCompletion, completionDismissed]);
 
   async function runStep(step: typeof steps[0], idx: number) {
     if (step.status === 'running') return;
@@ -1003,10 +1005,15 @@ function MissionControlTab({
             setShowCompletion(false);
             setShowEvidenceBoard(true);
             setBottomTab('case');
+            setCompletionDismissed(true);
           }}
-          onClose={() => setShowCompletion(false)}
+          onClose={() => {
+            setShowCompletion(false);
+            setCompletionDismissed(true);
+          }}
           onNewScenario={() => {
             setShowCompletion(false);
+            setCompletionDismissed(true);
             setFocusMode(false);
             resetScenario();
             onOpenScenarioBuilder();
