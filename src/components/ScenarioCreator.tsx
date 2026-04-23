@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useSystem } from '@/store';
+import { useMemo, useState } from 'react';
+import { useSystem, useChat } from '@/store';
 import {
   Plus, Save, Trash2, Layers, AlertTriangle, BookOpen,
   Wrench, CheckCircle, ArrowRight, Play, Search, Eye,
-  ChevronDown, ChevronRight, Loader2, X,
+  ChevronDown, ChevronRight, Loader2, X, FlaskConical,
+  MessageSquare, Upload, FileCode2,
 } from 'lucide-react';
 
 type RunbookStep = {
@@ -60,12 +61,19 @@ function emptyDraft(): ScenarioDraft {
 }
 
 export function ScenarioCreator() {
-  const { available_scenarios: scenarios, startScenario } = useSystem();
+  const { available_scenarios: scenarios, startScenario, refresh } = useSystem();
+  const { openWithPrompt, isOpen, toggleOpen } = useChat();
   const [draft, setDraft] = useState<ScenarioDraft>(emptyDraft);
   const [editing, setEditing] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ basic: true, hints: false, runbook: false, criteria: false });
   const [preview, setPreview] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveMessage, setSaveMessage] = useState('');
+  const [jsonImport, setJsonImport] = useState('');
+  const [importError, setImportError] = useState('');
+  const [runningScenario, setRunningScenario] = useState<string | null>(null);
+  const [stressingScenario, setStressingScenario] = useState<string | null>(null);
 
   const filtered = (scenarios ?? [])
     .filter((s) => s.title.toLowerCase().includes(search) || s.name.includes(search) || s.description.toLowerCase().includes(search))
@@ -75,6 +83,116 @@ export function ScenarioCreator() {
     });
 
   const update = (field: keyof ScenarioDraft, value: any) => setDraft((d) => ({ ...d, [field]: value }));
+
+  const scenarioOps = useMemo(() => {
+    return filtered.map((s: any) => {
+      const categories = Array.isArray(s.categories) ? s.categories.join(' · ') : '';
+      return {
+        ...s,
+        categoriesLabel: categories,
+      };
+    });
+  }, [filtered]);
+
+  async function launchScenarioWithCopilot(name: string, title?: string) {
+    setRunningScenario(name);
+    try {
+      await startScenario(name);
+      if (!isOpen) toggleOpen();
+      await openWithPrompt(`Start a new scenario: ${title || name}. Summarize the incident, tell me what matters first, and guide the first action.`);
+    } finally {
+      setRunningScenario(null);
+    }
+  }
+
+  async function stressTestScenario(name: string, title?: string) {
+    setStressingScenario(name);
+    try {
+      await startScenario(name);
+      await fetch('/api/tool', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'inject_event',
+          arguments: { event_type: 'reject_spike', target: 'desk', details: `Stress test launched for ${title || name}`, delay_sec: 0 },
+        }),
+      });
+      if (!isOpen) toggleOpen();
+      await openWithPrompt(`Stress test scenario ${title || name}. A reject spike has been injected. Triage the scenario, explain the blast radius, and recommend the next three actions.`);
+    } finally {
+      setStressingScenario(null);
+    }
+  }
+
+  function normalizeDraftInput(parsed: any): ScenarioDraft {
+    const steps = Array.isArray(parsed?.runbook?.steps)
+      ? parsed.runbook.steps.map((step: any, idx: number) => ({
+          step: Number(step?.step ?? idx + 1),
+          title: step?.title ?? '',
+          narrative: step?.narrative ?? '',
+          tool: step?.tool ?? '',
+          tool_args: step?.tool_args ?? {},
+          expected: step?.expected ?? '',
+        }))
+      : [];
+
+    return {
+      name: parsed?.name ?? '',
+      title: parsed?.title ?? '',
+      description: parsed?.description ?? '',
+      severity: parsed?.severity ?? 'medium',
+      difficulty: parsed?.difficulty ?? 'intermediate',
+      estimated_minutes: Number(parsed?.estimated_minutes ?? 20),
+      categories: Array.isArray(parsed?.categories) ? parsed.categories : [],
+      simulated_time: parsed?.simulated_time ?? '',
+      runbook: {
+        narrative: parsed?.runbook?.narrative ?? '',
+        steps,
+      },
+      hints: {
+        key_problems: Array.isArray(parsed?.hints?.key_problems) ? parsed.hints.key_problems : [],
+        diagnosis_path: parsed?.hints?.diagnosis_path ?? '',
+        common_mistakes: Array.isArray(parsed?.hints?.common_mistakes) ? parsed.hints.common_mistakes : [],
+      },
+      success_criteria: Array.isArray(parsed?.success_criteria) ? parsed.success_criteria : [],
+    };
+  }
+
+  function loadDraftFromJson(raw: string) {
+    try {
+      const parsed = JSON.parse(raw);
+      setDraft(normalizeDraftInput(parsed));
+      setEditing(true);
+      setPreview(false);
+      setImportError('');
+      setSaveState('idle');
+      setSaveMessage('Draft loaded into builder.');
+    } catch (err) {
+      setImportError(`Invalid JSON: ${(err as Error).message}`);
+    }
+  }
+
+  async function saveScenarioToServer(payloadText: string) {
+    setSaveState('saving');
+    setSaveMessage('Saving scenario...');
+    try {
+      const res = await fetch('/api/scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payloadText,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.output || 'Save failed');
+      }
+      await refresh();
+      setSaveState('saved');
+      setSaveMessage(`Saved as ${data.name}. It is ready to load or stress test.`);
+    } catch (err) {
+      setSaveState('error');
+      setSaveMessage((err as Error).message || 'Save failed');
+    }
+  }
 
   const addStep = () => {
     const step: RunbookStep = { step: draft.runbook.steps.length + 1, title: '', narrative: '', tool: '', tool_args: {}, expected: '' };
@@ -111,66 +229,142 @@ export function ScenarioCreator() {
 
   return (
     <div className="h-full flex bg-[var(--bg-void)]">
-      {/* Left panel: Library */}
-      <div className="w-[280px] border-r border-[var(--border-dim)] bg-[var(--bg-base)] flex flex-col shrink-0">
-        <div className="p-3 border-b border-[var(--border-dim)]">
-          <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
-            <Layers size={13} /> Scenario Library
-          </h2>
-        </div>
-        <div className="px-3 pt-2">
-          <input className="input-base !text-[13px] !py-1.5 !px-2.5 !rounded-lg !w-full" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {filtered.map((s: any) => (
-            <button key={s.name} onClick={() => startScenario(s.name)} className="w-full text-left px-2 py-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--cyan)]/30 transition-all">
-              <div className="text-[13px] font-mono font-semibold truncate">{s.title || s.name}</div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[13px] px-1 py-px rounded bg-[var(--cyan-dim)] text-[var(--cyan)] font-mono">{s.severity?.toUpperCase()}</span>
-                <span className="text-[13px] font-mono text-[var(--text-dim)]">{s.estimated_minutes}m</span>
-              </div>
+      {/* Left panel: Operations */}
+      <div className="w-[380px] border-r border-[var(--border-dim)] bg-[var(--bg-base)] flex flex-col shrink-0">
+        <div className="p-4 border-b border-[var(--border-dim)] space-y-3">
+          <div>
+            <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
+              <Layers size={13} /> Scenario Operations Desk
+            </h2>
+            <p className="text-[13px] text-[var(--text-muted)] mt-2 leading-relaxed">
+              Launch a scenario straight into the chatbot, inject stress, or create and load a new one without leaving this screen.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => { setDraft(emptyDraft()); setEditing(true); setPreview(false); setSaveState('idle'); setSaveMessage(''); }} className="btn-primary w-full flex items-center justify-center gap-1.5 !text-[13px]">
+              <Plus size={11} /> Create Scenario
             </button>
-          ))}
+            <button onClick={() => setEditing((v) => !v)} className="btn-secondary w-full flex items-center justify-center gap-1.5 !text-[13px]">
+              <FileCode2 size={11} /> {editing ? 'Hide Builder' : 'Open Builder'}
+            </button>
+          </div>
+          <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+            <div className="text-[12px] font-bold text-[var(--text-primary)] flex items-center gap-2 mb-2">
+              <Upload size={12} /> Load Scenario JSON
+            </div>
+            <textarea
+              className="input-base !text-[12px] !py-2 !px-2.5 !rounded-md !w-full resize-y min-h-[120px]"
+              placeholder="Paste a scenario JSON draft here to load it into the builder..."
+              value={jsonImport}
+              onChange={(e) => setJsonImport(e.target.value)}
+            />
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => loadDraftFromJson(jsonImport)} className="btn-secondary flex items-center gap-1.5 !text-[12px]">
+                <Upload size={11} /> Load Draft
+              </button>
+              <button onClick={() => { setJsonImport(''); setImportError(''); }} className="btn-secondary !text-[12px]">Clear</button>
+            </div>
+            {importError && <div className="mt-2 text-[12px] text-[var(--red)]">{importError}</div>}
+          </div>
         </div>
-        <div className="p-3 border-t border-[var(--border-dim)]">
-          <button onClick={() => { setDraft(emptyDraft()); setEditing(true); setPreview(false); }} className="btn-primary w-full flex items-center justify-center gap-1.5 !text-[13px]">
-            <Plus size={11} /> New Scenario
-          </button>
+        <div className="px-3 pt-3">
+          <input className="input-base !text-[13px] !py-1.5 !px-2.5 !rounded-lg !w-full" placeholder="Search scenarios..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {scenarioOps.map((s: any) => (
+            <div key={s.name} className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-dim)] p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold text-[var(--text-primary)] leading-tight">{s.title || s.name}</div>
+                  <div className="mt-1 text-[12px] text-[var(--text-dim)] font-mono">{s.estimated_minutes}m · {s.runbook_step_count || '?'} steps · {s.difficulty || 'intermediate'}</div>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--cyan-dim)] text-[var(--cyan)] font-mono">{s.severity?.toUpperCase()}</span>
+              </div>
+              {s.categoriesLabel && (
+                <div className="mt-2 text-[12px] text-[var(--text-muted)]">{s.categoriesLabel}</div>
+              )}
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                <button
+                  onClick={() => launchScenarioWithCopilot(s.name, s.title)}
+                  disabled={runningScenario === s.name}
+                  className="w-full rounded-lg bg-[var(--cyan)] text-black text-[13px] font-bold py-2 px-3 flex items-center justify-center gap-2 hover:bg-[var(--cyan)]/80 transition-colors disabled:opacity-50"
+                >
+                  {runningScenario === s.name ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />}
+                  Launch in Chatbot
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => startScenario(s.name)}
+                    className="w-full rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] text-[13px] font-semibold py-2 px-3 hover:border-[var(--cyan)]/30"
+                  >
+                    Load Only
+                  </button>
+                  <button
+                    onClick={() => stressTestScenario(s.name, s.title)}
+                    disabled={stressingScenario === s.name}
+                    className="w-full rounded-lg border border-[var(--red)]/40 bg-[var(--red)]/10 text-[var(--red)] text-[13px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--red)]/20 disabled:opacity-50"
+                  >
+                    {stressingScenario === s.name ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />}
+                    Stress Test
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Right panel: Editor or Preview */}
       <div className="flex-1 overflow-y-auto p-6">
-        {!editing ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <Layers size={32} className="text-[var(--text-dim)] mx-auto mb-2" />
-              <p className="text-[14px] text-[var(--text-muted)] mb-3">Select a scenario or create a new one</p>
-              <button onClick={() => { setDraft(emptyDraft()); setEditing(true); }} className="btn-primary flex items-center gap-1.5 !text-[13px] mx-auto">
-                <Plus size={11} /> Create Scenario
-              </button>
+        <div className="max-w-4xl">
+          <div className="mb-5 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Top-dollar workflow</div>
+                <h1 className="text-[24px] font-bold text-[var(--text-primary)] mt-1">Create → Load → Stress Test → Verify</h1>
+                <p className="text-[14px] text-[var(--text-secondary)] mt-2 leading-relaxed">
+                  This should be the scenario workbench: build or import a new incident, save it to the server, launch it straight into the chatbot, and pressure-test it with injected failures.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-2 min-w-[220px]">
+                <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2">
+                  <div className="text-[11px] uppercase text-[var(--text-dim)]">Saved scenarios</div>
+                  <div className="text-[22px] font-bold text-[var(--cyan)]">{scenarios?.length || 0}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2">
+                  <div className="text-[11px] uppercase text-[var(--text-dim)]">Stress tools surfaced</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)]">Launch + inject + chat handoff</div>
+                </div>
+              </div>
             </div>
+            {(saveState !== 'idle' || saveMessage) && (
+              <div className={`mt-4 rounded-lg border px-3 py-2 text-[13px] ${saveState === 'error' ? 'border-[var(--red)]/40 text-[var(--red)] bg-[var(--red)]/10' : 'border-[var(--green)]/30 text-[var(--green)] bg-[var(--green)]/10'}`}>
+                {saveMessage}
+              </div>
+            )}
+          </div>
+        {!editing ? (
+          <div className="rounded-2xl border border-dashed border-[var(--border-dim)] bg-[var(--bg-surface)] p-10 text-center">
+            <Layers size={36} className="text-[var(--text-dim)] mx-auto mb-3" />
+            <p className="text-[16px] text-[var(--text-secondary)] mb-2">Select an operation on the left.</p>
+            <p className="text-[13px] text-[var(--text-muted)] mb-4">Best path: create or import a scenario, save it, then launch it directly into the chatbot or hit Stress Test.</p>
+            <button onClick={() => { setDraft(emptyDraft()); setEditing(true); setPreview(false); }} className="btn-primary flex items-center gap-1.5 !text-[13px] mx-auto">
+              <Plus size={11} /> Start New Scenario Draft
+            </button>
           </div>
         ) : preview ? (
-          <div className="max-w-3xl">
+          <div className="max-w-4xl">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-lg font-bold">JSON Preview</h1>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPreview(false)} className="btn-secondary flex items-center gap-1.5 !text-[13px]"><Wrench size={11} /> Edit</button>
-                <button onClick={() => { navigator.clipboard.writeText(jsonPreview); }} className="btn-primary flex items-center gap-1.5 !text-[13px]"><Save size={11} /> Copy JSON</button>
-                <button onClick={async () => {
-                  try {
-                    const res = await fetch('/api/scenario', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: jsonPreview,
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      alert(`Saved as ${data.name}. Refresh to see it in the library.`);
-                    }
-                  } catch { alert('Save failed.'); }
-                }} className="btn-primary flex items-center gap-1.5 !text-[13px]"><Save size={11} /> Save to Server</button>
+              <h1 className="text-lg font-bold">Scenario JSON Preview</h1>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={() => setPreview(false)} className="btn-secondary flex items-center gap-1.5 !text-[13px]"><Wrench size={11} /> Back to Builder</button>
+                <button onClick={() => { navigator.clipboard.writeText(jsonPreview); }} className="btn-secondary flex items-center gap-1.5 !text-[13px]"><Save size={11} /> Copy JSON</button>
+                <button onClick={() => saveScenarioToServer(jsonPreview)} disabled={saveState === 'saving'} className="btn-primary flex items-center gap-1.5 !text-[13px] disabled:opacity-50">
+                  {saveState === 'saving' ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save to Server
+                </button>
+                <button onClick={() => launchScenarioWithCopilot(draft.name, draft.title)} disabled={!draft.name || saveState === 'saving'} className="btn-primary flex items-center gap-1.5 !text-[13px] disabled:opacity-50">
+                  <MessageSquare size={11} /> Save Then Launch in Chat
+                </button>
               </div>
             </div>
             <pre className="bg-[var(--bg-base)] p-4 rounded-md border border-[var(--border-dim)] text-[13px] font-mono text-[var(--text-secondary)] overflow-x-auto whitespace-pre-wrap max-h-[600px]">
@@ -178,13 +372,19 @@ export function ScenarioCreator() {
             </pre>
           </div>
         ) : (
-          <div className="max-w-3xl">
+          <div className="max-w-4xl">
             <div className="flex items-center justify-between mb-6">
-              <h1 className="text-lg font-bold">{draft.name ? `Edit: ${draft.title || draft.name}` : 'New Scenario'}</h1>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPreview(true)} className="btn-secondary flex items-center gap-1.5 !text-[13px]"><Eye size={11} /> Preview</button>
+              <h1 className="text-lg font-bold">{draft.name ? `Scenario Builder: ${draft.title || draft.name}` : 'Scenario Builder'}</h1>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={() => setPreview(true)} className="btn-secondary flex items-center gap-1.5 !text-[13px]"><Eye size={11} /> Preview JSON</button>
+                <button onClick={() => saveScenarioToServer(jsonPreview)} disabled={saveState === 'saving'} className="btn-secondary flex items-center gap-1.5 !text-[13px] disabled:opacity-50">
+                  {saveState === 'saving' ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save Draft
+                </button>
                 <button onClick={() => setEditing(false)} className="text-[var(--text-dim)] hover:text-[var(--red)]"><X size={14} /></button>
               </div>
+            </div>
+            <div className="mb-4 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+              Build the scenario here, save it to the server, then immediately load it or stress test it from the operations desk.
             </div>
 
             {/* Basic Info */}
@@ -276,6 +476,7 @@ export function ScenarioCreator() {
             </Section>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

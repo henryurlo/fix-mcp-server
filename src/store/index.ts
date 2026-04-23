@@ -432,6 +432,7 @@ interface ChatState {
   isTyping: boolean;
   setKey: (key: string | null) => void;
   toggleOpen: () => void;
+  openWithPrompt: (content: string) => Promise<void>;
   send: (content: string) => Promise<void>;
   approveToolCall: (msgId: string, toolIndex: number) => Promise<void>;
   clear: () => void;
@@ -447,6 +448,10 @@ export const useChat = create<ChatState>((set, get) => ({
 
   setKey: (key: string | null) => set({ openRouterKey: key }),
   toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),
+  openWithPrompt: async (content: string) => {
+    set({ isOpen: true });
+    await get().send(content);
+  },
 
   send: async (content: string) => {
     const { openRouterKey } = get();

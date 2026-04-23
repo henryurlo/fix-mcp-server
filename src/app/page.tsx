@@ -12,7 +12,7 @@ import {
   Eye, EyeOff, Loader2, ChevronRight, CheckCircle2, XCircle, Info,
   PanelLeftOpen, PanelLeftClose, ArrowRight, FileText, Send, Wrench,
   ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon, Star,
-  X, Trophy, Clock, Award, GraduationCap, HelpCircle, BookOpenCheck,
+  X, Trophy, Clock, Award, GraduationCap, HelpCircle, BookOpenCheck, FlaskConical,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -392,6 +392,34 @@ export default function Home() {
     } catch (e) { console.error('Reset failed:', e); }
   }, []);
 
+  const launchScenarioFromHeader = useCallback(async (name: string) => {
+    const scenarioMeta = available_scenarios?.find((s: any) => s.name === name);
+    await startScenario(name);
+    const chat = useChat.getState();
+    if (!chat.isOpen) chat.toggleOpen();
+    await chat.openWithPrompt(`Start a new scenario: ${scenarioMeta?.title || name}. Summarize the incident, tell me what matters first, and guide the first action.`);
+  }, [available_scenarios, startScenario]);
+
+  const stressTestCurrentScenario = useCallback(async () => {
+    if (!scenario) return;
+    const scenarioMeta = available_scenarios?.find((s: any) => s.name === scenario);
+    try {
+      await fetch('/api/tool', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'inject_event',
+          arguments: { event_type: 'reject_spike', target: 'desk', details: `Header stress test for ${scenarioMeta?.title || scenario}`, delay_sec: 0 },
+        }),
+      });
+      const chat = useChat.getState();
+      if (!chat.isOpen) chat.toggleOpen();
+      await chat.openWithPrompt(`Stress test the active scenario ${scenarioMeta?.title || scenario}. A reject spike was injected. Triage it and guide the response.`);
+    } catch (e) {
+      console.error('Stress test failed:', e);
+    }
+  }, [available_scenarios, scenario]);
+
   const name = scenarioContext?.title ?? (scenario ? scenario.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : '');
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -433,7 +461,7 @@ export default function Home() {
         </nav>
         <div className="flex items-center gap-3">
           <span className={`text-[13px] font-mono ${connected ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>{connected ? '● LIVE' : '● OFFLINE'}</span>
-          <select value={scenario || ''} onChange={(e) => e.target.value && startScenario(e.target.value)}
+          <select value={scenario || ''} onChange={(e) => e.target.value && launchScenarioFromHeader(e.target.value)}
             className="input-base !w-auto !py-1.5 !px-3 !text-[13px] !font-mono !rounded-md max-w-[220px]">
             <option value="">▶ Launch Scenario…</option>
             {available_scenarios?.map((s: any) => (
@@ -441,10 +469,16 @@ export default function Home() {
             ))}
           </select>
           {scenario && (
-            <button onClick={handleReset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--red-dim)]/40 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-all">
-              <RotateCcw size={12} /> Reset
-            </button>
+            <>
+              <button onClick={stressTestCurrentScenario}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--amber-dim)]/40 text-[var(--amber)] border border-[var(--amber)]/30 text-[13px] font-semibold hover:bg-[var(--amber-dim)] transition-all">
+                <FlaskConical size={12} /> Stress Test
+              </button>
+              <button onClick={handleReset}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--red-dim)]/40 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-all">
+                <RotateCcw size={12} /> Reset
+              </button>
+            </>
           )}
           <div className="relative group">
             <button onClick={toggleOpen}
