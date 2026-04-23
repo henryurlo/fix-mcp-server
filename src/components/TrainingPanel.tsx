@@ -84,7 +84,7 @@ function TimeControlPanel() {
       });
       const data = await res.json();
       // Parse the text response
-      const text = data.text || '';
+      const text = data.output || '';
       const statusMatch = text.match(/Simulated:\s*([^\n]+)/);
       const pausedMatch = text.match(/Paused:\s*([^\n]+)/);
       const speedMatch = text.match(/Speed:\s*([^\n]+)/);
@@ -219,7 +219,7 @@ function KPIScorePanel() {
         body: JSON.stringify({ tool: 'score_scenario', arguments: {} }),
       });
       const data = await res.json();
-      const text = data.text || '';
+      const text = data.output || '';
       
       // Parse score from text response
       const scoreMatch = text.match(/Overall Score:\s*([\d.]+)/);
@@ -389,7 +389,7 @@ function SnapshotsPanel({ onRollback }: { onRollback: (id: string) => void }) {
         body: JSON.stringify({ tool: 'list_snapshots', arguments: {} }),
       });
       const data = await res.json();
-      const text = data.text || '';
+      const text = data.output || '';
       const snaps: any[] = [];
       for (const line of text.split('\n')) {
         const m = line.match(/(snap_\d+)\s+\[([^\]]+)\]\s+(.+?)\s+(\d+)\s+order/);
@@ -490,7 +490,7 @@ function EventInjectionPanel() {
         }),
       });
       const data = await res.json();
-      setResult(data.text || '');
+      setResult(data.output || '');
     } catch (e) {
       setResult(`Error: ${e}`);
     } finally {
@@ -563,8 +563,8 @@ function EventInjectionPanel() {
 }
 
 // ─── Main Training Panel (tabs) ───
-export function TrainingPanel({ onRollback }: { onRollback: (id: string) => void }) {
-  const [tab, setTab] = useState<'time' | 'score' | 'snapshot' | 'inject'>('time');
+export function TrainingPanel({ onRollback, initialTab = 'time' }: { onRollback: (id: string) => void; initialTab?: 'time' | 'score' | 'snapshot' | 'inject' }) {
+  const [tab, setTab] = useState<'time' | 'score' | 'snapshot' | 'inject'>(initialTab);
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-base)]">

@@ -180,7 +180,7 @@ export default function Home() {
             <>
               <button onClick={stressTestCurrentScenario}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--amber-dim)]/40 text-[var(--amber)] border border-[var(--amber)]/30 text-[13px] font-semibold hover:bg-[var(--amber-dim)] transition-all">
-                <FlaskConical size={12} /> Stress Test
+                <FlaskConical size={12} /> Inject Reject Spike
               </button>
               <button onClick={handleReset}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--red-dim)]/40 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-all">
@@ -311,6 +311,7 @@ function MissionControlTab({
   // Hints tracking
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [showTraining, setShowTraining] = useState(false);
+  const [trainingInitialTab, setTrainingInitialTab] = useState<'time' | 'score' | 'snapshot' | 'inject'>('time');
   const [heroAction, setHeroAction] = useState<'launching' | 'stressing' | null>(null);
   const [showEvidenceBoard, setShowEvidenceBoard] = useState(false);
   const [completedStepAudit, setCompletedStepAudit] = useState<Array<{ step: number; title: string; tool: string; output: string; commands: Array<{ label: string; language: string; code: string }> }>>([]);
@@ -646,7 +647,7 @@ function MissionControlTab({
               <button onClick={startGuidedStress} disabled={heroAction !== null}
                 className="rounded-lg border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
                 <div className="flex items-center gap-1.5 text-[var(--amber)] font-bold text-[13px]">
-                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Stress Test Now
+                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Inject Reject Spike
                 </div>
                 <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject reject spike and force triage.</div>
               </button>
@@ -734,7 +735,7 @@ function MissionControlTab({
           <div className="flex items-center gap-2">
             {/* Training infrastructure toggle */}
             <div className="relative group">
-              <button onClick={() => setShowTraining(!showTraining)}
+              <button onClick={() => { setTrainingInitialTab('time'); setShowTraining(!showTraining); }}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${showTraining ? 'bg-[var(--green-dim)] text-[var(--green)] border border-[var(--green)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
                 <GraduationCap size={13} /> Resilience
               </button>
@@ -941,7 +942,11 @@ function MissionControlTab({
                   </button>
                   <button onClick={startGuidedStress} disabled={heroAction !== null}
                     className="w-full rounded-lg border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50">
-                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Stress Test Active
+                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Inject Reject Spike
+                  </button>
+                  <button onClick={() => { setTrainingInitialTab('inject'); setShowTraining(true); }}
+                    className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20">
+                    <GraduationCap size={12} /> Chaos Panel
                   </button>
                 </div>
 
@@ -951,7 +956,7 @@ function MissionControlTab({
                     <TrainingPanel onRollback={(id) => {
                       callTool('rollback_to_snapshot', { snapshot_id: id });
                       addAlert('Rolled back to snapshot ' + id, 'info', 3000);
-                    }} />
+                    }} initialTab={trainingInitialTab} />
                   </div>
                 ) : (
                   <>
