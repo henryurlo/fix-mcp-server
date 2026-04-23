@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChat, ChatMessage } from '@/store';
 import { useSystem } from '@/store';
-import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench, Key, Shield } from 'lucide-react';
+import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench, Key, Shield, Trash2 } from 'lucide-react';
 
 // Quick-prompt buttons — context-aware
 const QUICK_PROMPTS = [
@@ -155,6 +155,13 @@ export function ChatPanel() {
             onClick={clear}
             className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
             title="Clear chat"
+          >
+            <Trash2 size={13} />
+          </button>
+          <button
+            onClick={toggleOpen}
+            className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--red)]"
+            title="Close panel"
           >
             <X size={13} />
           </button>
