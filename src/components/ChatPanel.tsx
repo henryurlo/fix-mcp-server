@@ -35,6 +35,7 @@ const SCENARIO_QUICK_ACTION: Record<string, Array<{ icon: string; label: string;
   ],
 };
 
+const COPILOT_MODEL_LABEL = 'GPT-5.4 via OpenRouter';
 
 export function ChatPanel() {
   const { messages, isOpen, isTyping, openRouterKey, toggleOpen, send, setKey, clear } = useChat();
@@ -76,6 +77,36 @@ export function ChatPanel() {
   const scenarioPrompts = runbookPrompts.length > 0 ? runbookPrompts : fallbackPrompts;
   const allPrompts = [...scenarioPrompts, ...QUICK_PROMPTS];
 
+  const modeButtons = [
+    {
+      key: 'human',
+      label: 'H',
+      active: controlMode === 'human',
+      onClick: releaseToHuman,
+      activeClass: 'bg-[var(--green-dim)] text-[var(--green)]',
+      tooltipTitle: 'Human mode',
+      tooltipBody: 'You drive the desk. The copilot explains, suggests, and summarizes, but does not take over execution.',
+    },
+    {
+      key: 'collab',
+      label: 'C',
+      active: controlMode === 'collab',
+      onClick: toggleCollab,
+      activeClass: 'bg-[var(--cyan-dim)] text-[var(--cyan)]',
+      tooltipTitle: 'Co-pilot mode',
+      tooltipBody: 'Human and AI work together. Use this during demos to show guided diagnosis without giving up control.',
+    },
+    {
+      key: 'agent',
+      label: 'A',
+      active: controlMode === 'agent',
+      onClick: takeOverAsAgent,
+      activeClass: 'bg-[var(--purple-dim)] text-[var(--purple)]',
+      tooltipTitle: 'Agent mode',
+      tooltipBody: 'The agent actively drives the workflow. Best for showing MCP automation and autonomous runbook execution.',
+    },
+  ] as const;
+
   return (
     <div className="h-full flex flex-col bg-[var(--bg-base)]">
       {/* Header */}
@@ -86,6 +117,7 @@ export function ChatPanel() {
           </div>
           <div>
             <span className="text-[14px] font-bold text-[var(--text-primary)]">SRE Copilot</span>
+            <div className="text-[10px] font-mono text-[var(--text-dim)]">{COPILOT_MODEL_LABEL}</div>
             {scenario && (
               <div className="flex items-center gap-1">
                 <Radio size={8} className="text-[var(--cyan)] animate-pulse" />
@@ -98,27 +130,21 @@ export function ChatPanel() {
           {/* Control mode buttons */}
           {scenario && (
             <div className="flex items-center gap-0.5 mr-1">
-              <button
-                onClick={() => releaseToHuman()}
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${controlMode === 'human' ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
-                title="Human Mode"
-              >
-                H
-              </button>
-              <button
-                onClick={() => takeOverAsAgent()}
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${controlMode === 'agent' ? 'bg-[var(--purple-dim)] text-[var(--purple)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
-                title="Agent Mode"
-              >
-                A
-              </button>
-              <button
-                onClick={() => toggleCollab()}
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${controlMode === 'collab' ? 'bg-[var(--cyan-dim)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
-                title="Collaborative Mode"
-              >
-                C
-              </button>
+              {modeButtons.map((modeButton) => (
+                <div key={modeButton.key} className="group relative">
+                  <button
+                    onClick={modeButton.onClick}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${modeButton.active ? modeButton.activeClass : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
+                    title={modeButton.tooltipTitle}
+                  >
+                    {modeButton.label}
+                  </button>
+                  <div className="pointer-events-none invisible group-hover:visible absolute right-0 top-full mt-2 z-50 w-56 rounded-lg border border-[var(--border-bright)] bg-[var(--bg-elevated)] p-2 shadow-2xl">
+                    <div className="text-[11px] font-bold text-[var(--text-primary)]">{modeButton.tooltipTitle}</div>
+                    <div className="mt-1 text-[10px] leading-relaxed text-[var(--text-secondary)]">{modeButton.tooltipBody}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
           {mode === 'agent' && (

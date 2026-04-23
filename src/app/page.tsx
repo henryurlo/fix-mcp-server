@@ -202,10 +202,18 @@ function useKeyboardShortcuts({ onRun, onHint, onToggleCopilot, onNavPrev, onNav
 }
 
 // ═══ Scenario Case Brief — the story presentation ═══
-function CaseBrief({ ctx, onStart }: { ctx: ScenarioContext; onStart: () => void }) {
+function CaseBrief({ ctx, onStart, downCount, degradedCount, openOrders, stuckOrders }: {
+  ctx: ScenarioContext;
+  onStart: () => void;
+  downCount: number;
+  degradedCount: number;
+  openOrders: number;
+  stuckOrders: number;
+}) {
   const [expanded, setExpanded] = useState(false);
   const problems = ctx.hints?.key_problems || [];
   const diagnosis = ctx.hints?.diagnosis_path || '';
+  const categoryLabel = ctx.categories?.length ? ctx.categories.join(' · ') : 'ops incident';
 
   return (
     <div className="p-5 overflow-y-auto">
@@ -221,6 +229,29 @@ function CaseBrief({ ctx, onStart }: { ctx: ScenarioContext; onStart: () => void
         <div className="flex items-center gap-2 mb-3">
           <BookMarked size={20} className="text-[var(--cyan)]" />
           <h2 className="text-[20px] font-bold">{ctx.title}</h2>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-4 mb-4">
+          <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Venue pressure</div>
+            <div className="mt-1 text-[18px] font-bold text-[var(--text-primary)]">{downCount} down</div>
+            <div className="text-[12px] text-[var(--text-muted)]">{degradedCount} degraded</div>
+          </div>
+          <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Order pressure</div>
+            <div className="mt-1 text-[18px] font-bold text-[var(--text-primary)]">{stuckOrders} stuck</div>
+            <div className="text-[12px] text-[var(--text-muted)]">{openOrders} open orders</div>
+          </div>
+          <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Scenario lens</div>
+            <div className="mt-1 text-[14px] font-bold text-[var(--text-primary)]">{categoryLabel}</div>
+            <div className="text-[12px] text-[var(--text-muted)]">{ctx.difficulty} difficulty</div>
+          </div>
+          <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">AI / MCP path</div>
+            <div className="mt-1 text-[18px] font-bold text-[var(--text-primary)]">{ctx.runbook?.steps?.length || 0} steps</div>
+            <div className="text-[12px] text-[var(--text-muted)]">Explainable tool workflow</div>
+          </div>
         </div>
 
         {/* Scenario story — the "real case" presentation */}
@@ -281,10 +312,14 @@ function CaseBrief({ ctx, onStart }: { ctx: ScenarioContext; onStart: () => void
           </div>
         )}
 
+        <div className="mb-4 rounded-lg border border-[var(--cyan)]/20 bg-[var(--cyan-dim)]/10 p-3 text-[13px] text-[var(--text-secondary)]">
+          Best demo flow: brief the incident, run the case study, open Trace to show the MCP audit trail, then open Manual Runbook to prove every AI action maps to real desk commands.
+        </div>
+
         {/* Start button */}
         <button onClick={onStart}
           className="w-full py-3 rounded-lg bg-[var(--cyan)] text-black text-[16px] font-bold hover:bg-[var(--cyan)]/80 transition-colors flex items-center justify-center gap-2">
-          <Play size={18} fill="currentColor" /> Begin Case Study
+          <Play size={18} fill="currentColor" /> Start Live Drill
         </button>
       </div>
     </div>
@@ -376,6 +411,7 @@ export default function Home() {
       <header className="h-12 border-b border-[var(--border-dim)] flex items-center justify-between px-4 shrink-0 bg-[var(--bg-base)]">
         <div className="flex items-center gap-3">
           <span className="text-[15px] font-bold tracking-wider">FIX-MCP</span>
+          <span className="hidden md:inline text-[12px] text-[var(--text-dim)]">AI Trading Ops Simulator</span>
           {scenario && (
             <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
               <Radio size={8} className="text-[var(--cyan)] animate-pulse" />
@@ -419,6 +455,15 @@ export default function Home() {
               <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">AI assistant — ask it to diagnose issues, suggest fixes, or run commands for you. Opens in a chat panel on the right.</p>
             </div>
           </div>
+          <div className="relative group">
+            <button onClick={() => setShowOnboarding(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold border border-[var(--border-dim)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
+              <HelpCircle size={13} /> Tour
+            </button>
+            <div className="invisible group-hover:visible absolute right-0 top-full mt-2 z-[100] w-64 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
+              <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Open the product tour to frame the system: what FIX-MCP is, how MCP tools map to trading operations, and the best flow for a live demo.</p>
+            </div>
+          </div>
           <span className="text-[13px] font-mono text-[var(--text-muted)]">{user?.username || 'anon'}</span>
           <button onClick={logout} className="text-[var(--text-muted)] hover:text-[var(--red)]"><LogOut size={14} /></button>
         </div>
@@ -433,6 +478,7 @@ export default function Home() {
         </main>
         <aside className={`transition-all duration-300 bg-[var(--bg-base)] border-l border-[var(--border-dim)] ${isOpen ? 'w-[420px]' : 'w-0'} overflow-hidden shrink-0`}><ChatPanel /></aside>
       </div>
+      {showOnboarding && <OnboardingPanel onClose={() => setShowOnboarding(false)} />}
     </div>
   );
 }
@@ -442,9 +488,9 @@ export default function Home() {
 // ═══════════════════════════════════════════════════════════
 
 function MissionControlTab({ scenario: parentScenario, available_scenarios: parentScenarios }: { scenario: string | null; available_scenarios: any[] }) {
-  const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent } = useSystem();
+  const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, open_count, stuck_count } = useSystem();
   const { isOpen: chatOpen, toggleOpen: toggleChat } = useChat();
-  const [bottomTab, setBottomTab] = useState<'case' | 'terminal' | 'fixwire'>('case');
+  const [bottomTab, setBottomTab] = useState<'case' | 'terminal' | 'fixwire' | 'trace' | 'runbook'>('case');
   const activeScenarios = useSystem.getState().available_scenarios || parentScenarios || [];
 
   const runbook = scenarioContext?.runbook;
@@ -495,6 +541,14 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
   const totalSteps = steps.length;
   const allDone = doneCount >= totalSteps && totalSteps > 0;
   const progressPct = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
+  const downCount = sessions.filter((s) => s.status === 'down').length;
+  const degradedCount = sessions.filter((s) => s.status === 'degraded').length;
+  const featuredScenarios = [...activeScenarios]
+    .sort((a, b) => {
+      const rank = (sev: string) => ({ critical: 4, high: 3, medium: 2, low: 1 }[String(sev || '').toLowerCase()] || 0);
+      return rank(b.severity) - rank(a.severity);
+    })
+    .slice(0, 4);
 
   // Show completion screen when all done
   useEffect(() => {
@@ -554,28 +608,97 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
   if (!scenario) {
     return (
       <div className="h-full flex flex-col bg-[var(--bg-void)]">
-        {/* Full-screen welcome with scenario grid */}
         <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-[28px] font-bold mb-2 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">FIX-MCP Mission Control</h1>
-              <p className="text-[16px] text-[var(--text-muted)]">Real-world FIX protocol incident simulations. Walk through each case like a real production outage.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {activeScenarios?.map((s: any) => (
-                <button key={s.name} onClick={() => startScenario(s.name)}
-                  className="p-4 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--cyan)]/50 hover:bg-[var(--bg-elevated)] transition-all text-left group">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Play size={12} className="text-[var(--cyan)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <span className="text-[15px] font-bold group-hover:text-[var(--cyan)] transition-colors">{s.title || s.name}</span>
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+              <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6 shadow-2xl">
+                <div className="flex flex-wrap gap-2 mb-4 text-[11px] font-mono uppercase tracking-wide text-[var(--text-dim)]">
+                  <span className="rounded-full border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-1 text-[var(--cyan)]">FIX protocol</span>
+                  <span className="rounded-full border border-[var(--purple)]/30 bg-[var(--purple-dim)] px-2 py-1 text-[var(--purple)]">MCP tools</span>
+                  <span className="rounded-full border border-[var(--green)]/30 bg-[var(--green-dim)] px-2 py-1 text-[var(--green)]">AI copilot</span>
+                </div>
+                <h1 className="text-[32px] leading-tight font-bold mb-3 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
+                  A trading desk you can break, inspect, and recover live.
+                </h1>
+                <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed max-w-3xl">
+                  FIX-MCP is not just a dashboard. It is a scenario-driven trading operations simulator that shows how a human or AI operator can diagnose venue failures, stale market data, corporate actions, and algo drift through explainable MCP tools and real desk runbooks.
+                </p>
+
+                <div className="grid gap-3 md:grid-cols-3 mt-5">
+                  {[
+                    { title: 'Micro trading desk', desc: 'Venues, broker, market data, storage, and client flows visualized as one live system.' },
+                    { title: 'AI with receipts', desc: 'Trace every action and show the exact command a human SRE would run manually.' },
+                    { title: 'Demo-ready incidents', desc: 'Open, pre-market, dark pool, LULD, ticker rename, and algo execution crises.' },
+                  ].map((item) => (
+                    <div key={item.title} className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
+                      <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{item.title}</div>
+                      <div className="text-[13px] leading-relaxed text-[var(--text-muted)]">{item.desc}</div>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: SEV_BG[s.severity], color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
+                  ))}
+                </div>
+
+                <div className="mt-5">
+                  <div className="text-[12px] font-bold uppercase tracking-wide text-[var(--text-dim)] mb-2">Best live demo paths</div>
+                  <div className="flex flex-wrap gap-2">
+                    {featuredScenarios.map((s: any) => (
+                      <button key={s.name} onClick={() => startScenario(s.name)}
+                        className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/50 hover:text-[var(--cyan)] transition-colors">
+                        {s.title}
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">{s.description?.slice(0, 120)}...</p>
-                  <div className="mt-2 text-[12px] text-[var(--text-dim)] font-mono">{s.estimated_minutes} min · {s.runbook_step_count || '?'} steps</div>
-                </button>
-              ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6">
+                <div className="text-[12px] font-bold uppercase tracking-wide text-[var(--text-dim)] mb-3">Why it lands in a room</div>
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
+                    <div className="text-[24px] font-bold text-[var(--cyan)]">{activeScenarios.length}</div>
+                    <div className="text-[13px] text-[var(--text-secondary)]">Live incidents ready to run</div>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
+                    <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Show three layers together</div>
+                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Topology for the system story, case study for the operator story, trace and runbook for the AI/MCP explainability story.</div>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
+                    <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Ideal audience framing</div>
+                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Trading desk: resilience. SRE: incident response. AI audience: tools, autonomy, and auditability.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Scenario Library</h2>
+                  <p className="text-[13px] text-[var(--text-muted)]">Pick the desk failure you want to present. Each scenario has a story, runbook, and success criteria.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+                {activeScenarios?.map((s: any) => (
+                  <button key={s.name} onClick={() => startScenario(s.name)}
+                    className="p-4 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--cyan)]/50 hover:bg-[var(--bg-elevated)] transition-all text-left group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Play size={12} className="text-[var(--cyan)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span className="text-[15px] font-bold group-hover:text-[var(--cyan)] transition-colors">{s.title || s.name}</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: SEV_BG[s.severity], color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
+                    </div>
+                    <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">{s.description?.slice(0, 160)}...</p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                      <span className="rounded-full bg-[var(--bg-elevated)] px-2 py-1 font-mono text-[var(--text-dim)]">{s.estimated_minutes} min</span>
+                      <span className="rounded-full bg-[var(--bg-elevated)] px-2 py-1 font-mono text-[var(--text-dim)]">{s.runbook_step_count || '?'} steps</span>
+                      <span className="rounded-full bg-[var(--bg-elevated)] px-2 py-1 text-[var(--text-dim)]">{s.difficulty || 'intermediate'}</span>
+                    </div>
+                    {s.categories?.length > 0 && (
+                      <div className="mt-2 text-[12px] text-[var(--text-dim)]">{s.categories.join(' · ')}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -620,7 +743,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
       <div className={`flex-1 min-h-0 flex flex-col transition-all duration-300 ${focusMode ? 'max-w-5xl mx-auto w-full' : 'flex'}`}>
           {/* Tab bar: Case Study | Terminal | FIX Wire */}
         <div className="flex items-center justify-between px-2 py-1.5 border-b border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
-          <div className="flex gap-0.5">
+          <div className="flex gap-0.5 flex-wrap">
             <button onClick={() => setBottomTab('case')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[13px] font-semibold transition-all ${bottomTab === 'case' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
               <BookOpen size={13} /> Case Study
@@ -632,6 +755,14 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
             <button onClick={() => setBottomTab('fixwire')}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'fixwire' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
               <Zap size={14} /> FIX Wire
+            </button>
+            <button onClick={() => setBottomTab('trace')}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'trace' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              <FileText size={14} /> Trace
+            </button>
+            <button onClick={() => setBottomTab('runbook')}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[14px] font-semibold transition-all ${bottomTab === 'runbook' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              <BookOpenCheck size={14} /> Manual Runbook
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -658,7 +789,14 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
               {/* LEFT: Step guide (wide) */}
               <div className={`flex-1 min-w-[400px] overflow-y-auto transition-all duration-300 ${showTraining ? 'mr-0' : ''}`} ref={runbookScrollRef}>
                 {showCaseBrief && (
-                  <CaseBrief ctx={activeScenario} onStart={() => setShowCaseBrief(false)} />
+                  <CaseBrief
+                    ctx={activeScenario}
+                    onStart={() => setShowCaseBrief(false)}
+                    downCount={downCount}
+                    degradedCount={degradedCount}
+                    openOrders={open_count}
+                    stuckOrders={stuck_count}
+                  />
                 )}
 
                 {!showCaseBrief && steps.length > 0 && (
@@ -819,6 +957,10 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
           {bottomTab === 'terminal' && <FixTerminal />}
 
           {bottomTab === 'fixwire' && <FixWireView sessions={sessions || []} />}
+
+          {bottomTab === 'trace' && <TraceTab />}
+
+          {bottomTab === 'runbook' && <ManualRunbookPanel />}
         </div>
       </div>
 

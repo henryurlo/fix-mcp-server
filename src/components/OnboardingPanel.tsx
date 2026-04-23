@@ -33,6 +33,13 @@ const TABS = [
 
 export function OnboardingPanel({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<'what' | 'how' | 'scenarios' | 'glossary'>('what');
+  const [glossaryQuery, setGlossaryQuery] = useState('');
+
+  const filteredGlossary = GLOSSARY.filter((item) => {
+    const q = glossaryQuery.trim().toLowerCase();
+    if (!q) return true;
+    return item.term.toLowerCase().includes(q) || item.def.toLowerCase().includes(q);
+  });
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -45,7 +52,7 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-dim)] shrink-0">
           <h2 className="text-[18px] font-bold bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
-            FIX-MCP Simulator — Getting Started
+            FIX-MCP Trading Desk Simulator — Getting Started
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
             <X size={18} className="text-[var(--text-muted)]" />
@@ -73,8 +80,8 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
               <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-dim)] p-5">
                 <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-2">What is the FIX-MCP Simulator?</h3>
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-3">
-                  A trading-operations training platform that simulates real-world FIX protocol incidents. 
-                  Think of it as a flight simulator for engineers who build and maintain electronic trading systems.
+                  An AI-native trading operations simulator for presenting how FIX infrastructure, MCP tools,
+                  and incident-response runbooks fit together on a modern trading desk.
                 </p>
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-3">
                   <b className="text-[var(--text-primary)]">FIX</b> (Financial Information Exchange) is the standard 
@@ -83,9 +90,10 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
                   drift, venues go down — engineers need to diagnose and fix problems in minutes, not hours.
                 </p>
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed">
-                  This simulator creates realistic failure scenarios (venue outages, corporate actions, circuit breakers) 
-                  and guides you through the diagnosis and resolution process. Every tool the AI fires maps to actual 
-                  FIX-level commands you could run manually on the real system — no "magic" here.
+                  This simulator creates realistic failure scenarios (venue outages, corporate actions, circuit breakers,
+                  algo degradation), then lets a human operator or AI copilot work the same workflow a real desk would:
+                  inspect sessions, query orders, review traces, and execute explainable runbooks. Every AI action maps
+                  to actual FIX-level or Linux/SQL commands — no black box magic.
                 </p>
               </div>
 
@@ -217,17 +225,24 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
               <div className="mb-3">
                 <input
                   type="text"
+                  value={glossaryQuery}
+                  onChange={(e) => setGlossaryQuery(e.target.value)}
                   placeholder="Search terms..."
                   className="w-full px-3 py-2 bg-[var(--bg-surface)] border border-[var(--border-dim)] rounded-lg text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--cyan)]/50"
                 />
               </div>
               <div className="space-y-2">
-                {GLOSSARY.map((item, i) => (
+                {filteredGlossary.map((item, i) => (
                   <div key={i} className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border-dim)] p-4">
                     <div className="text-[13px] font-bold text-[var(--cyan)] mb-1">{item.term}</div>
                     <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{item.def}</div>
                   </div>
                 ))}
+                {filteredGlossary.length === 0 && (
+                  <div className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border-dim)] p-4 text-[13px] text-[var(--text-muted)]">
+                    No glossary terms match "{glossaryQuery}".
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -300,11 +300,15 @@ export const useSystem = create<SystemState>((set, get) => ({
         session_id: s.session_id,
       }));
 
+      const normalizedScenario = statusRes.scenario && statusRes.scenario !== 'clear'
+        ? statusRes.scenario
+        : null;
+
       set({
         sessions,
         orders: ordersRes ?? [],
         events: (eventsRes ?? []).slice(0, 50),
-        scenario: statusRes.scenario,
+        scenario: normalizedScenario,
         available_scenarios: statusRes.available_scenarios || [],
         mode: (modeRes?.mode as SystemState['mode']) || 'human',
         controlMode: (modeRes?.mode === 'agent' ? 'agent' : modeRes?.mode === 'mixed' ? 'collab' : 'human') as ControlMode,
@@ -316,15 +320,25 @@ export const useSystem = create<SystemState>((set, get) => ({
       });
 
       // Fetch scenario context on first load (Docker-initiated scenario)
-      if (statusRes.scenario && !get().scenarioContext) {
+      if (normalizedScenario && !get().scenarioContext) {
         try {
-          const ctx = await jsonFetch<ScenarioContext>(`/api/scenario/${statusRes.scenario}`);
+          const ctx = await jsonFetch<ScenarioContext>(`/api/scenario/${normalizedScenario}`);
           set({ scenarioContext: ctx, scenarioState: 'diagnosing' });
           // Only init steps once — all set to 'idle', no auto-run
           if (!get().trackedSteps.length) {
             get().resetStepsForScenario(ctx.runbook?.steps || []);
           }
         } catch { /* no context available */ }
+      }
+
+      if (!normalizedScenario && (get().scenarioContext || get().trackedSteps.length || get().completedSteps.length)) {
+        set({
+          scenarioContext: null,
+          trackedSteps: [],
+          completedSteps: [],
+          scenarioState: 'idle',
+          locked: false,
+        });
       }
     } catch (err: unknown) {
       set({ connected: false, error: (err as Error).message });
@@ -483,7 +497,7 @@ export const useChat = create<ChatState>((set, get) => ({
           'X-Title': 'FIX MCP Console',
         },
         body: JSON.stringify({
-          model: 'qwen/qwen3.6-plus',
+          model: 'openai/gpt-5.4',
           messages: msgs,
           max_tokens: 2048,
         }),
