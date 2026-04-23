@@ -420,7 +420,7 @@ export default function Home() {
     }
   }, [available_scenarios, scenario]);
 
-  const name = scenarioContext?.title ?? (scenario ? scenario.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : '');
+  const titleName = scenarioContext?.title ?? (scenario ? scenario.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : '');
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Auto-show onboarding for first-time visitors
@@ -443,7 +443,7 @@ export default function Home() {
           {scenario && (
             <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
               <Radio size={8} className="text-[var(--cyan)] animate-pulse" />
-              <span className="text-[14px] font-mono font-bold text-[var(--cyan)]">{name}</span>
+              <span className="text-[14px] font-mono font-bold text-[var(--cyan)]">{titleName}</span>
             </div>
           )}
         </div>
@@ -506,7 +506,13 @@ export default function Home() {
       {/* ═══ MAIN CONTENT ═══ */}
       <div className="flex-1 flex overflow-hidden">
         <main className="flex-1 overflow-hidden">
-          {activeTab === 'mission-control' && <MissionControlTab scenario={scenario} available_scenarios={available_scenarios} />}
+          {activeTab === 'mission-control' && (
+            <MissionControlTab
+              scenario={scenario}
+              available_scenarios={available_scenarios}
+              onOpenScenarioBuilder={() => setActiveTab('scenario-library')}
+            />
+          )}
           {activeTab === 'telemetry' && <TelemetryDashboard />}
           {activeTab === 'scenario-library' && <ScenarioCreator />}
         </main>
@@ -521,7 +527,15 @@ export default function Home() {
 // Mission Control Tab — main scenario workspace
 // ═══════════════════════════════════════════════════════════
 
-function MissionControlTab({ scenario: parentScenario, available_scenarios: parentScenarios }: { scenario: string | null; available_scenarios: any[] }) {
+function MissionControlTab({
+  scenario: parentScenario,
+  available_scenarios: parentScenarios,
+  onOpenScenarioBuilder,
+}: {
+  scenario: string | null;
+  available_scenarios: any[];
+  onOpenScenarioBuilder: () => void;
+}) {
   const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, open_count, stuck_count } = useSystem();
   const { isOpen: chatOpen, toggleOpen: toggleChat } = useChat();
   const [bottomTab, setBottomTab] = useState<'case' | 'terminal' | 'fixwire' | 'trace' | 'runbook'>('case');
@@ -549,6 +563,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
   // Hints tracking
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [showTraining, setShowTraining] = useState(false);
+  const [heroAction, setHeroAction] = useState<'launching' | 'stressing' | null>(null);
 
   // Reset state on scenario change
   useEffect(() => {
@@ -638,6 +653,50 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
     onNavPrev: () => currentStep > 0 ? setCurrentStep(currentStep - 1) : undefined,
     onNavNext: () => currentStep < steps.length - 1 ? setCurrentStep(currentStep + 1) : undefined,
   });
+
+  async function launchActiveScenarioInCopilot() {
+    if (!scenario || !activeScenarios.length) return;
+    const meta = activeScenarios.find((s: any) => s.name === scenario);
+    const chat = useChat.getState();
+    if (!chat.isOpen) chat.toggleOpen();
+    await chat.openWithPrompt(`Start a new scenario: ${meta?.title || scenario}. Summarize the incident, tell me what matters first, and guide the first action.`);
+  }
+
+  async function injectStressEvent() {
+    if (!scenario) return;
+    await fetch('/api/tool', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tool: 'inject_event',
+        arguments: { event_type: 'reject_spike', target: 'desk', details: `Mission control stress test for ${scenario}`, delay_sec: 0 },
+      }),
+    });
+  }
+
+  async function startGuidedLaunch() {
+    setHeroAction('launching');
+    try {
+      await launchActiveScenarioInCopilot();
+      setShowCaseBrief(false);
+    } finally {
+      setHeroAction(null);
+    }
+  }
+
+  async function startGuidedStress() {
+    setHeroAction('stressing');
+    try {
+      await injectStressEvent();
+      const chat = useChat.getState();
+      if (!chat.isOpen) chat.toggleOpen();
+      await chat.openWithPrompt(`Stress test the active scenario ${activeScenario?.title || scenario}. A reject spike was injected. Triage the incident and guide the response.`);
+      setShowTraining(true);
+      setBottomTab('case');
+    } finally {
+      setHeroAction(null);
+    }
+  }
 
   if (!scenario) {
     return (
@@ -742,42 +801,118 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
 
   // ── Scenario active ──
   const activeScenario = scenarioContext || null;
+  const activeTitle = activeScenario?.title ?? (scenario ? scenario.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : '');
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
-      {/* ═══ TOP: Toggleable Topology ═══ */}
-      <div
-        className={`border-b border-[var(--border-dim)] relative shrink-0 transition-all duration-300 overflow-hidden ${
-          topologyCollapsed ? 'h-[40px] min-h-[40px]' : 'h-[180px] min-h-[180px]'
-        }`}
-        onClick={() => setTopologyCollapsed(!topologyCollapsed)}
-        style={{ cursor: 'pointer' }}
-      >
-        {!topologyCollapsed && <TopologyGraph />}
-        {/* Always-visible status bar */}
-        <div className={`absolute top-1 left-2 z-10 flex gap-2 items-center ${topologyCollapsed ? 'w-full px-4 justify-center' : ''}`}>
-          {!topologyCollapsed && (
-            <>
-              <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--cyan)]">● {scenario}</div>
-              <div className="glass-panel px-2.5 py-1 text-[11px] font-mono">{sessions?.length || 0} sessions</div>
-              {doneCount > 0 && <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--green)]">{doneCount}/{totalSteps} · {progressPct}%</div>}
-              {allDone && <div className="glass-panel px-2.5 py-1 text-[11px] font-mono text-[var(--green)] bg-[var(--green)]/10">✅ Resolved</div>}
-            </>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); setTopologyCollapsed(!topologyCollapsed); }}
-            className="glass-panel px-2 py-0.5 text-[10px] font-mono text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-          >
-            {topologyCollapsed ? <><ChevronDown size={10} /> Expand Topology</> : <><ChevronUp size={10} /> Collapse</>}
-          </button>
+      <div className="border-b border-[var(--border-dim)] bg-[var(--bg-base)] px-4 py-4">
+        <div className="grid gap-4 xl:grid-cols-[1.45fr_0.95fr]">
+          <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 shadow-2xl">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="rounded-full border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2.5 py-1 text-[11px] font-mono text-[var(--cyan)]">LIVE INCIDENT</span>
+              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-mono text-[var(--text-dim)]">{scenario}</span>
+              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] font-mono text-[var(--text-dim)]">{activeScenario?.simulated_time || '—'}</span>
+            </div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h1 className="text-[28px] leading-tight font-bold text-[var(--text-primary)]">{activeTitle}</h1>
+                <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-[var(--text-secondary)]">
+                  {activeScenario?.description || activeScenario?.runbook?.narrative || 'Live trading operations incident loaded.'}
+                </p>
+              </div>
+              <div className="hidden xl:flex flex-col gap-2 min-w-[180px]">
+                <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2">
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Scenario lens</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)]">{activeScenario?.categories?.join(' · ') || 'ops incident'}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2">
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Guided by</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)]">Chatbot + MCP tools</div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Notional pressure</div>
+                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{open_count}</div>
+                <div className="text-[12px] text-[var(--text-muted)]">open orders at risk</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Venue health</div>
+                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{downCount + degradedCount}</div>
+                <div className="text-[12px] text-[var(--text-muted)]">{downCount} down · {degradedCount} degraded</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Runbook</div>
+                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{totalSteps}</div>
+                <div className="text-[12px] text-[var(--text-muted)]">explainable recovery steps</div>
+              </div>
+              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-3">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)]">Current progress</div>
+                <div className="mt-1 text-[24px] font-bold text-[var(--text-primary)]">{progressPct}%</div>
+                <div className="text-[12px] text-[var(--text-muted)]">{doneCount}/{totalSteps} steps complete</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 shadow-2xl">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Scenario Ops</div>
+                <div className="text-[18px] font-bold text-[var(--text-primary)]">Run the desk</div>
+              </div>
+              <button onClick={onOpenScenarioBuilder} className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                Create / Load Scenarios
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button onClick={startGuidedLaunch} disabled={heroAction !== null}
+                className="rounded-xl border border-[var(--cyan)]/30 bg-[var(--cyan-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--cyan-dim)]/30 disabled:opacity-50">
+                <div className="flex items-center gap-2 text-[var(--cyan)] font-bold text-[14px]">
+                  {heroAction === 'launching' ? <Loader2 size={15} className="animate-spin" /> : <MessageSquare size={15} />} Launch in Chatbot
+                </div>
+                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Open the copilot, brief the incident, and start the guided response immediately.</div>
+              </button>
+              <button onClick={startGuidedStress} disabled={heroAction !== null}
+                className="rounded-xl border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
+                <div className="flex items-center gap-2 text-[var(--amber)] font-bold text-[14px]">
+                  {heroAction === 'stressing' ? <Loader2 size={15} className="animate-spin" /> : <FlaskConical size={15} />} Stress Test Now
+                </div>
+                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Inject failure pressure and force the chatbot + operator workflow to react.</div>
+              </button>
+              <button onClick={() => setShowTraining(true)}
+                className="rounded-xl border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-4 py-4 text-left transition-colors hover:bg-[var(--green-dim)]/30">
+                <div className="flex items-center gap-2 text-[var(--green)] font-bold text-[14px]"><GraduationCap size={15} /> Open Stress Controls</div>
+                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Time control, snapshots, scoring, and event injection are available here.</div>
+              </button>
+              <button onClick={() => setBottomTab('trace')}
+                className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-4 py-4 text-left transition-colors hover:border-[var(--cyan)]/30">
+                <div className="flex items-center gap-2 text-[var(--text-primary)] font-bold text-[14px]"><FileText size={15} /> Audit the MCP Trace</div>
+                <div className="mt-2 text-[13px] text-[var(--text-secondary)]">Show every tool call, argument, latency, and outcome like a real incident desk.</div>
+              </button>
+            </div>
+            <div className="mt-4 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3">
+              <div className="text-[12px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Most important first</div>
+              <div className="mt-2 text-[13px] leading-relaxed text-[var(--text-secondary)]">{activeScenario?.hints?.diagnosis_path || 'Use the copilot to summarize the blast radius, then follow the runbook.'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-[var(--border-dim)] bg-[var(--bg-base)] px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+            <div className="h-full rounded-full bg-[var(--cyan)] transition-all" style={{ width: `${progressPct}%` }} />
+          </div>
+          <div className="text-[12px] font-mono text-[var(--text-muted)]">{doneCount}/{totalSteps} done</div>
         </div>
       </div>
 
       {/* ═══ BOTTOM: Case Study / Runbook ═══ */}
-      <div className={`flex-1 min-h-0 flex flex-col transition-all duration-300 ${focusMode ? 'max-w-5xl mx-auto w-full' : 'flex'}`}>
+      <div className={`flex-1 min-h-0 flex flex-col transition-all duration-300 ${focusMode ? 'max-w-6xl mx-auto w-full' : 'flex'}`}>
           {/* Tab bar: Case Study | Terminal | FIX Wire */}
-        <div className="flex items-center justify-between px-2 py-1.5 border-b border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
-          <div className="flex gap-0.5 flex-wrap">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0">
+          <div className="flex gap-1 flex-wrap">
             <button onClick={() => setBottomTab('case')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[13px] font-semibold transition-all ${bottomTab === 'case' ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
               <BookOpen size={13} /> Case Study
@@ -821,7 +956,7 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
           {bottomTab === 'case' && activeScenario && (
             <div className="h-full flex">
               {/* LEFT: Step guide (wide) */}
-              <div className={`flex-1 min-w-[400px] overflow-y-auto transition-all duration-300 ${showTraining ? 'mr-0' : ''}`} ref={runbookScrollRef}>
+              <div className={`flex-1 min-w-[400px] overflow-y-auto transition-all duration-300`} ref={runbookScrollRef}>
                 {showCaseBrief && (
                   <CaseBrief
                     ctx={activeScenario}
@@ -938,25 +1073,41 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
                 )}
               </div>
 
-              {/* RIGHT: Scenario list sidebar (hidden in focus mode, shows HeartbeatPanel at bottom) */}
-              <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[260px]'}`}>
-                <div className="px-3 py-2 border-b border-[var(--border-dim)]">
-                  <span className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Scenarios</span>
+              {/* RIGHT: Ops rail */}
+              <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[320px]'}`}>
+                <div className="px-4 py-3 border-b border-[var(--border-dim)]">
+                  <div className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Ops Rail</div>
+                  <div className="text-[14px] font-semibold text-[var(--text-primary)] mt-1">Stress, launch, switch, create</div>
                 </div>
-                <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+                <div className="p-3 space-y-3 border-b border-[var(--border-dim)]">
+                  <button onClick={startGuidedLaunch} disabled={heroAction !== null}
+                    className="w-full rounded-xl bg-[var(--cyan)] text-black text-[13px] font-bold py-2.5 px-3 flex items-center justify-center gap-2 hover:bg-[var(--cyan)]/80 disabled:opacity-50">
+                    {heroAction === 'launching' ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Launch in Chatbot
+                  </button>
+                  <button onClick={startGuidedStress} disabled={heroAction !== null}
+                    className="w-full rounded-xl border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[13px] font-semibold py-2.5 px-3 flex items-center justify-center gap-2 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50">
+                    {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Stress Test Active Scenario
+                  </button>
+                  <button onClick={onOpenScenarioBuilder}
+                    className="w-full rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] text-[13px] font-semibold py-2.5 px-3 hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                    Create / Load / Test Scenarios
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
                   {activeScenarios?.map((s: any) => {
                     const isActive = scenario === s.name;
                     return (
                       <button key={s.name} onClick={() => startScenario(s.name)}
-                        className={`w-full px-3 py-2 rounded-lg text-left transition-all flex items-center gap-2 ${
-                          isActive ? 'bg-[var(--cyan-dim)] border border-[var(--cyan)]/40' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
+                        className={`w-full px-3 py-3 rounded-xl text-left transition-all ${
+                          isActive ? 'bg-[var(--cyan-dim)]/20 border border-[var(--cyan)]/40' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
                         }`}>
-                        <span className="shrink-0">{isActive ? '●' : <Play size={10} />}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-[13px] font-semibold truncate ${isActive ? 'text-[var(--cyan)]' : 'text-[var(--text-secondary)]'}`}>{s.title || s.name}</div>
-                          <div className="text-[11px] text-[var(--text-dim)] font-mono">{s.estimated_minutes}m · {(s.runbook_step_count || '?')} steps</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className={`text-[13px] font-semibold leading-snug ${isActive ? 'text-[var(--cyan)]' : 'text-[var(--text-secondary)]'}`}>{s.title || s.name}</div>
+                            <div className="mt-1 text-[11px] text-[var(--text-dim)] font-mono">{s.estimated_minutes}m · {(s.runbook_step_count || '?')} steps</div>
+                          </div>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0" style={{ backgroundColor: SEV_BG[s.severity], color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
                         </div>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0" style={{ backgroundColor: SEV_BG[s.severity], color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
                       </button>
                     );
                   })}
@@ -971,8 +1122,8 @@ function MissionControlTab({ scenario: parentScenario, available_scenarios: pare
           )}
 
           {/* Training Panel (right sidebar for Case Study) */}
-          {showTraining && bottomTab === 'case' && activeScenario && (
-            <div className="w-[320px] border-l border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0 overflow-hidden">
+          {showTraining && activeScenario && (
+            <div className="w-[360px] border-l border-[var(--border-dim)] bg-[var(--bg-base)] shrink-0 overflow-hidden">
               <TrainingPanel onRollback={async (id: string) => {
                 await callTool('rollback_to_snapshot', { snapshot_id: id });
               }} />
