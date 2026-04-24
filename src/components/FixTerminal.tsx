@@ -150,6 +150,18 @@ export default function FixTerminal() {
         addLines([{ type: 'output', text: resolved }]);
       } else if (baseCmd === 'pwd') {
         addLines([{ type: 'output', text: cwd }]);
+      } else if (baseCmd === 'ps') {
+        cmdPs();
+      } else if (baseCmd === 'sql') {
+        cmdSql(parts.slice(1).join(' '));
+      } else if (baseCmd === 'df') {
+        cmdDf();
+      } else if (baseCmd === 'whoami') {
+        addLines([{ type: 'output', text: 'fix-operator' }]);
+      } else if (baseCmd === 'env') {
+        cmdEnv();
+      } else if (baseCmd === 'history') {
+        cmdHistory();
       } else {
         addLines([{ type: 'error', text: `Unknown command: ${baseCmd}. Type "help" or "shortcuts".` }]);
       }
@@ -299,70 +311,124 @@ export default function FixTerminal() {
     addLines([{ type: 'error', text: `cat: ${file}: No such file or directory` }]);
   };
 
-  // Generate realistic FIX log lines
+  // Generate realistic FIX log lines — scenario-aware
   const generateFixLog = (venue: string, count: number): string => {
-    const types = [
-      { tag: '35=A', name: 'Logon', level: 'INFO' },
-      { tag: '35=0', name: 'Heartbeat', level: 'INFO' },
-      { tag: '35=D', name: 'NewOrderSingle', level: 'INFO' },
-      { tag: '35=8', name: 'ExecutionReport', level: 'INFO' },
-      { tag: '35=3', name: 'Reject', level: 'WARN' },
-      { tag: '35=5', name: 'Logout', level: 'WARN' },
-    ];
-    const symbols = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'GOOGL', 'META', 'AMZN', 'AMD'];
+    const session = sessions.find((s: SessionInfo) => s.venue === venue);
+    const venueOrders = orders.filter((o: OrderInfo) => o.venue === venue);
+    const isDown = session?.status === 'down';
+    const isDegraded = session?.status === 'degraded';
+    const symbols = Array.from(new Set(venueOrders.map(o => o.symbol).concat(['AAPL', 'MSFT', 'TSLA', 'NVDA', 'GOOGL', 'META', 'AMZN', 'AMD'])));
+
     const lines: string[] = [];
     const baseTime = new Date();
+
     for (let i = 0; i < count; i++) {
       const t = new Date(baseTime.getTime() - (count - i) * 1500);
       const ts = `${t.toISOString().split('T')[0].replace(/-/g, '')}-${t.toTimeString().split(' ')[0]}.${String(t.getMilliseconds()).padStart(3, '0')}`;
-      const mt = types[Math.floor(Math.random() * types.length)];
-      const sym = symbols[Math.floor(Math.random() * symbols.length)];
       const seq = 12400 + i;
-      const msg = `8=FIX.4.2|9=${140+Math.floor(Math.random()*80)}|${mt.tag}|34=${seq}|49=FIRM_A|56=${venue}|52=${ts}|55=${sym}|54=${Math.random()>0.5?'1':'2'}|38=${Math.floor(Math.random()*5000)+100}|10=${String(Math.floor(Math.random()*256)).padStart(3,'0')}|`;
-      lines.push(`${ts} ${mt.level.padEnd(5)} [${venue}-PROD-01] ${mt.name} ${msg}`);
+      const sym = symbols[Math.floor(Math.random() * symbols.length)];
+
+      // Scenario-aware message generation
+      let level = 'INFO';
+      let msgType = '35=0'; // Heartbeat default
+      let msgName = 'Heartbeat';
+
+      if (isDown) {
+        const downMsgs = [
+          { tag: '35=5', name: 'Logout', level: 'WARN' },
+          { tag: '35=3', name: 'Reject', level: 'ERROR' },
+          { tag: '35=2', name: 'ResendRequest', level: 'WARN' },
+          { tag: '35=A', name: 'Logon', level: 'INFO' },
+        ];
+        const dm = downMsgs[Math.floor(Math.random() * downMsgs.length)];
+        msgType = dm.tag;
+        msgName = dm.name;
+        level = dm.level;
+      } else if (isDegraded) {
+        const degMsgs = [
+          { tag: '35=0', name: 'Heartbeat', level: 'WARN' },
+          { tag: '35=1', name: 'TestRequest', level: 'WARN' },
+          { tag: '35=3', name: 'Reject', level: 'WARN' },
+          { tag: '35=8', name: 'ExecutionReport', level: 'INFO' },
+        ];
+        const dm = degMsgs[Math.floor(Math.random() * degMsgs.length)];
+        msgType = dm.tag;
+        msgName = dm.name;
+        level = dm.level;
+      } else {
+        const normalMsgs = [
+          { tag: '35=0', name: 'Heartbeat', level: 'INFO' },
+          { tag: '35=8', name: 'ExecutionReport', level: 'INFO' },
+          { tag: '35=D', name: 'NewOrderSingle', level: 'INFO' },
+          { tag: '35=A', name: 'Logon', level: 'INFO' },
+        ];
+        const nm = normalMsgs[Math.floor(Math.random() * normalMsgs.length)];
+        msgType = nm.tag;
+        msgName = nm.name;
+        level = nm.level;
+      }
+
+      // Add stuck-order related messages if applicable
+      const stuckHere = venueOrders.filter(o => o.status === 'stuck');
+      if (stuckHere.length > 0 && Math.random() > 0.7) {
+        const stuck = stuckHere[Math.floor(Math.random() * stuckHere.length)];
+        msgType = '35=3';
+        msgName = 'Reject';
+        level = 'ERROR';
+        lines.push(`${ts} ${level.padEnd(5)} [${venue}-PROD-01] ${msgName} 8=FIX.4.2|9=178|${msgType}|34=${seq}|49=FIRM_A|56=${venue}|52=${ts}|55=${stuck.symbol}|54=${stuck.side === 'buy' ? '1' : '2'}|38=${stuck.quantity}|103=99|58=Venue unreachable|10=${String(Math.floor(Math.random()*256)).padStart(3,'0')}|`);
+        continue;
+      }
+
+      const msg = `8=FIX.4.2|9=${140+Math.floor(Math.random()*80)}|${msgType}|34=${seq}|49=FIRM_A|56=${venue}|52=${ts}|55=${sym}|54=${Math.random()>0.5?'1':'2'}|38=${Math.floor(Math.random()*5000)+100}|10=${String(Math.floor(Math.random()*256)).padStart(3,'0')}|`;
+      lines.push(`${ts} ${level.padEnd(5)} [${venue}-PROD-01] ${msgName} ${msg}`);
     }
     return lines.join('\n');
   };
 
   const cmdHelp = () => {
     addLines([
-      { type: 'header', text: '┌─ Available Commands ─────────────────────────────────────────┐' },
-      { type: 'output', text: '│                                                              │' },
-      { type: 'output', text: '│  Sessions                                                    │' },
-      { type: 'output', text: '│  show sessions            — show all FIX sessions            │' },
-      { type: 'output', text: '│  heartbeat <VENUE>       — check heartbeat for a venue       │' },
-      { type: 'output', text: '│  reset seq <VENUE>       — reset sequence numbers            │' },
-      { type: 'output', text: '│  dump <VENUE>            — full session diagnostics          │' },
-      { type: 'output', text: '│                                                              │' },
-      { type: 'output', text: '│  Orders                                                      │' },
-      { type: 'output', text: '│  show orders             — show all orders                   │' },
-      { type: 'output', text: '│  show orders --open      — show open orders only             │' },
-      { type: 'output', text: '│  show orders --status X  — filter by status                  │' },
-      { type: 'output', text: '│  show orders --venue X   — filter by venue                   │' },
-      { type: 'output', text: '│  show orders --symbol X  — filter by symbol                  │' },
-      { type: 'output', text: '│  send order <SYM> <SIDE> <QTY> [@PRICE] [VENUE]             │' },
-      { type: 'output', text: '│  cancel <ORDER_ID>       — cancel an order                   │' },
-      { type: 'output', text: '│  release stuck           — release stuck orders              │' },
-      { type: 'output', text: '│                                                              │' },
-      { type: 'output', text: '│  Logs                                                        │' },
-      { type: 'output', text: '│  tail <LOGFILE> [N]      — tail a log file                   │' },
-      { type: 'output', text: '│  grep <PATTERN> <FILE>   — search logs                       │' },
-      { type: 'output', text: '│                                                              │' },
-      { type: 'output', text: '│  Scenarios                                                   │' },
-      { type: 'output', text: '│  scenario list           — list available scenarios          │' },
-      { type: 'output', text: '│  scenario load <NAME>    — load a scenario                   │' },
-      { type: 'output', text: '│                                                              │' },
-      { type: 'output', text: '│  Filesystem                                                   │' },
-      { type: 'output', text: '│  ls [DIR]                — list directory contents            │' },
-      { type: 'output', text: '│  cat <FILE>              — view file contents                │' },
-      { type: 'output', text: '│  pwd                     — print working directory           │' },
-      { type: 'output', text: '│                                                              │' },
-      { type: 'output', text: '│  Misc                                                        │' },
-      { type: 'output', text: '│  parse <FIX_MSG>         — parse a FIX message client-side   │' },
-      { type: 'output', text: '│  shortcuts               — quick log access shortcuts        │' },
-      { type: 'output', text: '│  status                  — full system status                │' },
-      { type: 'output', text: '│  clear                   — clear terminal                    │' },
-      { type: 'header', text: '└──────────────────────────────────────────────────────────────┘' },
+      { type: 'header', text: '\u250c\u2500 Available Commands \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510' },
+      { type: 'output', text: '\u2502                                                              \u2502' },
+      { type: 'output', text: '\u2502  Sessions                                                     \u2502' },
+      { type: 'output', text: '\u2502  show sessions            \u2014 show all FIX sessions            \u2502' },
+      { type: 'output', text: '\u2502  heartbeat <VENUE>       \u2014 check heartbeat for a venue       \u2502' },
+      { type: 'output', text: '\u2502  reset seq <VENUE>       \u2014 reset sequence numbers            \u2502' },
+      { type: 'output', text: '\u2502  dump <VENUE>            \u2014 full session diagnostics          \u2502' },
+      { type: 'output', text: '\u2502                                                              \u2502' },
+      { type: 'output', text: '\u2502  Orders                                                       \u2502' },
+      { type: 'output', text: '\u2502  show orders             \u2014 show all orders                   \u2502' },
+      { type: 'output', text: '\u2502  show orders --open      \u2014 show open orders only             \u2502' },
+      { type: 'output', text: '\u2502  show orders --status X  \u2014 filter by status                  \u2502' },
+      { type: 'output', text: '\u2502  show orders --venue X   \u2014 filter by venue                   \u2502' },
+      { type: 'output', text: '\u2502  show orders --symbol X  \u2014 filter by symbol                  \u2502' },
+      { type: 'output', text: '\u2502  send order <SYM> <SIDE> <QTY> [@PRICE] [VENUE]             \u2502' },
+      { type: 'output', text: '\u2502  cancel <ORDER_ID>       \u2014 cancel an order                   \u2502' },
+      { type: 'output', text: '\u2502  release stuck           \u2014 release stuck orders              \u2502' },
+      { type: 'output', text: '\u2502                                                              \u2502' },
+      { type: 'output', text: '\u2502  Queries                                                      \u2502' },
+      { type: 'output', text: '\u2502  sql "SELECT ..."        \u2014 query orders/sessions live        \u2502' },
+      { type: 'output', text: '\u2502  ps                      \u2014 list running processes            \u2502' },
+      { type: 'output', text: '\u2502  df                      \u2014 disk usage                        \u2502' },
+      { type: 'output', text: '\u2502  env                     \u2014 environment variables             \u2502' },
+      { type: 'output', text: '\u2502  whoami                  \u2014 current user                      \u2502' },
+      { type: 'output', text: '\u2502                                                              \u2502' },
+      { type: 'output', text: '\u2502  Logs                                                         \u2502' },
+      { type: 'output', text: '\u2502  tail <LOGFILE> [N]      \u2014 tail a log file                   \u2502' },
+      { type: 'output', text: '\u2502  grep <PATTERN> <FILE>   \u2014 search logs                       \u2502' },
+      { type: 'output', text: '\u2502  cat <FILE>              \u2014 view file contents                \u2502' },
+      { type: 'output', text: '\u2502  ls [DIR]                \u2014 list directory                    \u2502' },
+      { type: 'output', text: '\u2502                                                              \u2502' },
+      { type: 'output', text: '\u2502  Scenarios                                                    \u2502' },
+      { type: 'output', text: '\u2502  scenario list           \u2014 list available scenarios          \u2502' },
+      { type: 'output', text: '\u2502  scenario load <NAME>    \u2014 load a scenario                   \u2502' },
+      { type: 'output', text: '\u2502                                                              \u2502' },
+      { type: 'output', text: '\u2502  Misc                                                         \u2502' },
+      { type: 'output', text: '\u2502  parse <FIX_MSG>         \u2014 parse a FIX message               \u2502' },
+      { type: 'output', text: '\u2502  shortcuts               \u2014 quick log access shortcuts        \u2502' },
+      { type: 'output', text: '\u2502  status                  \u2014 full system status                \u2502' },
+      { type: 'output', text: '\u2502  history                 \u2014 command history                   \u2502' },
+      { type: 'output', text: '\u2502  clear                   \u2014 clear terminal                    \u2502' },
+      { type: 'header', text: '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518' },
     ]);
   };
 
@@ -691,14 +757,14 @@ export default function FixTerminal() {
 
     addLines([
       { type: 'header', text: 'SYSTEM STATUS' },
-      { type: 'header', text: '─'.repeat(60) },
+      { type: 'header', text: '\u2500'.repeat(60) },
       { type: 'output', text: `  FIX Sessions:    ${activeSessions}/${sessions.length} active, ${downSessions} down` },
       { type: 'output', text: `  Open Orders:     ${openOrders} (${stuckOrders} stuck)` },
       { type: 'output', text: '' },
       { type: 'header', text: '  Venue Details:' },
     ]);
     for (const s of sessions) {
-      const icon = s.status === 'active' ? '●' : s.status === 'degraded' ? '◐' : '○';
+      const icon = s.status === 'active' ? '\u25cf' : s.status === 'degraded' ? '\u25d0' : '\u25cb';
       const logFile = LOG_PATHS[s.venue] || `/opt/fix/logs/${s.venue}-PROD-01.log`;
       addLines([{
         type: s.status === 'active' ? 'success' : s.status === 'degraded' ? 'output' : 'error',
@@ -718,7 +784,139 @@ export default function FixTerminal() {
     ]);
   };
 
-  // ── Input handling ─────────────────────────────────────────────
+  // ── New commands: ps, sql, df, env, history ──
+
+  const cmdPs = () => {
+    const procs = [
+      { pid: 101, name: 'fix-gateway', user: 'fix-operator', cpu: '2.4%', mem: '128M', status: 'active' },
+      { pid: 102, name: 'fix-oms-engine', user: 'fix-operator', cpu: '1.8%', mem: '256M', status: 'active' },
+      { pid: 103, name: 'fix-sor-router', user: 'fix-operator', cpu: '1.2%', mem: '64M', status: 'active' },
+      { pid: 104, name: 'fix-monitor', user: 'fix-operator', cpu: '0.4%', mem: '32M', status: 'active' },
+      { pid: 105, name: 'fix-replay', user: 'fix-operator', cpu: '0.1%', mem: '16M', status: 'idle' },
+      { pid: 201, name: 'postgres', user: 'postgres', cpu: '3.2%', mem: '512M', status: 'active' },
+      { pid: 202, name: 'redis-server', user: 'redis', cpu: '0.8%', mem: '64M', status: 'active' },
+      { pid: 301, name: 'nginx', user: 'www-data', cpu: '0.2%', mem: '24M', status: 'active' },
+    ];
+    addLines([
+      { type: 'header', text: '  PID   PROCESS          USER         CPU    MEM     STATUS' },
+      { type: 'header', text: '\u2500'.repeat(70) },
+    ]);
+    for (const p of procs) {
+      addLines([{ type: 'output', text: `  ${String(p.pid).padEnd(5)} ${p.name.padEnd(16)} ${p.user.padEnd(12)} ${p.cpu.padEnd(6)} ${p.mem.padEnd(7)} ${p.status}` }]);
+    }
+    addLines([{ type: 'output', text: '' }, { type: 'output', text: `  ${procs.length} processes running` }]);
+  };
+
+  const cmdSql = (query: string) => {
+    if (!query) {
+      addLines([
+        { type: 'error', text: 'Usage: sql "<QUERY>"' },
+        { type: 'output', text: 'Examples:' },
+        { type: 'output', text: '  sql "SELECT * FROM orders WHERE status = \'stuck\'"' },
+        { type: 'output', text: '  sql "SELECT venue, COUNT(*) FROM orders GROUP BY venue"' },
+        { type: 'output', text: '  sql "SELECT * FROM sessions WHERE status != \'active\'"' },
+      ]);
+      return;
+    }
+    const q = query.toLowerCase().trim();
+
+    // Parse simple SQL-ish queries against in-memory data
+    if (q.includes('from orders')) {
+      let filtered = [...orders];
+      if (q.includes("where")) {
+        if (q.includes("status") && (q.includes("stuck") || q.includes("'stuck'") || q.includes('"stuck"'))) {
+          filtered = filtered.filter((o) => o.status === 'stuck');
+        } else if (q.includes("status") && (q.includes("new") || q.includes("'new'") || q.includes('"new"'))) {
+          filtered = filtered.filter((o) => o.status === 'new');
+        } else if (q.includes("venue")) {
+          const match = query.match(/venue\s*=\s*['"]?([A-Z]+)['"]?/i);
+          if (match) filtered = filtered.filter((o) => o.venue === match[1]);
+        } else if (q.includes("symbol")) {
+          const match = query.match(/symbol\s*=\s*['"]?([A-Z]+)['"]?/i);
+          if (match) filtered = filtered.filter((o) => o.symbol === match[1]);
+        }
+      }
+      if (q.includes('count(*)')) {
+        addLines([{ type: 'success', text: `COUNT\n${filtered.length}` }]);
+        return;
+      }
+      const cols = q.includes('*') ? ['order_id', 'symbol', 'side', 'quantity', 'status', 'venue', 'client_name'] : ['order_id', 'symbol', 'status'];
+      const header = cols.map((c) => c.toUpperCase().padEnd(c === 'order_id' ? 20 : c === 'client_name' ? 18 : 10)).join(' ');
+      addLines([{ type: 'header', text: header }, { type: 'header', text: '\u2500'.repeat(header.length) }]);
+      for (const o of filtered.slice(0, 30)) {
+        const row = cols.map((c) => {
+          const val = (o as any)[c] ?? '';
+          return String(val).padEnd(c === 'order_id' ? 20 : c === 'client_name' ? 18 : 10);
+        }).join(' ');
+        addLines([{ type: 'output', text: row }]);
+      }
+      if (filtered.length > 30) {
+        addLines([{ type: 'output', text: `  ... and ${filtered.length - 30} more rows` }]);
+      }
+      addLines([{ type: 'output', text: `  ${filtered.length} row(s)` }]);
+      return;
+    }
+
+    if (q.includes('from sessions')) {
+      let filtered = [...sessions];
+      if (q.includes("where") && q.includes("status") && q.includes("!='active'")) {
+        filtered = filtered.filter((s) => s.status !== 'active');
+      }
+      const header = 'VENUE      STATUS     LATENCY  SESSION_ID';
+      addLines([{ type: 'header', text: header }, { type: 'header', text: '\u2500'.repeat(header.length) }]);
+      for (const s of filtered) {
+        addLines([{ type: 'output', text: `  ${s.venue.padEnd(10)} ${s.status.padEnd(10)} ${String(s.latency_ms ?? 0).padEnd(8)} ${s.session_id ?? 'N/A'}` }]);
+      }
+      addLines([{ type: 'output', text: `  ${filtered.length} row(s)` }]);
+      return;
+    }
+
+    addLines([{ type: 'error', text: 'Supported tables: orders, sessions' }, { type: 'output', text: 'Try: sql "SELECT * FROM orders WHERE status = \'stuck\'"' }]);
+  };
+
+  const cmdDf = () => {
+    addLines([
+      { type: 'header', text: 'Filesystem      Size  Used  Avail  Use%  Mounted on' },
+      { type: 'header', text: '\u2500'.repeat(65) },
+      { type: 'output', text: '  /dev/sda1      500G  120G  380G   24%  /' },
+      { type: 'output', text: '  /dev/sda2      200G   45G  155G   23%  /opt/fix' },
+      { type: 'output', text: '  /dev/sdb1      1.0T  310G  690G   31%  /var/lib/fix' },
+      { type: 'output', text: '  tmpfs           32G  2.1G   30G    7%  /tmp' },
+    ]);
+  };
+
+  const cmdEnv = () => {
+    addLines([
+      { type: 'header', text: 'Environment Variables' },
+      { type: 'header', text: '\u2500'.repeat(50) },
+      { type: 'output', text: '  FIX_HOME=/opt/fix' },
+      { type: 'output', text: '  FIX_CONFIG=/opt/fix/config' },
+      { type: 'output', text: '  FIX_LOGS=/opt/fix/logs' },
+      { type: 'output', text: '  FIX_VERSION=4.2' },
+      { type: 'output', text: '  VENUES=NYSE,ARCA,BATS,IEX,NASDAQ' },
+      { type: 'output', text: '  SOR_ALGORITHM=latency_weighted' },
+      { type: 'output', text: '  SLA_INSTITUTIONAL_MIN=15' },
+      { type: 'output', text: '  SLA_RETAIL_MIN=60' },
+      { type: 'output', text: '  HEARTBEAT_INTERVAL=30' },
+      { type: 'output', text: '  RECONNECT_INTERVAL=30' },
+      { type: 'output', text: '  USER=fix-operator' },
+      { type: 'output', text: '  SHELL=/bin/bash' },
+      { type: 'output', text: '  PATH=/opt/fix/bin:/usr/local/bin:/usr/bin:/bin' },
+    ]);
+  };
+
+  const cmdHistory = () => {
+    if (history.length === 0) {
+      addLines([{ type: 'output', text: 'No commands in history.' }]);
+      return;
+    }
+    addLines([{ type: 'header', text: 'Command History' }, { type: 'header', text: '\u2500'.repeat(40) }]);
+    for (let i = history.length - 1; i >= 0; i--) {
+      addLines([{ type: 'output', text: `  ${String(history.length - i).padStart(3)}  ${history[i]}` }]);
+    }
+  };
+
+  // ── Input handling ──
 
   const handleInput = (e: React.FormEvent) => {
     e.preventDefault();
@@ -747,7 +945,7 @@ export default function FixTerminal() {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const cmds = ['show', 'send', 'cancel', 'fix', 'release', 'heartbeat', 'reset', 'dump', 'parse', 'tail', 'grep', 'scenario', 'status', 'help', 'clear', 'shortcuts', 'ls', 'cat', 'pwd'];
+      const cmds = ['show', 'send', 'cancel', 'fix', 'release', 'heartbeat', 'reset', 'dump', 'parse', 'tail', 'grep', 'scenario', 'status', 'help', 'clear', 'shortcuts', 'ls', 'cat', 'pwd', 'ps', 'sql', 'df', 'whoami', 'env', 'history'];
       const partial = input.trim().toLowerCase();
       if (partial) {
         const match = cmds.find(c => c.startsWith(partial));

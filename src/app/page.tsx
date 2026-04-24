@@ -10,6 +10,7 @@ import useKeyboardShortcuts from '@/hooks/useKeyboardShortcuts';
 
 import { useSystem, useChat } from '@/store';
 import { useAuth } from '@/store/auth';
+import { useProgress } from '@/store/progress';
 import dynamic from 'next/dynamic';
 import type { ScenarioContext, RunbookStep, TrackedStep } from '@/store';
 import {
@@ -19,7 +20,7 @@ import {
   PanelLeftOpen, PanelLeftClose, ArrowRight, FileText, Send, Wrench,
   ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon, Star,
   X, Trophy, Clock, Award, GraduationCap, HelpCircle, BookOpenCheck, FlaskConical,
-  BarChart3,
+  BarChart3, Route,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -33,6 +34,7 @@ const TrainingPanel = dynamic(() => import('@/components/TrainingPanel').then(m 
 const TraceTab = dynamic(() => import('@/components/TraceTab').then(m => ({ default: m.TraceTab })), { ssr: false });
 const OnboardingPanel = dynamic(() => import('@/components/OnboardingPanel').then(m => ({ default: m.OnboardingPanel })), { ssr: false, loading: () => null });
 const ManualRunbookPanel = dynamic(() => import('@/components/ManualRunbookPanel').then(m => ({ default: m.ManualRunbookPanel })), { ssr: false });
+const LearningPath = dynamic(() => import('@/components/LearningPath').then(m => ({ default: m.default })), { ssr: false });
 
 const MANUAL_RUNBOOK_MAP: Record<string, Array<{ label: string; language: string; code: string }>> = {
   check_fix_sessions: [
@@ -83,7 +85,7 @@ const SEV_BG: Record<string, string> = { low: 'var(--green-dim)', medium: 'var(-
 // Keyboard shortcuts hook
 // ═══════════════════════════════════════════════════════════
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'mission-control' | 'scenario-library'>('mission-control');
+  const [activeTab, setActiveTab] = useState<'mission-control' | 'learning-path' | 'scenario-library'>('learning-path');
   const { scenario, scenarioContext, scenarioState, available_scenarios, refresh, error, connected, startScenario, sessions, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, locked } = useSystem();
   const { isOpen, toggleOpen } = useChat();
   const { isAuthenticated, user, logout } = useAuth();
@@ -158,8 +160,9 @@ export default function Home() {
         </div>
         <nav className="flex gap-0.5 bg-[var(--bg-surface)] rounded-lg p-0.5 border border-[var(--border-dim)]">
           {([
+            ['learning-path', 'Academy', Route],
             ['mission-control', 'Mission Control', Layers],
-            ['scenario-library', 'Scenario Library', PlusCircle],
+            ['scenario-library', 'Builder', PlusCircle],
           ] as const).map(([id, label, Icon]) => (
             <button key={id} onClick={() => setActiveTab(id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all ${activeTab === id ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
@@ -220,6 +223,12 @@ export default function Home() {
               available_scenarios={available_scenarios}
               onOpenScenarioBuilder={() => setActiveTab('scenario-library')}
             />
+          )}
+          {activeTab === 'learning-path' && (
+            <LearningPath onStartLab={(name) => {
+              setActiveTab('mission-control');
+              launchScenarioFromHeader(name);
+            }} />
           )}
           {activeTab === 'scenario-library' && <ScenarioCreator />}
         </main>
@@ -285,6 +294,7 @@ function MissionControlTab({
 }) {
   const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, open_count, stuck_count, resetScenario } = useSystem();
   const { isOpen: chatOpen, toggleOpen: toggleChat } = useChat();
+  const { completeLab } = useProgress();
   const [bottomTab, setBottomTab] = useState<'case' | 'terminal' | 'fixwire' | 'trace' | 'runbook'>('case');
   const activeScenarios = useSystem.getState().available_scenarios || parentScenarios || [];
 
@@ -358,6 +368,13 @@ function MissionControlTab({
       return rank(b.severity) - rank(a.severity);
     })
     .slice(0, 4);
+
+  // Track lab completion in academy progress
+  useEffect(() => {
+    if (allDone && scenario && totalSteps > 0) {
+      completeLab(scenario, doneCount, totalSteps, hintsUsedCount);
+    }
+  }, [allDone, scenario, doneCount, totalSteps, hintsUsedCount, completeLab]);
 
   // Show completion screen when all done
   useEffect(() => {
