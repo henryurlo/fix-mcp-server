@@ -52,7 +52,7 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-dim)] shrink-0">
           <h2 className="text-[18px] font-bold bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
-            FIX-MCP Trading Desk Simulator — Getting Started
+            FIX-MCP Trading Desk Simulator - Getting Started
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
             <X size={18} className="text-[var(--text-muted)]" />
@@ -80,8 +80,8 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
               <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-dim)] p-5">
                 <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-2">What is the FIX-MCP Simulator?</h3>
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-3">
-                  An AI-native trading operations simulator for presenting how FIX infrastructure, MCP tools,
-                  and incident-response runbooks fit together on a modern trading desk.
+                  A professional open-source demo for presenting how FIX infrastructure, MCP tools,
+                  human approval, and incident-response runbooks fit together on a modern trading desk.
                 </p>
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-3">
                   <b className="text-[var(--text-primary)]">FIX</b> (Financial Information Exchange) is the standard 
@@ -92,19 +92,18 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed">
                   This simulator creates realistic failure scenarios (venue outages, corporate actions, circuit breakers,
                   algo degradation), then lets a human operator or AI copilot work the same workflow a real desk would:
-                  inspect sessions, query orders, review traces, and execute explainable runbooks. Every AI action maps
-                  to actual FIX-level or Linux/SQL commands — no black box magic.
+                  inspect sessions, query orders, review traces, approve a recovery workbook, and execute explainable runbooks. Every AI action maps
+                  to actual FIX-level or Linux/SQL commands.
                 </p>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { icon: '🏦', title: 'Trading Desk', desc: 'Learn protocol-level diagnostics without risking real orders' },
-                  { icon: '🔧', title: 'SRE / DevOps', desc: 'Observe FIX session management, sequence recovery, and failover' },
-                  { icon: '🎯', title: 'Investor / CTO', desc: 'Understand the infrastructure depth behind modern trading systems' },
+                  { title: 'Trading Desk', desc: 'Review protocol-level diagnostics without risking real orders' },
+                  { title: 'SRE / DevOps', desc: 'Observe FIX session management, sequence recovery, and failover' },
+                  { title: 'AI / CTO', desc: 'See how MCP turns documentation and tools into bounded agent work' },
                 ].map((item, i) => (
                   <div key={i} className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-dim)] p-4 text-center">
-                    <div className="text-[24px] mb-2">{item.icon}</div>
                     <div className="text-[13px] font-bold text-[var(--text-primary)] mb-1">{item.title}</div>
                     <div className="text-[12px] text-[var(--text-muted)] leading-relaxed">{item.desc}</div>
                   </div>
@@ -122,19 +121,19 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
                     {
                       step: '1',
                       title: 'Pick a scenario',
-                      desc: 'Use the scenario dropdown in the header or browse the scenario cards on the landing page. Each scenario represents a real trading desk incident — ARCA session down, MOC deadline missed, LULD halt, etc.',
+                      desc: 'Use the scenario dropdown in the header or browse the scenario cards on the landing page. Each scenario represents a real trading desk incident: ARCA session down, MOC deadline missed, LULD halt, and related operational failures.',
                       highlight: 'Select from the scenarios dropdown',
                     },
                     {
                       step: '2',
                       title: 'Read the case brief',
-                      desc: 'Each scenario presents a narrative briefing: the time, what went wrong, what symptoms you should look for, and what success looks like. Think "post-mortem scenario presented as a live incident."',
+                      desc: 'Each scenario presents a narrative briefing: the time, what went wrong, what symptoms to inspect, and what success looks like.',
                       highlight: '',
                     },
                     {
                       step: '3',
                       title: 'Follow the runbook steps',
-                      desc: 'Click through each step in order. Each step tells you what tool to run. Watch the output, understand what changed, then move to the next step. Use the Copilot (chat) if you need help.',
+                      desc: 'Click through each step in order, or approve the full workbook from Mission Control. Each step shows the MCP tool, expected output, and evidence produced.',
                       highlight: 'Run each step in sequence',
                     },
                     {
@@ -146,7 +145,7 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
                     {
                       step: '5',
                       title: 'Check the Manual Runbook',
-                      desc: 'The Runbook panel shows the exact Linux/SQL/FIX commands a human would run to achieve the same result. This proves the system isn\'t "black box" — every AI action is explainable.',
+                      desc: 'The Runbook panel shows the exact Linux, SQL, and FIX commands a human would run to achieve the same result. Every AI action is explainable.',
                       highlight: '',
                     },
                     {
@@ -165,7 +164,7 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
                         <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{item.desc}</div>
                         {item.highlight && (
                           <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--cyan-dim)] rounded text-[11px] text-[var(--cyan)] font-semibold">
-                            👈 {item.highlight}
+                            {item.highlight}
                           </div>
                         )}
                       </div>
@@ -187,34 +186,34 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
                 <ul className="space-y-2 text-[13px] text-[var(--text-secondary)]">
                   <li className="flex items-start gap-2">
                     <span className="text-[var(--cyan)] font-bold mt-0.5">•</span>
-                    <span><b className="text-[var(--text-primary)]">Simulated time</b> — when the incident occurred (pre-market, opening, EOD, etc.)</span>
+                    <span><b className="text-[var(--text-primary)]">Simulated time</b> - when the incident occurred (pre-market, opening, EOD, etc.)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-[var(--cyan)] font-bold mt-0.5">•</span>
-                    <span><b className="text-[var(--text-primary)]">Seeded state</b> — FIX sessions with specific statuses, orders in various states across venues</span>
+                    <span><b className="text-[var(--text-primary)]">Seeded state</b> - FIX sessions with specific statuses, orders in various states across venues</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-[var(--cyan)] font-bold mt-0.5">•</span>
-                    <span><b className="text-[var(--text-primary)]">Runbook steps</b> — ordered sequence of tool calls to diagnose and resolve the issues</span>
+                    <span><b className="text-[var(--text-primary)]">Runbook steps</b> - ordered sequence of tool calls to diagnose and resolve the issues</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-[var(--cyan)] font-bold mt-0.5">•</span>
-                    <span><b className="text-[var(--text-primary)]">Success criteria</b> — what "done" looks like for this scenario</span>
+                    <span><b className="text-[var(--text-primary)]">Success criteria</b> - what "done" looks like for this scenario</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-[var(--cyan)] font-bold mt-0.5">•</span>
-                    <span><b className="text-[var(--text-primary)]">Hints</b> — guidance for diagnosing the issues without giving away the answer</span>
+                    <span><b className="text-[var(--text-primary)]">Hints</b> - guidance for diagnosing the issues without giving away the answer</span>
                   </li>
                 </ul>
               </div>
 
               <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-dim)] p-5">
-                <h3 className="text-[14px] font-bold text-[var(--text-primary)] mb-2">Training Infrastructure</h3>
+                <h3 className="text-[14px] font-bold text-[var(--text-primary)] mb-2">Stress Infrastructure</h3>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
-                  Each scenario also includes a <b className="text-[var(--green)]">training panel</b> (Training button in the tab bar) 
-                  with time control, KPI scoring, state snapshots, and event injection. These tools let you 
-                  practice incident response under time pressure, save your state before risky operations, 
-                  and inject additional failures mid-scenario to test your adaptability.
+                  Each scenario also includes a <b className="text-[var(--green)]">stress panel</b>
+                  with time control, KPI scoring, state snapshots, and event injection. These tools let you
+                  rehearse incident response under time pressure, save state before risky operations,
+                  and inject additional failures mid-scenario to evaluate the operating model.
                 </p>
               </div>
             </div>

@@ -1,5 +1,33 @@
 # Production Deployment
 
+## Demo vs Production Modes
+
+The demo and production versions should expose the same operator experience and MCP tool surface. The difference is the backend each tool talks to: simulated state for this project, real infrastructure for a consulting engagement.
+
+The product promise is not "let an LLM trade by itself." The promise is an MCP-based operations layer where the model can read the right context, call bounded tools, propose a workbook, and leave the human in control of approval and escalation.
+
+### Operating Modes
+
+| Mode | Demo Behavior | Production Behavior |
+|---|---|---|
+| Watchdog | Scenario state or injected pressure triggers a desk alert with context and recommended response. | Monitoring/event streams trigger alerts from live session, order, market data, and reference systems. |
+| Investigator | Operator asks a question; the copilot calls MCP tools to explain scope, impact, and root cause. | Same MCP interface queries real logs, OMS state, reference data, and monitoring tools. |
+| Advisor | Copilot proposes a full recovery workbook with steps, expected outcomes, tool calls, and manual equivalents. | Workbook is reviewed against local policy, approvals, and client-specific runbooks before execution. |
+| Agent Run | Stress event is injected and the agent works through the runbook while the human observes and can interrupt. | Agent follows approved action policies, emits full trace evidence, and escalates when confidence or authority is insufficient. |
+
+### How These Modes Map to the Demo vs Production
+
+| Component | Demo (This Project) | Production (Consulting Engagement) |
+|---|---|---|
+| FIX sessions | Simulated Python objects | Connected to real FIX engine logs |
+| OMS | In-memory order state | Connected to real OMS database/API |
+| Reference data | Pre-loaded JSON files | Connected to real symbology feeds (DTCC, vendors) |
+| Monitoring | Scenario engine pre-loads problems | Connected to real monitoring stack (Datadog, Splunk) |
+| Alerts | Triggered by querying pre-loaded state | Triggered by real-time event streams |
+| Execution | Updates in-memory state | Sends real FIX messages / calls real OMS APIs |
+| MCP tools | Identical | Identical -- same tool interface, different backend |
+| Domain intelligence | Identical | Identical -- same system prompt, same trading logic |
+
 ## Architecture
 
 ```

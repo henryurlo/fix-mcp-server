@@ -60,15 +60,13 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <GraduationCap size={18} className="text-[var(--cyan)]" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cyan)]">FIX-MCP Academy</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cyan)]">FIX-MCP Professional Path</span>
               </div>
               <h1 className="text-[28px] font-bold text-[var(--text-primary)] leading-tight">
-                Learn trading operations by doing.
+                Prove MCP on a trading desk.
               </h1>
               <p className="mt-2 text-[15px] text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                Six modules, 14 hands-on labs, one simulated trading desk. Every lab is a real incident — 
-                venue outages, corporate actions, algo drift, regulatory halts. Work through them with 
-                MCP tools, FIX protocol diagnostics, and live runbooks.
+                Six modules, 14 incident walkthroughs, one simulated trading desk. Each path shows how a human operator and an AI agent use MCP tools, FIX diagnostics, runbooks, and trace evidence to recover from venue outages, corporate actions, algo drift, and regulatory halts.
               </p>
             </div>
             <div className="flex flex-col gap-2 min-w-[200px]">
@@ -85,7 +83,7 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
               <div className="flex gap-2">
                 <div className="flex-1 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3 text-center">
                   <div className="text-[20px] font-bold text-[var(--text-primary)]">{completedModules.length}</div>
-                  <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Modules Done</div>
+                  <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Paths Done</div>
                 </div>
                 <div className="flex-1 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3 text-center">
                   <div className="text-[20px] font-bold text-[var(--text-primary)]">{ACADEMY_MODULES.length}</div>
@@ -182,7 +180,7 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
 
                     {/* Concepts */}
                     <div className="mb-4">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-2">What you will learn</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-2">Operational concepts</div>
                       <div className="flex flex-wrap gap-1.5">
                         {mod.concepts.map((c) => (
                           <span key={c} className="px-2 py-1 rounded-md bg-[var(--bg-elevated)] border border-[var(--border-dim)] text-[11px] text-[var(--text-secondary)]">
@@ -194,7 +192,7 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
 
                     {/* Labs */}
                     <div className="space-y-2">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1">Labs</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1">Incident runs</div>
                       {mod.labs.map((lab) => {
                         const isCompleted = completedLabs.includes(lab.scenarioName);
                         const scenarioMeta = available_scenarios?.find((s: any) => s.name === lab.scenarioName);

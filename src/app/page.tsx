@@ -74,6 +74,12 @@ const MANUAL_RUNBOOK_MAP: Record<string, Array<{ label: string; language: string
 
 const SEV: Record<string, string> = { low: 'var(--green)', medium: 'var(--amber)', high: 'var(--red)', critical: 'var(--purple)' };
 const SEV_BG: Record<string, string> = { low: 'var(--green-dim)', medium: 'var(--amber-dim)', high: 'var(--red-dim)', critical: 'var(--purple-dim)' };
+const OPERATING_MODES = [
+  { label: 'Watchdog', desc: 'Trigger a desk alert from session, order, market-data, or host pressure.' },
+  { label: 'Investigator', desc: 'Ask the copilot for scope, root cause, blast radius, and evidence.' },
+  { label: 'Advisor', desc: 'Review a full recovery workbook before approving execution.' },
+  { label: 'Agent Run', desc: 'Let the agent work the incident while the human observes and can intervene.' },
+];
 
 // ═══════════════════════════════════════════════════════════
 // Collapsible Step Output
@@ -160,9 +166,9 @@ export default function Home() {
         </div>
         <nav className="flex gap-0.5 bg-[var(--bg-surface)] rounded-lg p-0.5 border border-[var(--border-dim)]">
           {([
-            ['learning-path', 'Academy', Route],
+            ['learning-path', 'Professional Path', Route],
             ['mission-control', 'Mission Control', Layers],
-            ['scenario-library', 'Builder', PlusCircle],
+            ['scenario-library', 'Scenario Builder', PlusCircle],
           ] as const).map(([id, label, Icon]) => (
             <button key={id} onClick={() => setActiveTab(id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all ${activeTab === id ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
@@ -292,7 +298,7 @@ function MissionControlTab({
   available_scenarios: any[];
   onOpenScenarioBuilder: () => void;
 }) {
-  const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, open_count, stuck_count, resetScenario } = useSystem();
+  const { scenario, scenarioContext, scenarioState, sessions, startScenario, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, open_count, stuck_count, resetScenario, takeOverAsAgent } = useSystem();
   const { isOpen: chatOpen, toggleOpen: toggleChat } = useChat();
   const { completeLab } = useProgress();
   const [bottomTab, setBottomTab] = useState<'case' | 'terminal' | 'fixwire' | 'trace' | 'runbook'>('case');
@@ -322,7 +328,7 @@ function MissionControlTab({
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [showTraining, setShowTraining] = useState(false);
   const [trainingInitialTab, setTrainingInitialTab] = useState<'time' | 'score' | 'snapshot' | 'inject'>('time');
-  const [heroAction, setHeroAction] = useState<'launching' | 'stressing' | null>(null);
+  const [heroAction, setHeroAction] = useState<'launching' | 'stressing' | 'workbook' | 'agent-run' | null>(null);
   const [showEvidenceBoard, setShowEvidenceBoard] = useState(false);
   const [completedStepAudit, setCompletedStepAudit] = useState<Array<{ step: number; title: string; tool: string; output: string; commands: Array<{ label: string; language: string; code: string }> }>>([]);
   const [completionSummary, setCompletionSummary] = useState('');
@@ -412,6 +418,28 @@ function MissionControlTab({
     }
   }
 
+  async function runWorkbook(mode: 'advisor' | 'agent') {
+    if (!scenario || steps.length === 0) return;
+    setHeroAction(mode === 'advisor' ? 'workbook' : 'agent-run');
+    setShowCaseBrief(false);
+    setShowEvidenceBoard(true);
+    try {
+      if (mode === 'agent') {
+        await takeOverAsAgent();
+      }
+      for (let i = 0; i < steps.length; i += 1) {
+        const liveStep = useSystem.getState().trackedSteps.find((s) => s.step === steps[i].step) || steps[i];
+        if (liveStep.status === 'done') continue;
+        await runStep(liveStep, i);
+      }
+      addHostEvent(mode === 'advisor' ? 'workbook_approved' : 'agent_run_complete',
+        mode === 'advisor' ? 'Human approved the recovery workbook' : 'Agent run completed the recovery workbook',
+        'info');
+    } finally {
+      setHeroAction(null);
+    }
+  }
+
   function toggleHint(stepIdx: number) {
     setRevealedHints(prev => {
       const next = new Set(prev);
@@ -485,6 +513,21 @@ function MissionControlTab({
     }
   }
 
+  async function startAgentRun() {
+    setHeroAction('agent-run');
+    try {
+      await injectStressEvent();
+      const chat = useChat.getState();
+      if (!chat.isOpen) chat.toggleOpen();
+      await chat.openWithPrompt(`Agent Run for ${activeScenario?.title || scenario}: pressure was injected into the simulated desk. Work through the recovery plan using MCP tools, explain each decision, and stop if human approval is required.`);
+      await runWorkbook('agent');
+      setShowTraining(true);
+      setBottomTab('trace');
+    } finally {
+      setHeroAction(null);
+    }
+  }
+
   if (!scenario) {
     return (
       <div className="h-full flex flex-col bg-[var(--bg-void)]">
@@ -498,20 +541,16 @@ function MissionControlTab({
                   <span className="rounded-full border border-[var(--green)]/30 bg-[var(--green-dim)] px-2 py-1 text-[var(--green)]">AI copilot</span>
                 </div>
                 <h1 className="text-[32px] leading-tight font-bold mb-3 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
-                  A trading desk you can break, inspect, and recover live.
+                  MCP for human-led trading desk operations.
                 </h1>
                 <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed max-w-3xl">
-                  FIX-MCP is not just a dashboard. It is a scenario-driven trading operations simulator that shows how a human or AI operator can diagnose venue failures, stale market data, corporate actions, and algo drift through explainable MCP tools and real desk runbooks.
+                  FIX-MCP is a professional open-source demo for showing how an AI agent can diagnose venue failures, stale market data, corporate actions, and algo drift through bounded MCP tools while the human stays in charge of approval and escalation.
                 </p>
 
-                <div className="grid gap-3 md:grid-cols-3 mt-5">
-                  {[
-                    { title: 'Micro trading desk', desc: 'Venues, broker, market data, storage, and client flows visualized as one live system.' },
-                    { title: 'AI with receipts', desc: 'Trace every action and show the exact command a human SRE would run manually.' },
-                    { title: 'Demo-ready incidents', desc: 'Open, pre-market, dark pool, LULD, ticker rename, and algo execution crises.' },
-                  ].map((item) => (
-                    <div key={item.title} className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
-                      <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{item.title}</div>
+                <div className="grid gap-3 md:grid-cols-4 mt-5">
+                  {OPERATING_MODES.map((item) => (
+                    <div key={item.label} className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
+                      <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{item.label}</div>
                       <div className="text-[13px] leading-relaxed text-[var(--text-muted)]">{item.desc}</div>
                     </div>
                   ))}
@@ -538,12 +577,12 @@ function MissionControlTab({
                     <div className="text-[13px] text-[var(--text-secondary)]">Live incidents ready to run</div>
                   </div>
                   <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
-                    <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Show three layers together</div>
-                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Topology for the system story, case study for the operator story, trace and runbook for the AI/MCP explainability story.</div>
+                    <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Show the full control loop</div>
+                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Alert, investigate, approve the recovery workbook, execute through MCP, and verify with trace evidence.</div>
                   </div>
                   <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
                     <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Ideal audience framing</div>
-                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Trading desk: resilience. SRE: incident response. AI audience: tools, autonomy, and auditability.</div>
+                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Trading desk: resilience. SRE: incident response. AI audience: tools, human approval, and auditability.</div>
                   </div>
                 </div>
               </div>
@@ -615,7 +654,7 @@ function MissionControlTab({
                 </div>
                 <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5">
                   <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Guided by</div>
-                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">Chatbot + MCP tools</div>
+                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">Copilot + MCP tools</div>
                 </div>
               </div>
             </div>
@@ -647,7 +686,7 @@ function MissionControlTab({
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Scenario Ops</div>
-                <div className="text-[16px] font-bold text-[var(--text-primary)]">Run the desk</div>
+                <div className="text-[16px] font-bold text-[var(--text-primary)]">Human approval workflow</div>
               </div>
               <button onClick={onOpenScenarioBuilder} className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
                 Create / Load
@@ -657,16 +696,30 @@ function MissionControlTab({
               <button onClick={startGuidedLaunch} disabled={heroAction !== null}
                 className="rounded-lg border border-[var(--cyan)]/30 bg-[var(--cyan-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--cyan-dim)]/30 disabled:opacity-50">
                 <div className="flex items-center gap-1.5 text-[var(--cyan)] font-bold text-[13px]">
-                  {heroAction === 'launching' ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Launch in Chatbot
+                  {heroAction === 'launching' ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Investigator
                 </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Open copilot and start guided response.</div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Open copilot for scope, root cause, and impact analysis.</div>
+              </button>
+              <button onClick={() => runWorkbook('advisor')} disabled={heroAction !== null || totalSteps === 0}
+                className="rounded-lg border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--green-dim)]/30 disabled:opacity-50">
+                <div className="flex items-center gap-1.5 text-[var(--green)] font-bold text-[13px]">
+                  {heroAction === 'workbook' ? <Loader2 size={13} className="animate-spin" /> : <BookOpenCheck size={13} />} Approve Workbook
+                </div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Approve the full recovery plan and execute all steps.</div>
               </button>
               <button onClick={startGuidedStress} disabled={heroAction !== null}
                 className="rounded-lg border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
                 <div className="flex items-center gap-1.5 text-[var(--amber)] font-bold text-[13px]">
-                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Inject Reject Spike
+                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Watchdog Trigger
                 </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject reject spike and force triage.</div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject pressure and ask the copilot to triage.</div>
+              </button>
+              <button onClick={startAgentRun} disabled={heroAction !== null || totalSteps === 0}
+                className="rounded-lg border border-[var(--purple)]/30 bg-[var(--purple-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--purple-dim)]/30 disabled:opacity-50">
+                <div className="flex items-center gap-1.5 text-[var(--purple)] font-bold text-[13px]">
+                  {heroAction === 'agent-run' ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />} Agent Run
+                </div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject pressure, let the agent work, and watch the trace.</div>
               </button>
             </div>
             <div className="mt-3 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-2.5">
@@ -955,15 +1008,23 @@ function MissionControlTab({
                 <div className="p-2.5 space-y-2 border-b border-[var(--border-dim)]">
                   <button onClick={startGuidedLaunch} disabled={heroAction !== null}
                     className="w-full rounded-lg bg-[var(--cyan)] text-black text-[12px] font-bold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--cyan)]/80 disabled:opacity-50">
-                    {heroAction === 'launching' ? <Loader2 size={12} className="animate-spin" /> : <MessageSquare size={12} />} Launch in Chatbot
+                    {heroAction === 'launching' ? <Loader2 size={12} className="animate-spin" /> : <MessageSquare size={12} />} Investigator
                   </button>
                   <button onClick={startGuidedStress} disabled={heroAction !== null}
                     className="w-full rounded-lg border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50">
-                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Inject Reject Spike
+                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Watchdog Trigger
+                  </button>
+                  <button onClick={() => runWorkbook('advisor')} disabled={heroAction !== null || totalSteps === 0}
+                    className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20 disabled:opacity-50">
+                    {heroAction === 'workbook' ? <Loader2 size={12} className="animate-spin" /> : <BookOpenCheck size={12} />} Approve Workbook
+                  </button>
+                  <button onClick={startAgentRun} disabled={heroAction !== null || totalSteps === 0}
+                    className="w-full rounded-lg border border-[var(--purple)]/40 bg-[var(--purple-dim)]/10 text-[var(--purple)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--purple-dim)]/20 disabled:opacity-50">
+                    {heroAction === 'agent-run' ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Agent Run
                   </button>
                   <button onClick={() => { setTrainingInitialTab('inject'); setShowTraining(true); }}
                     className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20">
-                    <GraduationCap size={12} /> Chaos Panel
+                    <GraduationCap size={12} /> Stress Panel
                   </button>
                 </div>
 

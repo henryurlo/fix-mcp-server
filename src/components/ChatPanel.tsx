@@ -5,14 +5,14 @@ import { useChat, ChatMessage } from '@/store';
 import { useSystem } from '@/store';
 import { Send, X, Bot, CheckCircle, AlertCircle, Loader2, AlertTriangle, Terminal, Zap, Radio, Wrench, Key, Shield, Trash2, Copy, Check } from 'lucide-react';
 
-// Quick-prompt buttons — context-aware
+// Quick-prompt buttons - context-aware
 const QUICK_PROMPTS = [
-  { icon: '🔍', label: 'System status', prompt: 'What is the current system status? Check all sessions, engines, and report any issues.' },
-  { icon: '📋', label: 'Open orders', prompt: 'Query all open orders. Show what\'s stuck, what\'s at risk, and SLA status.' },
-  { icon: '🔧', label: 'Fix sessions', prompt: 'Check all FIX sessions across exchanges. Identify degraded/down venues and recommend fixes.' },
-  { icon: '⚠️', label: 'Risk analysis', prompt: 'Analyze current scenario risk. What SLAs are breaching? What needs immediate action?' },
-  { icon: '📊', label: 'Market data', prompt: 'Check all market data feeds. Are any venues stale or disconnected? Check FX rates for anomalies.' },
-  { icon: '🔗', label: 'Interlist check', prompt: 'Verify interlisted symbol resolution. Are all cross-venue mappings working correctly?' },
+  { icon: '', label: 'System status', prompt: 'What is the current system status? Check all sessions, engines, and report any issues.' },
+  { icon: '', label: 'Open orders', prompt: 'Query all open orders. Show what is stuck, what is at risk, and SLA status.' },
+  { icon: '', label: 'Fix sessions', prompt: 'Check all FIX sessions across exchanges. Identify degraded/down venues and recommend fixes.' },
+  { icon: '', label: 'Risk analysis', prompt: 'Analyze current scenario risk. What SLAs are breaching? What needs immediate action?' },
+  { icon: '', label: 'Market data', prompt: 'Check all market data feeds. Are any venues stale or disconnected? Check FX rates for anomalies.' },
+  { icon: '', label: 'Interlist check', prompt: 'Verify interlisted symbol resolution. Are all cross-venue mappings working correctly?' },
 ];
 
 // Scenario-specific quick prompts -- now sourced from the loaded scenario JSON hints
@@ -20,18 +20,18 @@ const QUICK_PROMPTS = [
 // prompts if a scenario JSON is not yet loaded.
 const SCENARIO_QUICK_ACTION: Record<string, Array<{ icon: string; label: string; prompt: string }>> = {
   morning_triage: [
-    { icon: '🔍', label: 'Check ARCA', prompt: 'Check ARCA session -- it should be down. Attempt reconnection.' },
-    { icon: '📋', label: 'Stale tickers', prompt: 'Check for ACME→ACMX ticker rename and verify all affected orders.' },
-    { icon: '🆕', label: 'Load ZEPH', prompt: 'Load the ZEPH IPO symbol so pending orders can proceed.' },
+    { icon: '', label: 'Check ARCA', prompt: 'Check ARCA session -- it should be down. Attempt reconnection.' },
+    { icon: '', label: 'Stale tickers', prompt: 'Check for ACME to ACMX ticker rename and verify all affected orders.' },
+    { icon: '', label: 'Load ZEPH', prompt: 'Load the ZEPH IPO symbol so pending orders can proceed.' },
   ],
   venue_degradation_1030: [
-    { icon: '📡', label: 'NYSE latency', prompt: 'Check NYSE latency -- it should be ~180ms. Dump session state.' },
-    { icon: '📊', label: 'Stuck orders', prompt: 'Query all NYSE orders -- identify stuck and listing-venue-required.' },
-    { icon: '🔧', label: 'Reconnect', prompt: 'Attempt NYSE reconnection. Check if latency improves.' },
+    { icon: '', label: 'NYSE latency', prompt: 'Check NYSE latency -- it should be ~180ms. Dump session state.' },
+    { icon: '', label: 'Stuck orders', prompt: 'Query all NYSE orders -- identify stuck and listing-venue-required.' },
+    { icon: '', label: 'Reconnect', prompt: 'Attempt NYSE reconnection. Check if latency improves.' },
   ],
   ssr_and_split_1130: [
-    { icon: '⚖️', label: 'RIDE SSR', prompt: 'Check RIDE SSR status and rejected short orders.' },
-    { icon: '✂️', label: 'AAPL split', prompt: 'Find all AAPL orders that need 4:1 split adjustment before 12:00 ET.' },
+    { icon: '', label: 'RIDE SSR', prompt: 'Check RIDE SSR status and rejected short orders.' },
+    { icon: '', label: 'AAPL split', prompt: 'Find all AAPL orders that need 4:1 split adjustment before 12:00 ET.' },
   ],
 };
 
@@ -92,7 +92,7 @@ export function ChatPanel() {
   // Context-aware prompts: prefer runbook steps from loaded scenarioContext,
   // fall back to the hardcoded SCENARIO_QUICK_ACTION map, then general prompts.
   const runbookPrompts = scenarioContext?.runbook?.steps?.map((s) => ({
-    icon: '⚡',
+    icon: '',
     label: `Step ${s.step}: ${s.title}`,
     prompt: `Run runbook step ${s.step}: ${s.title}. ${s.narrative}`,
   })) || [];
@@ -140,7 +140,7 @@ export function ChatPanel() {
             <Terminal size={12} className="text-white" />
           </div>
           <div>
-            <span className="text-[14px] font-bold text-[var(--text-primary)]">SRE Copilot</span>
+            <span className="text-[14px] font-bold text-[var(--text-primary)]">Trading Ops Copilot</span>
             <div className="text-[10px] font-mono text-[var(--text-dim)]">{COPILOT_MODEL_LABEL}</div>
             {scenario && (
               <div className="flex items-center gap-1">
@@ -205,7 +205,7 @@ export function ChatPanel() {
         {messages.length <= 1 && (
           <div className="text-center py-8">
             <Terminal size={24} className="text-[var(--text-muted)] mx-auto mb-3" />
-            <p className="text-[14px] text-[var(--text-muted)] mb-1">SRE Copilot Ready</p>
+            <p className="text-[14px] text-[var(--text-muted)] mb-1">Trading Ops Copilot Ready</p>
             <p className="text-[12px] text-[var(--text-muted)] mb-2">
               {scenarioContext
                 ? `Scenario: ${scenarioContext.title}. ${scenarioContext.runbook?.steps?.length || 0} runbook steps.`
@@ -284,7 +284,6 @@ export function ChatPanel() {
               onClick={() => { send(qp.prompt); }}
               className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[12px] text-[var(--text-muted)] hover:border-[var(--cyan)]/30 hover:text-[var(--text-secondary)] transition-colors"
             >
-              <span>{qp.icon}</span>
               {qp.label}
             </button>
           ))}
