@@ -540,6 +540,9 @@ export const useChat = create<ChatState>((set, get) => ({
 
       if (!resp.ok) {
         const e = await resp.text();
+        if (e.includes('OPENROUTER_API_KEY not configured')) {
+          throw new Error('LLM is not configured. Add an OpenRouter key in the Copilot key menu or set OPENROUTER_API_KEY on the server, then rerun Investigator.');
+        }
         throw new Error(e);
       }
 
@@ -564,7 +567,7 @@ export const useChat = create<ChatState>((set, get) => ({
         messages: [...s.messages, {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: `⚠️ Error: ${(err as Error).message}`,
+          content: `Error: ${(err as Error).message}`,
           timestamp: Date.now(),
         }],
         isTyping: false,
