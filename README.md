@@ -1,6 +1,38 @@
 # FIX-MCP
 
-FIX protocol simulation platform for capital markets operations. AI-powered SRE copilot with real-time diagnostics, incident runbooks, and MCP tool integration for trading infrastructure management.
+AI trading operations command center built on MCP. FIX-MCP is an open-source professional demo that shows how a human operator and an AI agent can diagnose, approve, and resolve trading desk incidents through explicit MCP tools, runbooks, and auditable FIX-level evidence.
+
+The demo runs against a simulated broker-dealer environment. The product thesis is broader: MCP is the right interface for letting LLMs work with real operational systems while keeping the human responsible for approval, escalation, and final control.
+
+---
+
+## Operating Modes
+
+FIX-MCP is organized around four modes that map to real trading desk work:
+
+| Mode | What It Shows | Human Role |
+|------|---------------|------------|
+| **Watchdog** | The system monitors sessions, orders, reference data, and market pressure, then raises contextual desk alerts instead of generic infrastructure noise. | Reviews the alert, decides whether to start the proposed response. |
+| **Investigator** | A human asks natural-language questions and the AI uses MCP tools to build scope, impact, and root-cause analysis. | Drives the investigation and challenges the evidence. |
+| **Advisor** | The AI proposes a complete recovery workbook: ordered steps, expected outcomes, MCP tools, and equivalent manual commands. | Approves the workbook step-by-step or all at once. |
+| **Agent Run** | A stress event is injected into the simulated market/host system and the agent works toward resolution while the operator watches the trace. | Observes, interrupts, approves, or takes back control. |
+
+This is the key pattern: the LLM does not get magic access to the desk. It works through MCP tools, domain prompts, resources, traces, and approval gates.
+
+## Demo vs Production
+
+| Component | Demo (This Project) | Production / Consulting Engagement |
+|-----------|--------------------|------------------------------------|
+| FIX sessions | Simulated Python objects | Connected to real FIX engine logs |
+| OMS | In-memory order state | Connected to real OMS database/API |
+| Reference data | Pre-loaded JSON files | Connected to real symbology feeds and vendors |
+| Monitoring | Scenario engine pre-loads problems | Connected to Datadog, Splunk, Grafana, or internal monitoring |
+| Alerts | Triggered by querying simulated state | Triggered by real-time event streams |
+| Execution | Updates in-memory state | Sends real FIX messages or calls approved OMS APIs |
+| MCP tools | Same tool surface | Same tool surface, different backend adapters |
+| Domain intelligence | Same prompts and trading logic | Same prompts and trading logic, tuned to the client environment |
+
+The professional engagement is the integration layer: wire the same MCP tools and trading operations knowledge into a firm's real FIX logs, OMS, reference data, monitoring, and approval workflows.
 
 ---
 
@@ -28,13 +60,13 @@ No Node or Python on your host — everything runs in containers.
 
 ## Mission Control
 
-Three tabs:
+Mission Control is the professional demo surface.
 
 | Tab | Purpose |
 |-----|---------|
-| **Mission Control** | Live topology, FIX heartbeat panel, scenario picker + interactive terminal |
-| **Telemetry** | Real-time metrics — sparklines, order book, FX rates |
-| **Scenario Library** | Browse all scenarios by severity/difficulty, inspect runbooks, success criteria |
+| **Professional Path** | Start the guided scenario path and learn the core desk incidents |
+| **Mission Control** | Live topology, runbook workbook, stress injection, evidence board, terminal, trace |
+| **Scenario Builder** | Browse and create incident scenarios by severity, difficulty, and desk domain |
 
 ### Core Layout
 
@@ -94,8 +126,9 @@ Three tabs:
 The SRE Copilot is FIX-aware with:
 - Full decision trees for session diagnostics, order triage, and algo management
 - Scenario-specific context injection (situation, key problems, flag meanings, common mistakes, success criteria)
-- Tool call approval gates for irreversible operations
+- Human approval gates for irreversible operations and full workbook execution
 - Concise, actionable output — quantitative impact with FIX message types
+- Traceable MCP calls, manual-command equivalents, and evidence after every action
 
 ---
 
@@ -139,6 +172,8 @@ The SRE Copilot is FIX-aware with:
 ---
 
 ## MCP Integration (external clients)
+
+FIX-MCP is built on MCP, not a vendor-specific AI client. The Next.js console is the built-in demo UI, and MCP-compatible clients can connect to the same tool surface.
 
 ```json
 {
