@@ -104,7 +104,7 @@ export function ChatPanel() {
   const modeButtons = [
     {
       key: 'human',
-      label: 'H',
+      label: 'Human',
       active: controlMode === 'human',
       onClick: releaseToHuman,
       activeClass: 'bg-[var(--green-dim)] text-[var(--green)]',
@@ -113,7 +113,7 @@ export function ChatPanel() {
     },
     {
       key: 'collab',
-      label: 'C',
+      label: 'Co-pilot',
       active: controlMode === 'collab',
       onClick: toggleCollab,
       activeClass: 'bg-[var(--cyan-dim)] text-[var(--cyan)]',
@@ -122,7 +122,7 @@ export function ChatPanel() {
     },
     {
       key: 'agent',
-      label: 'A',
+      label: 'Agent',
       active: controlMode === 'agent',
       onClick: takeOverAsAgent,
       activeClass: 'bg-[var(--purple-dim)] text-[var(--purple)]',
@@ -136,8 +136,8 @@ export function ChatPanel() {
       {/* Header */}
       <div className="h-12 flex items-center justify-between px-4 border-b border-[var(--border-dim)] bg-[var(--bg-surface)] shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[var(--purple)] to-[var(--blue)] flex items-center justify-center">
-            <Terminal size={12} className="text-white" />
+          <div className="w-6 h-6 rounded-md bg-[var(--bg-elevated)] border border-[var(--border-dim)] flex items-center justify-center">
+            <Terminal size={12} className="text-[var(--cyan)]" />
           </div>
           <div>
             <span className="text-[14px] font-bold text-[var(--text-primary)]">Trading Ops Copilot</span>
@@ -158,7 +158,7 @@ export function ChatPanel() {
                 <div key={modeButton.key} className="group relative">
                   <button
                     onClick={modeButton.onClick}
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${modeButton.active ? modeButton.activeClass : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
+                    className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${modeButton.active ? modeButton.activeClass : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'}`}
                     title={modeButton.tooltipTitle}
                   >
                     {modeButton.label}
@@ -338,7 +338,7 @@ export function ChatPanel() {
                   setShowKeyModal(false);
                   setKeyInput('');
                 }}
-                className="flex-1 py-2 rounded-lg bg-[var(--cyan)] text-black text-[13px] font-bold hover:bg-[var(--cyan)]/80 transition-colors"
+                className="flex-1 py-2 rounded-lg bg-[var(--cyan)] text-white text-[13px] font-bold hover:bg-[var(--cyan)]/80 transition-colors"
               >
                 Save
               </button>

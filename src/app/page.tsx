@@ -20,7 +20,7 @@ import {
   PanelLeftOpen, PanelLeftClose, ArrowRight, FileText, Send, Wrench,
   ChevronDown, ChevronUp, AlertTriangle, Lightbulb, Zap, Eye as EyeIcon, Star,
   X, Trophy, Clock, Award, GraduationCap, HelpCircle, BookOpenCheck, FlaskConical,
-  BarChart3, Route,
+  BarChart3, Route, BriefcaseBusiness, ClipboardList, ShieldCheck, Search, Database,
 } from 'lucide-react';
 
 const TopologyGraph = dynamic(() => import('@/components/TopologyGraph'), { ssr: false });
@@ -91,7 +91,7 @@ const OPERATING_MODES = [
 // Keyboard shortcuts hook
 // ═══════════════════════════════════════════════════════════
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'mission-control' | 'learning-path' | 'scenario-library'>('learning-path');
+  const [activeTab, setActiveTab] = useState<'mission-control' | 'learning-path' | 'scenario-library'>('mission-control');
   const { scenario, scenarioContext, scenarioState, available_scenarios, refresh, error, connected, startScenario, sessions, trackedSteps, callTool, setStepStatus, completeStep, addAlert, addHostEvent, locked } = useSystem();
   const { isOpen, toggleOpen } = useChat();
   const { isAuthenticated, user, logout } = useAuth();
@@ -153,25 +153,25 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-void)] text-[var(--text-primary)]">
       {/* ═══ HEADER ═══ */}
-      <header className="h-12 border-b border-[var(--border-dim)] flex items-center justify-between px-4 shrink-0 bg-[var(--bg-base)]">
+      <header className="h-14 border-b border-[var(--border-dim)] flex items-center justify-between px-4 shrink-0 bg-[var(--bg-base)] shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="text-[15px] font-bold tracking-wider">FIX-MCP</span>
-          <span className="hidden md:inline text-[12px] text-[var(--text-dim)]">AI Trading Ops Simulator</span>
+          <span className="text-[15px] font-bold tracking-wider text-[var(--text-primary)]">FIX-MCP</span>
+          <span className="hidden md:inline text-[12px] text-[var(--text-muted)]">Trading Operations Console</span>
           {scenario && (
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--cyan-dim)] border border-[var(--cyan)]/30">
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[var(--cyan-dim)] border border-[var(--cyan)]/30 max-w-[280px]">
               <Radio size={8} className="text-[var(--cyan)] animate-pulse" />
-              <span className="text-[14px] font-mono font-bold text-[var(--cyan)]">{titleName}</span>
+              <span className="truncate text-[13px] font-mono font-bold text-[var(--cyan)]">{titleName}</span>
             </div>
           )}
         </div>
-        <nav className="flex gap-0.5 bg-[var(--bg-surface)] rounded-lg p-0.5 border border-[var(--border-dim)]">
+        <nav className="flex gap-0.5 bg-[var(--bg-surface)] rounded-md p-0.5 border border-[var(--border-dim)]">
           {([
-            ['learning-path', 'Professional Path', Route],
-            ['mission-control', 'Mission Control', Layers],
-            ['scenario-library', 'Scenario Builder', PlusCircle],
+            ['mission-control', 'Desk', Layers],
+            ['learning-path', 'Incidents', Route],
+            ['scenario-library', 'Builder', PlusCircle],
           ] as const).map(([id, label, Icon]) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold transition-all ${activeTab === id ? 'bg-[var(--bg-elevated)] text-[var(--cyan)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] font-semibold transition-all ${activeTab === id ? 'bg-[var(--bg-base)] text-[var(--cyan)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
               <Icon size={14} /> {label}
             </button>
           ))}
@@ -180,7 +180,7 @@ export default function Home() {
           <span className={`text-[13px] font-mono ${connected ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>{connected ? '● LIVE' : '● OFFLINE'}</span>
           <select value={scenario || ''} onChange={(e) => e.target.value && launchScenarioFromHeader(e.target.value)}
             className="input-base !w-auto !py-1.5 !px-3 !text-[13px] !font-mono !rounded-md max-w-[220px]">
-            <option value="">▶ Launch Scenario…</option>
+            <option value="">Load scenario...</option>
             {available_scenarios?.map((s: any) => (
               <option key={s.name} value={s.name}>{s.title || s.name} ({s.estimated_minutes}m)</option>
             ))}
@@ -189,7 +189,7 @@ export default function Home() {
             <>
               <button onClick={stressTestCurrentScenario}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--amber-dim)]/40 text-[var(--amber)] border border-[var(--amber)]/30 text-[13px] font-semibold hover:bg-[var(--amber-dim)] transition-all">
-                <FlaskConical size={12} /> Inject Reject Spike
+                <FlaskConical size={12} /> Stress Test
               </button>
               <button onClick={handleReset}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--red-dim)]/40 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-all">
@@ -531,59 +531,39 @@ function MissionControlTab({
   if (!scenario) {
     return (
       <div className="h-full flex flex-col bg-[var(--bg-void)]">
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-              <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6 shadow-2xl">
-                <div className="flex flex-wrap gap-2 mb-4 text-[11px] font-mono uppercase tracking-wide text-[var(--text-dim)]">
-                  <span className="rounded-full border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-1 text-[var(--cyan)]">FIX protocol</span>
-                  <span className="rounded-full border border-[var(--purple)]/30 bg-[var(--purple-dim)] px-2 py-1 text-[var(--purple)]">MCP tools</span>
-                  <span className="rounded-full border border-[var(--green)]/30 bg-[var(--green-dim)] px-2 py-1 text-[var(--green)]">AI copilot</span>
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto space-y-5">
+            <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-5 shadow-sm">
+              <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-3 text-[11px] font-mono uppercase tracking-wide text-[var(--text-dim)]">
+                    <span className="rounded border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-1 text-[var(--cyan)]">FIX protocol</span>
+                    <span className="rounded border border-[var(--blue)]/30 bg-[var(--blue-dim)] px-2 py-1 text-[var(--blue)]">MCP tool surface</span>
+                    <span className="rounded border border-[var(--green)]/30 bg-[var(--green-dim)] px-2 py-1 text-[var(--green)]">Human approval</span>
+                  </div>
+                  <h1 className="text-[30px] leading-tight font-bold mb-3 text-[var(--text-primary)]">
+                    MCP command center for trading operations.
+                  </h1>
+                  <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed max-w-3xl">
+                    Pick an incident, let the copilot investigate with MCP tools, approve a recovery workbook, and verify every action with trace and manual-command evidence.
+                  </p>
                 </div>
-                <h1 className="text-[32px] leading-tight font-bold mb-3 bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
-                  MCP for human-led trading desk operations.
-                </h1>
-                <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed max-w-3xl">
-                  FIX-MCP is a professional open-source demo for showing how an AI agent can diagnose venue failures, stale market data, corporate actions, and algo drift through bounded MCP tools while the human stays in charge of approval and escalation.
-                </p>
-
-                <div className="grid gap-3 md:grid-cols-4 mt-5">
-                  {OPERATING_MODES.map((item) => (
-                    <div key={item.label} className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
-                      <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">{item.label}</div>
-                      <div className="text-[13px] leading-relaxed text-[var(--text-muted)]">{item.desc}</div>
+                <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-4">
+                  <div className="text-[12px] font-bold uppercase tracking-wide text-[var(--text-dim)] mb-3">Operator demo sequence</div>
+                  {[
+                    ['1', 'Load incident', 'Choose any category from the catalog below.'],
+                    ['2', 'Investigator', 'Ask the LLM to summarize impact and first action.'],
+                    ['3', 'Approve workbook', 'Run the full recovery plan through bounded MCP tools.'],
+                    ['4', 'Stress test', 'Inject pressure only after the baseline incident is understood.'],
+                  ].map(([n, title, desc]) => (
+                    <div key={n} className="flex gap-3 border-t border-[var(--border-dim)] py-2 first:border-t-0 first:pt-0">
+                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-[var(--cyan-dim)] text-[11px] font-bold text-[var(--cyan)]">{n}</div>
+                      <div>
+                        <div className="text-[13px] font-bold text-[var(--text-primary)]">{title}</div>
+                        <div className="text-[12px] leading-relaxed text-[var(--text-muted)]">{desc}</div>
+                      </div>
                     </div>
                   ))}
-                </div>
-
-                <div className="mt-5">
-                  <div className="text-[12px] font-bold uppercase tracking-wide text-[var(--text-dim)] mb-2">Best live demo paths</div>
-                  <div className="flex flex-wrap gap-2">
-                    {featuredScenarios.map((s: any) => (
-                      <button key={s.name} onClick={() => startScenario(s.name)}
-                        className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/50 hover:text-[var(--cyan)] transition-colors">
-                        {s.title}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6">
-                <div className="text-[12px] font-bold uppercase tracking-wide text-[var(--text-dim)] mb-3">Why it lands in a room</div>
-                <div className="space-y-3">
-                  <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
-                    <div className="text-[24px] font-bold text-[var(--cyan)]">{activeScenarios.length}</div>
-                    <div className="text-[13px] text-[var(--text-secondary)]">Live incidents ready to run</div>
-                  </div>
-                  <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
-                    <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Show the full control loop</div>
-                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Alert, investigate, approve the recovery workbook, execute through MCP, and verify with trace evidence.</div>
-                  </div>
-                  <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
-                    <div className="text-[14px] font-bold text-[var(--text-primary)] mb-1">Ideal audience framing</div>
-                    <div className="text-[13px] text-[var(--text-muted)] leading-relaxed">Trading desk: resilience. SRE: incident response. AI audience: tools, human approval, and auditability.</div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -591,14 +571,14 @@ function MissionControlTab({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Scenario Library</h2>
-                  <p className="text-[13px] text-[var(--text-muted)]">Pick the desk failure you want to present. Each scenario has a story, runbook, and success criteria.</p>
+                  <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Incident Catalog</h2>
+                  <p className="text-[13px] text-[var(--text-muted)]">Start any event category directly. Severity and difficulty help you choose the right demo for the audience.</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
                 {activeScenarios?.map((s: any) => (
                   <button key={s.name} onClick={() => startScenario(s.name)}
-                    className="p-4 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-surface)] hover:border-[var(--cyan)]/50 hover:bg-[var(--bg-elevated)] transition-all text-left group">
+                    className="p-4 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-base)] hover:border-[var(--cyan)]/50 hover:bg-[var(--bg-surface)] transition-all text-left group shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Play size={12} className="text-[var(--cyan)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -608,9 +588,9 @@ function MissionControlTab({
                     </div>
                     <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">{s.description?.slice(0, 160)}...</p>
                     <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                      <span className="rounded-full bg-[var(--bg-elevated)] px-2 py-1 font-mono text-[var(--text-dim)]">{s.estimated_minutes} min</span>
-                      <span className="rounded-full bg-[var(--bg-elevated)] px-2 py-1 font-mono text-[var(--text-dim)]">{s.runbook_step_count || '?'} steps</span>
-                      <span className="rounded-full bg-[var(--bg-elevated)] px-2 py-1 text-[var(--text-dim)]">{s.difficulty || 'intermediate'}</span>
+                      <span className="rounded bg-[var(--bg-elevated)] px-2 py-1 font-mono text-[var(--text-dim)]">{s.estimated_minutes} min</span>
+                      <span className="rounded bg-[var(--bg-elevated)] px-2 py-1 font-mono text-[var(--text-dim)]">{s.runbook_step_count || '?'} steps</span>
+                      <span className="rounded bg-[var(--bg-elevated)] px-2 py-1 text-[var(--text-dim)]">{s.difficulty || 'intermediate'}</span>
                     </div>
                     {s.categories?.length > 0 && (
                       <div className="mt-2 text-[12px] text-[var(--text-dim)]">{s.categories.join(' · ')}</div>
@@ -633,12 +613,12 @@ function MissionControlTab({
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
       {/* ── Compact Hero ── */}
       <div className="border-b border-[var(--border-dim)] bg-[var(--bg-base)] px-4 py-3">
-        <div className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
-          <div className="rounded-xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4 shadow-lg">
+        <div className="grid items-start gap-3 xl:grid-cols-[1.45fr_0.95fr]">
+          <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="rounded-full border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-0.5 text-[10px] font-mono text-[var(--cyan)]">LIVE INCIDENT</span>
-              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{scenario}</span>
-              <span className="rounded-full border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{activeScenario?.simulated_time || '—'}</span>
+              <span className="rounded border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-0.5 text-[10px] font-mono text-[var(--cyan)]">ACTIVE INCIDENT</span>
+              <span className="rounded border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{scenario}</span>
+              <span className="rounded border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{activeScenario?.simulated_time || '—'}</span>
             </div>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
@@ -648,33 +628,33 @@ function MissionControlTab({
                 </p>
               </div>
               <div className="hidden xl:flex flex-col gap-1.5 min-w-[160px]">
-                <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5">
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5">
                   <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Lens</div>
                   <div className="text-[12px] font-semibold text-[var(--text-primary)]">{activeScenario?.categories?.join(' · ') || 'ops incident'}</div>
                 </div>
-                <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5">
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5">
                   <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Guided by</div>
                   <div className="text-[12px] font-semibold text-[var(--text-primary)]">Copilot + MCP tools</div>
                 </div>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
                 <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Notional pressure</div>
                 <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{open_count}</div>
                 <div className="text-[11px] text-[var(--text-muted)]">open orders at risk</div>
               </div>
-              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
                 <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Venue health</div>
                 <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{downCount + degradedCount}</div>
                 <div className="text-[11px] text-[var(--text-muted)]">{downCount} down · {degradedCount} degraded</div>
               </div>
-              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
                 <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Runbook</div>
                 <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{totalSteps}</div>
                 <div className="text-[11px] text-[var(--text-muted)]">recovery steps</div>
               </div>
-              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-2">
+              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
                 <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Progress</div>
                 <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{progressPct}%</div>
                 <div className="text-[11px] text-[var(--text-muted)]">{doneCount}/{totalSteps} done</div>
@@ -682,51 +662,51 @@ function MissionControlTab({
             </div>
           </div>
 
-          <div className="rounded-xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4 shadow-lg">
+          <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Scenario Ops</div>
-                <div className="text-[16px] font-bold text-[var(--text-primary)]">Human approval workflow</div>
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Desk Workflow</div>
+                <div className="text-[16px] font-bold text-[var(--text-primary)]">Human-led AI response</div>
               </div>
-              <button onClick={onOpenScenarioBuilder} className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+              <button onClick={onOpenScenarioBuilder} className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
                 Create / Load
               </button>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <button onClick={startGuidedLaunch} disabled={heroAction !== null}
-                className="rounded-lg border border-[var(--cyan)]/30 bg-[var(--cyan-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--cyan-dim)]/30 disabled:opacity-50">
+                className="rounded-md border border-[var(--cyan)]/30 bg-[var(--cyan-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--cyan-dim)]/30 disabled:opacity-50">
                 <div className="flex items-center gap-1.5 text-[var(--cyan)] font-bold text-[13px]">
                   {heroAction === 'launching' ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Investigator
                 </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Open copilot for scope, root cause, and impact analysis.</div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Start the LLM review: impact, root cause, and first action.</div>
               </button>
               <button onClick={() => runWorkbook('advisor')} disabled={heroAction !== null || totalSteps === 0}
-                className="rounded-lg border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--green-dim)]/30 disabled:opacity-50">
+                className="rounded-md border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--green-dim)]/30 disabled:opacity-50">
                 <div className="flex items-center gap-1.5 text-[var(--green)] font-bold text-[13px]">
                   {heroAction === 'workbook' ? <Loader2 size={13} className="animate-spin" /> : <BookOpenCheck size={13} />} Approve Workbook
                 </div>
                 <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Approve the full recovery plan and execute all steps.</div>
               </button>
               <button onClick={startGuidedStress} disabled={heroAction !== null}
-                className="rounded-lg border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
+                className="rounded-md border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
                 <div className="flex items-center gap-1.5 text-[var(--amber)] font-bold text-[13px]">
-                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Watchdog Trigger
+                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Inject Stress
                 </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject pressure and ask the copilot to triage.</div>
+                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Add a controlled reject spike after the baseline incident is loaded.</div>
               </button>
               <button onClick={startAgentRun} disabled={heroAction !== null || totalSteps === 0}
-                className="rounded-lg border border-[var(--purple)]/30 bg-[var(--purple-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--purple-dim)]/30 disabled:opacity-50">
+                className="rounded-md border border-[var(--purple)]/30 bg-[var(--purple-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--purple-dim)]/30 disabled:opacity-50">
                 <div className="flex items-center gap-1.5 text-[var(--purple)] font-bold text-[13px]">
                   {heroAction === 'agent-run' ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />} Agent Run
                 </div>
                 <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject pressure, let the agent work, and watch the trace.</div>
               </button>
             </div>
-            <div className="mt-3 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-2.5">
+            <div className="mt-3 rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-2.5">
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Most important first</div>
               <div className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">{activeScenario?.hints?.diagnosis_path || 'Use the copilot to summarize the blast radius, then follow the runbook.'}</div>
             </div>
-            <div className="mt-2 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-2.5">
+            <div className="mt-2 rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Resolution board</div>
@@ -762,7 +742,7 @@ function MissionControlTab({
                 <BookOpen size={13} /> Case Study
               </button>
               <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
-                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">The scenario narrative and runbook steps. This is your main workspace — read the incident, then click Run on each step.</p>
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">The incident brief and recovery workbook. This is the main operator workspace.</p>
               </div>
             </div>
             <div className="relative group">
@@ -771,7 +751,7 @@ function MissionControlTab({
                 <TerminalIcon size={14} /> Terminal
               </button>
               <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
-                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">A simulated FIX CLI. Type commands like `fix-cli show orders` or `fix-cli heartbeat NYSE` to inspect the system manually.</p>
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">Manual inspection path. Use this when the user wants to compare MCP output with desk-style commands.</p>
               </div>
             </div>
             <div className="relative group">
@@ -780,7 +760,7 @@ function MissionControlTab({
                 <Zap size={14} /> FIX Wire
               </button>
               <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
-                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">Raw FIX protocol messages (New Order Single, Execution Reports, Rejects) with timestamps. For developers who need to see the wire-level traffic.</p>
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">Wire-level FIX messages: NewOrderSingle, ExecutionReport, Reject, and session traffic.</p>
               </div>
             </div>
             <div className="relative group">
@@ -789,7 +769,7 @@ function MissionControlTab({
                 <FileText size={14} /> Trace
               </button>
               <div className="pointer-events-none invisible group-hover:visible absolute left-0 top-full mt-2 z-50 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
-                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">Audit log of every MCP tool call: what tool ran, what arguments were passed, the output, latency, and whether it succeeded. Filterable and exportable.</p>
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">Primary proof surface: every MCP tool call, arguments, output, latency, and result.</p>
               </div>
             </div>
             <div className="relative group">
@@ -807,17 +787,17 @@ function MissionControlTab({
             <div className="relative group">
               <button onClick={() => { setTrainingInitialTab('time'); setShowTraining(!showTraining); }}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${showTraining ? 'bg-[var(--green-dim)] text-[var(--green)] border border-[var(--green)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-                <GraduationCap size={13} /> Resilience
+                <GraduationCap size={13} /> Stress Lab
               </button>
               <div className="pointer-events-none invisible group-hover:visible absolute right-0 top-full mt-2 z-50 w-64 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
-                <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Opens the chaos engineering panel: inject failures (venue outage, reject spike, LULD halt), fast-forward time, compute performance scores, and save/restore system snapshots.</p>
+                <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Opens controlled stress testing: inject a venue outage, reject spike, LULD halt, sequence gap, or SLA breach after the operator understands the base incident.</p>
               </div>
             </div>
             <button onClick={() => setFocusMode(!focusMode)}
               className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${focusMode ? 'bg-[var(--cyan-dim)] text-[var(--cyan)] border border-[var(--cyan)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
               title="Focus mode">
               {focusMode ? <PanelLeftClose size={12} /> : <PanelLeftOpen size={12} />}
-              {focusMode ? 'Expand' : 'Focus'}
+              {focusMode ? 'Full Console' : 'Focus'}
             </button>
           </div>
         </div>
@@ -932,7 +912,7 @@ function MissionControlTab({
                                 <button
                                   onClick={(e) => { e.stopPropagation(); runStep(step, idx); }}
                                   disabled={isRunning}
-                                  className="px-3 py-1.5 rounded-md bg-[var(--cyan)] text-black text-[12px] font-bold hover:bg-[var(--cyan)]/80 transition-colors disabled:opacity-50 flex items-center gap-1"
+                                  className="px-3 py-1.5 rounded-md bg-[var(--cyan)] text-white text-[12px] font-bold hover:bg-[var(--cyan)]/80 transition-colors disabled:opacity-50 flex items-center gap-1"
                                 >
                                   {isRunning ? <><Loader2 size={10} className="animate-spin" /> Run</> : isDone ? 'Rerun' : <><Play size={10} fill="currentColor" /> Run</>}
                                 </button>
@@ -989,8 +969,8 @@ function MissionControlTab({
                       {allDone && (
                         <div className="mt-4 p-4 rounded-lg bg-[var(--green-dim)]/10 border border-[var(--green)]/30 text-center">
                           <CheckCircle2 size={24} className="text-[var(--green)] mx-auto mb-2" />
-                          <p className="text-[18px] font-bold text-[var(--green)] mb-1">Case Resolved!</p>
-                          <p className="text-[14px] text-[var(--text-secondary)]">All {totalSteps} steps completed successfully. Review the evidence board for the commands and proof.</p>
+                          <p className="text-[18px] font-bold text-[var(--green)] mb-1">Incident Resolved</p>
+                          <p className="text-[14px] text-[var(--text-secondary)]">All {totalSteps} steps completed successfully. Review the evidence board for MCP output and manual-command proof.</p>
                         </div>
                       )}
                     </div>
@@ -1001,18 +981,18 @@ function MissionControlTab({
               {/* RIGHT: Ops rail */}
               <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[340px]'}`}>
                 <div className="px-3 py-2.5 border-b border-[var(--border-dim)]">
-                  <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Ops Rail</div>
-                  <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">{showTraining ? 'Chaos Engineering' : 'Stress, launch, switch'}</div>
+                  <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Operator Rail</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">{showTraining ? 'Stress Test Controls' : 'Next best actions'}</div>
                   <LiveTelemetryStrip />
                 </div>
                 <div className="p-2.5 space-y-2 border-b border-[var(--border-dim)]">
                   <button onClick={startGuidedLaunch} disabled={heroAction !== null}
-                    className="w-full rounded-lg bg-[var(--cyan)] text-black text-[12px] font-bold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--cyan)]/80 disabled:opacity-50">
+                    className="w-full rounded-md bg-[var(--cyan)] text-white text-[12px] font-bold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--cyan)]/80 disabled:opacity-50">
                     {heroAction === 'launching' ? <Loader2 size={12} className="animate-spin" /> : <MessageSquare size={12} />} Investigator
                   </button>
                   <button onClick={startGuidedStress} disabled={heroAction !== null}
                     className="w-full rounded-lg border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50">
-                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Watchdog Trigger
+                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Inject Stress
                   </button>
                   <button onClick={() => runWorkbook('advisor')} disabled={heroAction !== null || totalSteps === 0}
                     className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20 disabled:opacity-50">
@@ -1024,7 +1004,7 @@ function MissionControlTab({
                   </button>
                   <button onClick={() => { setTrainingInitialTab('inject'); setShowTraining(true); }}
                     className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20">
-                    <GraduationCap size={12} /> Stress Panel
+                    <GraduationCap size={12} /> Configure Stress Test
                   </button>
                 </div>
 
@@ -1039,23 +1019,29 @@ function MissionControlTab({
                 ) : (
                   <>
                     <div className="flex-1 min-h-0 overflow-y-auto px-2.5 py-2.5 space-y-2">
-                      {activeScenarios?.map((s: any) => {
-                        const isActive = scenario === s.name;
-                        return (
-                          <button key={s.name} onClick={() => startScenario(s.name)}
-                            className={`w-full px-2.5 py-2.5 rounded-lg text-left transition-all ${
-                              isActive ? 'bg-[var(--cyan-dim)]/20 border border-[var(--cyan)]/40' : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--border-base)]'
-                            }`}>
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className={`text-[12px] font-semibold leading-snug ${isActive ? 'text-[var(--cyan)]' : 'text-[var(--text-secondary)]'}`}>{s.title || s.name}</div>
-                                <div className="mt-0.5 text-[10px] text-[var(--text-dim)] font-mono">{s.estimated_minutes}m · {(s.runbook_step_count || '?')} steps</div>
-                              </div>
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0" style={{ backgroundColor: SEV_BG[s.severity], color: SEV[s.severity] }}>{(s.severity || '').toUpperCase()}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                      <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+                        <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wide text-[var(--text-dim)]">
+                          <ClipboardList size={13} /> Recommended sequence
+                        </div>
+                        <ol className="mt-3 space-y-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                          <li><b className="text-[var(--text-primary)]">1.</b> Read the case brief and run Investigator.</li>
+                          <li><b className="text-[var(--text-primary)]">2.</b> Approve Workbook to execute the complete MCP plan.</li>
+                          <li><b className="text-[var(--text-primary)]">3.</b> Open Trace to prove every tool call and output.</li>
+                          <li><b className="text-[var(--text-primary)]">4.</b> Use Inject Stress only to show resilience after the base case is clear.</li>
+                        </ol>
+                      </div>
+                      <button
+                        onClick={() => onOpenScenarioBuilder()}
+                        className="w-full rounded-md border border-[var(--border-dim)] bg-[var(--bg-base)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/40 hover:text-[var(--cyan)]"
+                      >
+                        Switch scenario catalog
+                      </button>
+                      <button
+                        onClick={() => setBottomTab('trace')}
+                        className="w-full rounded-md border border-[var(--border-dim)] bg-[var(--bg-base)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/40 hover:text-[var(--cyan)]"
+                      >
+                        Open trace evidence
+                      </button>
                     </div>
                     <div className="border-t border-[var(--border-dim)]">
                       <button

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/store/auth';
-import { Zap, Eye, EyeOff, User, Mail, Lock, ArrowRight, Shield } from 'lucide-react';
+import { BriefcaseBusiness, Eye, EyeOff, User, Mail, Lock, ArrowRight, Shield } from 'lucide-react';
 
 export default function AuthGate() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -28,30 +28,17 @@ export default function AuthGate() {
 
   return (
     <div className="h-screen w-screen flex items-center justify-center bg-[var(--bg-void)] relative overflow-hidden">
-      {/* Background grid */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{
-        backgroundImage: `
-          linear-gradient(var(--cyan) 1px, transparent 1px),
-          linear-gradient(90deg, var(--cyan) 1px, transparent 1px)
-        `,
-        backgroundSize: '60px 60px',
-      }} />
-
-      {/* Glow orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-[var(--cyan)] opacity-[0.03] blur-[100px]" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-[var(--blue)] opacity-[0.03] blur-[100px]" />
-
       {/* Auth card */}
       <div className="relative z-10 w-full max-w-md animate-slide-up">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--cyan)] to-[var(--blue)] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[var(--cyan-dim)]">
-            <Zap size={24} className="text-white" />
+          <div className="w-14 h-14 rounded-lg bg-[var(--bg-base)] border border-[var(--border-base)] flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <BriefcaseBusiness size={24} className="text-[var(--cyan)]" />
           </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
             FIX-MCP
           </h1>
-          <p className="text-[11px] text-[var(--text-muted)] font-mono mt-1">Mission Control</p>
+          <p className="text-[11px] text-[var(--text-muted)] font-mono mt-1">Trading Operations Console</p>
         </div>
 
         {/* Card */}
@@ -127,7 +114,7 @@ export default function AuthGate() {
               className="btn-primary w-full flex items-center justify-center gap-2 !py-2.5 !text-sm"
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
                   {mode === 'login' ? 'Sign In' : 'Create Account'}
@@ -160,7 +147,7 @@ export default function AuthGate() {
 
         {/* Footer */}
         <p className="text-center text-[9px] text-[var(--text-dim)] font-mono mt-4">
-          FIX Protocol • MCP • AI-Powered SRE • Mission Control
+          FIX Protocol • MCP Tools • Human Approval • Audit Trace
         </p>
       </div>
     </div>

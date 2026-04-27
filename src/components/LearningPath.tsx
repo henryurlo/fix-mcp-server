@@ -5,9 +5,9 @@ import { ACADEMY_MODULES } from '@/data/modules';
 import { useProgress } from '@/store/progress';
 import { useSystem } from '@/store';
 import {
-  Lock, Unlock, CheckCircle2, Clock, ChevronRight, ChevronDown,
+  CheckCircle2, Clock, ChevronRight, ChevronDown,
   Play, BookOpen, BarChart3, AlertTriangle, SignalHigh, SignalMedium, SignalLow,
-  GraduationCap, RotateCcw,
+  BriefcaseBusiness, RotateCcw, Filter,
 } from 'lucide-react';
 
 const DIFF_ICON: Record<string, typeof SignalLow> = {
@@ -45,7 +45,8 @@ const SEV_BG: Record<string, string> = {
 export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName: string, moduleId: string) => void }) {
   const { completedLabs, completedModules, isModuleUnlocked, getModuleProgress, resetProgress } = useProgress();
   const { available_scenarios } = useSystem();
-  const [expandedModule, setExpandedModule] = useState<string | null>(null);
+  const [expandedModule, setExpandedModule] = useState<string | null>('m1-fix-fundamentals');
+  const [difficultyFilter, setDifficultyFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
   const overallProgress = useProgress.getState().getOverallProgress();
 
   const totalLabs = ACADEMY_MODULES.reduce((s, m) => s + m.labs.length, 0);
@@ -53,24 +54,40 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--bg-void)]">
-      <div className="max-w-6xl mx-auto p-8 space-y-8">
+      <div className="max-w-7xl mx-auto p-6 space-y-5">
         {/* ── Hero ── */}
-        <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6 shadow-2xl">
+        <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <GraduationCap size={18} className="text-[var(--cyan)]" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cyan)]">FIX-MCP Professional Path</span>
+                <BriefcaseBusiness size={17} className="text-[var(--cyan)]" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cyan)]">Incident Program</span>
               </div>
-              <h1 className="text-[28px] font-bold text-[var(--text-primary)] leading-tight">
-                Prove MCP on a trading desk.
+              <h1 className="text-[26px] font-bold text-[var(--text-primary)] leading-tight">
+                Select any desk incident. No locked path.
               </h1>
               <p className="mt-2 text-[15px] text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                Six modules, 14 incident walkthroughs, one simulated trading desk. Each path shows how a human operator and an AI agent use MCP tools, FIX diagnostics, runbooks, and trace evidence to recover from venue outages, corporate actions, algo drift, and regulatory halts.
+                Use this as a professional demo catalog, not a course gate. Pick the scenario that fits the audience: FIX basics for first contact, venue outages for trading ops, or compound failures for executives and senior engineers.
               </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-[var(--text-dim)]"><Filter size={12} /> Filter</span>
+                {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setDifficultyFilter(filter)}
+                    className={`rounded-md border px-3 py-1.5 text-[12px] font-semibold capitalize transition-colors ${
+                      difficultyFilter === filter
+                        ? 'border-[var(--cyan)] bg-[var(--cyan-dim)] text-[var(--cyan)]'
+                        : 'border-[var(--border-dim)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-[var(--border-bright)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex flex-col gap-2 min-w-[200px]">
-              <div className="rounded-xl border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-4">
+              <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-4">
                 <div className="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">Overall Progress</div>
                 <div className="flex items-end gap-2 mt-1">
                   <span className="text-[28px] font-bold text-[var(--text-primary)]">{Math.round(overallProgress * 100)}%</span>
@@ -81,11 +98,11 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
                 </div>
               </div>
               <div className="flex gap-2">
-                <div className="flex-1 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3 text-center">
+                <div className="flex-1 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3 text-center">
                   <div className="text-[20px] font-bold text-[var(--text-primary)]">{completedModules.length}</div>
                   <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Paths Done</div>
                 </div>
-                <div className="flex-1 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-elevated)] p-3 text-center">
+                <div className="flex-1 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3 text-center">
                   <div className="text-[20px] font-bold text-[var(--text-primary)]">{ACADEMY_MODULES.length}</div>
                   <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Total</div>
                 </div>
@@ -97,11 +114,13 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
         {/* ── Module Grid ── */}
         <div className="space-y-4">
           {ACADEMY_MODULES.map((mod) => {
-            const unlocked = isModuleUnlocked(mod.id);
+            const unlocked = true;
             const completed = completedModules.includes(mod.id);
             const progress = getModuleProgress(mod.id);
             const isExpanded = expandedModule === mod.id;
             const DiffIcon = DIFF_ICON[mod.difficulty];
+            const visibleLabs = mod.labs.filter((lab) => difficultyFilter === 'all' || lab.difficulty === difficultyFilter);
+            if (visibleLabs.length === 0) return null;
 
             return (
               <div
@@ -109,9 +128,7 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
                 className={`rounded-xl border transition-all ${
                   completed
                     ? 'border-[var(--green)]/30 bg-[var(--green)]/5'
-                    : unlocked
-                    ? 'border-[var(--border-base)] bg-[var(--bg-surface)] hover:border-[var(--cyan)]/40'
-                    : 'border-[var(--border-dim)] bg-[var(--bg-surface)] opacity-60'
+                  : 'border-[var(--border-base)] bg-[var(--bg-base)] hover:border-[var(--cyan)]/40'
                 }`}
               >
                 {/* Module header */}
@@ -121,16 +138,12 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
                 >
                   <div className="shrink-0">
                     {completed ? (
-                      <div className="w-10 h-10 rounded-full bg-[var(--green-dim)] border border-[var(--green)]/30 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-md bg-[var(--green-dim)] border border-[var(--green)]/30 flex items-center justify-center">
                         <CheckCircle2 size={18} className="text-[var(--green)]" />
                       </div>
-                    ) : unlocked ? (
-                      <div className="w-10 h-10 rounded-full bg-[var(--cyan-dim)] border border-[var(--cyan)]/30 flex items-center justify-center">
-                        <span className="text-[14px] font-bold text-[var(--cyan)]">M{mod.number}</span>
-                      </div>
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-dim)] flex items-center justify-center">
-                        <Lock size={16} className="text-[var(--text-dim)]" />
+                      <div className="w-10 h-10 rounded-md bg-[var(--cyan-dim)] border border-[var(--cyan)]/30 flex items-center justify-center">
+                        <span className="text-[14px] font-bold text-[var(--cyan)]">M{mod.number}</span>
                       </div>
                     )}
                   </div>
@@ -193,23 +206,20 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
                     {/* Labs */}
                     <div className="space-y-2">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-1">Incident runs</div>
-                      {mod.labs.map((lab) => {
+                      {visibleLabs.map((lab) => {
                         const isCompleted = completedLabs.includes(lab.scenarioName);
                         const scenarioMeta = available_scenarios?.find((s: any) => s.name === lab.scenarioName);
 
                         return (
                           <button
                             key={lab.scenarioName}
-                            disabled={!unlocked}
                             onClick={() => {
-                              if (unlocked) onStartLab(lab.scenarioName, mod.id);
+                              onStartLab(lab.scenarioName, mod.id);
                             }}
                             className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
                               isCompleted
                                 ? 'bg-[var(--green)]/5 border border-[var(--green)]/20 hover:bg-[var(--green)]/10'
-                                : unlocked
-                                ? 'bg-[var(--bg-elevated)] border border-[var(--border-dim)] hover:border-[var(--cyan)]/40 hover:bg-[var(--bg-base)]'
-                                : 'bg-[var(--bg-elevated)] border border-[var(--border-dim)] opacity-50 cursor-not-allowed'
+                                : 'bg-[var(--bg-surface)] border border-[var(--border-dim)] hover:border-[var(--cyan)]/40 hover:bg-[var(--bg-base)]'
                             }`}
                           >
                             <div className="shrink-0">
@@ -250,17 +260,14 @@ export default function LearningPath({ onStartLab }: { onStartLab: (scenarioName
                                 ))}
                               </div>
                             </div>
-                            {unlocked && (
-                              <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
-                            )}
-                            {!unlocked && <Lock size={12} className="text-[var(--text-dim)] shrink-0" />}
+                            <ChevronRight size={14} className="text-[var(--text-dim)] shrink-0" />
                           </button>
                         );
                       })}
                     </div>
 
                     {/* Prerequisites notice */}
-                    {!unlocked && mod.prerequisites.length > 0 && (
+                    {false && mod.prerequisites.length > 0 && (
                       <div className="mt-3 flex items-center gap-2 text-[12px] text-[var(--amber)]">
                         <AlertTriangle size={12} />
                         <span>Complete {mod.prerequisites.map((p) => `M${ACADEMY_MODULES.find((m) => m.id === p)?.number}`).join(', ')} to unlock.</span>

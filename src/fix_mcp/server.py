@@ -2727,7 +2727,8 @@ async def _tool_inject_event(args: dict) -> list[TextContent]:
                 stuck_count = 0
                 for order in oms.orders.values():
                     if order.venue.upper() == target.upper() and order.status not in {"filled", "canceled", "rejected"}:
-                        order.flags.add("venue_down")
+                        if "venue_down" not in order.flags:
+                            order.flags.append("venue_down")
                         order.status = "stuck"
                         order.stuck_reason = "venue_down"
                         stuck_count += 1
@@ -2737,7 +2738,8 @@ async def _tool_inject_event(args: dict) -> list[TextContent]:
             halted = 0
             for order in oms.orders.values():
                 if order.symbol == target.upper() and order.status not in {"filled", "canceled", "rejected"}:
-                    order.flags.add("luld_halted")
+                    if "luld_halted" not in order.flags:
+                        order.flags.append("luld_halted")
                     halted += 1
             effects.append(f"LULD halt on {target}, {halted} orders affected")
         elif event_type == "reject_spike":

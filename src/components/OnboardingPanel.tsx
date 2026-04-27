@@ -48,11 +48,11 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[var(--bg-elevated)] border border-[var(--border-bright)] rounded-2xl w-[680px] max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-[var(--bg-base)] border border-[var(--border-bright)] rounded-lg w-[680px] max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-dim)] shrink-0">
-          <h2 className="text-[18px] font-bold bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] bg-clip-text text-transparent">
-            FIX-MCP Trading Desk Simulator - Getting Started
+          <h2 className="text-[18px] font-bold text-[var(--text-primary)]">
+            FIX-MCP Trading Operations Console
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
             <X size={18} className="text-[var(--text-muted)]" />
@@ -77,8 +77,8 @@ export function OnboardingPanel({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {tab === 'what' && (
             <div className="space-y-4">
-              <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-dim)] p-5">
-                <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-2">What is the FIX-MCP Simulator?</h3>
+              <div className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border-dim)] p-5">
+                <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-2">What is FIX-MCP?</h3>
                 <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-3">
                   A professional open-source demo for presenting how FIX infrastructure, MCP tools,
                   human approval, and incident-response runbooks fit together on a modern trading desk.

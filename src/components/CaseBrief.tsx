@@ -123,8 +123,8 @@ function CaseBrief({ ctx, onStart, downCount, degradedCount, openOrders, stuckOr
 
         {/* Start button */}
         <button onClick={onStart}
-          className="w-full py-3 rounded-lg bg-[var(--cyan)] text-black text-[16px] font-bold hover:bg-[var(--cyan)]/80 transition-colors flex items-center justify-center gap-2">
-          <Play size={18} fill="currentColor" /> Start Live Drill
+          className="w-full py-3 rounded-md bg-[var(--cyan)] text-white text-[15px] font-bold hover:bg-[var(--cyan)]/80 transition-colors flex items-center justify-center gap-2">
+          <Play size={16} fill="currentColor" /> Open Recovery Workbook
         </button>
       </div>
     </div>

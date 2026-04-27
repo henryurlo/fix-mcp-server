@@ -4,38 +4,38 @@
 
 :root {
   /* Core palette */
-  --bg-void: #06080d;
-  --bg-base: #0a0e1a;
-  --bg-surface: #10131f;
-  --bg-elevated: #161b2e;
-  --bg-hover: #1c2240;
+  --bg-void: #f4f6f8;
+  --bg-base: #ffffff;
+  --bg-surface: #f9fafb;
+  --bg-elevated: #eef2f5;
+  --bg-hover: #e5eaef;
   
   /* Borders */
-  --border-dim: #1a1f35;
-  --border-base: #252c4a;
-  --border-bright: #3a4470;
+  --border-dim: #d8dee6;
+  --border-base: #c1c9d3;
+  --border-bright: #8a97a8;
   
   /* Text */
-  --text-primary: #e8ecf4;
-  --text-secondary: #8b92b0;
-  --text-muted: #555d7a;
-  --text-dim: #4a5070;
+  --text-primary: #111827;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
   
   /* Accent colors */
-  --cyan: #00d4ff;
-  --cyan-dim: #00d4ff30;
-  --green: #00ff88;
-  --green-dim: #00ff8830;
-  --orange: #ff6b35;
-  --orange-dim: #ff6b3530;
-  --red: #ff3366;
-  --red-dim: #ff336630;
-  --purple: #8b5cf6;
-  --purple-dim: #8b5cf630;
-  --blue: #3b82f6;
-  --blue-dim: #3b82f630;
-  --amber: #f59e0b;
-  --amber-dim: #f59e0b30;
+  --cyan: #006f8f;
+  --cyan-dim: #006f8f18;
+  --green: #047857;
+  --green-dim: #04785718;
+  --orange: #c2410c;
+  --orange-dim: #c2410c18;
+  --red: #b91c1c;
+  --red-dim: #b91c1c18;
+  --purple: #5b21b6;
+  --purple-dim: #5b21b618;
+  --blue: #1d4ed8;
+  --blue-dim: #1d4ed818;
+  --amber: #b45309;
+  --amber-dim: #b4530918;
 }
 
 * {
@@ -122,17 +122,15 @@ body {
 /* ── Glass panels ─────────────────────────────────────────── */
 
 .glass-panel {
-  background: linear-gradient(135deg, rgba(16, 19, 31, 0.8), rgba(22, 27, 46, 0.6));
-  backdrop-filter: blur(12px);
+  background: var(--bg-base);
   border: 1px solid var(--border-dim);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .glass-panel-bright {
-  background: linear-gradient(135deg, rgba(16, 19, 31, 0.9), rgba(22, 27, 46, 0.7));
-  backdrop-filter: blur(16px);
+  background: var(--bg-base);
   border: 1px solid var(--border-base);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 /* ── Status indicators ────────────────────────────────────── */
@@ -167,7 +165,7 @@ body {
 /* ── React Flow overrides ─────────────────────────────────── */
 
 .react-flow__background {
-  background: var(--bg-void) !important;
+  background: var(--bg-surface) !important;
 }
 
 .react-flow__controls {
@@ -203,7 +201,7 @@ body {
 .scenario-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-dim);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -211,14 +209,13 @@ body {
 
 .scenario-card:hover {
   border-color: var(--border-bright);
-  background: var(--bg-elevated);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  background: var(--bg-base);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
 .scenario-card.active {
   border-color: var(--cyan);
-  box-shadow: 0 0 12px var(--cyan-dim);
+  box-shadow: inset 3px 0 0 var(--cyan);
 }
 
 /* ── Input styles ─────────────────────────────────────────── */
@@ -247,8 +244,8 @@ body {
 /* ── Button styles ────────────────────────────────────────── */
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--cyan), #0099cc);
-  color: #000;
+  background: var(--cyan);
+  color: #fff;
   font-weight: 600;
   font-size: 14px;
   padding: 10px 18px;
@@ -259,9 +256,7 @@ body {
 }
 
 .btn-primary:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px var(--cyan-dim);
+  background: #075985;
 }
 
 .btn-primary:disabled {
@@ -295,13 +290,13 @@ body {
   font-size: 14px;
   padding: 10px 18px;
   border-radius: 8px;
-  border: 1px solid #ff336640;
+  border: 1px solid #b91c1c40;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-danger:hover {
-  background: #ff336640;
+  background: #b91c1c20;
   box-shadow: 0 0 8px var(--red-dim);
 }
 

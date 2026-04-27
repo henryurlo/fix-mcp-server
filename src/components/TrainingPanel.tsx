@@ -476,6 +476,14 @@ function EventInjectionPanel() {
   const [details, setDetails] = useState('');
   const [injecting, setInjecting] = useState(false);
   const [result, setResult] = useState('');
+  const eventHelp: Record<string, { use: string; target: string }> = {
+    venue_outage: { use: 'Turns a venue session down and marks open orders on that venue as stuck.', target: 'Use a venue such as ARCA, NYSE, BATS, or IEX.' },
+    luld: { use: 'Marks orders in a symbol as affected by a Limit Up-Limit Down halt.', target: 'Use a symbol such as AAPL, TSLA, or MSFT.' },
+    reject_spike: { use: 'Records a market-wide reject spike so the copilot can triage sudden order rejects.', target: 'Target is optional; desk is fine for a global pressure event.' },
+    seq_gap: { use: 'Creates a sequence mismatch on a FIX session so recovery requires validation/reset.', target: 'Use a venue such as ARCA, BATS, NYSE, or IEX.' },
+    client_message: { use: 'Records a client-facing escalation event for the incident timeline.', target: 'Use a client, desk, or account label.' },
+    sla_breach: { use: 'Records SLA pressure for institutional order handling and scoring.', target: 'Use a client, desk, venue, or symbol.' },
+  };
 
   async function inject() {
     setInjecting(true);
@@ -500,8 +508,8 @@ function EventInjectionPanel() {
 
   return (
     <div className="space-y-3">
-      <div className="text-[12px] text-[var(--text-muted)] leading-relaxed">
-        Inject training events to test your response under pressure. The simulation will auto-pause on disruptive events.
+      <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3 text-[12px] text-[var(--text-secondary)] leading-relaxed">
+        Use this after the baseline incident is understood. Injection deliberately adds a second pressure signal so you can show whether the LLM notices changed state, updates the plan, and leaves evidence in Trace.
       </div>
 
       {/* Event type selector */}
@@ -526,6 +534,10 @@ function EventInjectionPanel() {
             </button>
           ))}
         </div>
+        <div className="mt-2 rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+          <b className="text-[var(--text-secondary)]">Effect:</b> {eventHelp[eventType]?.use}<br />
+          <b className="text-[var(--text-secondary)]">Target:</b> {eventHelp[eventType]?.target}
+        </div>
       </div>
 
       {/* Target */}
@@ -533,7 +545,7 @@ function EventInjectionPanel() {
         <div className="text-[12px] font-bold text-[var(--text-secondary)] mb-1">Target</div>
         <input type="text" value={target} onChange={e => setTarget(e.target.value)}
           className="input-base w-full !py-1.5 !px-2 !text-[12px]"
-          placeholder="Venue (e.g. ARCA) or symbol (e.g. AAPL)"
+          placeholder={eventHelp[eventType]?.target || 'Venue, symbol, client, or desk'}
         />
       </div>
 
@@ -548,8 +560,8 @@ function EventInjectionPanel() {
 
       {/* Inject button */}
       <button onClick={inject} disabled={injecting}
-        className="w-full py-2 rounded-lg bg-[var(--red)]/20 border border-[var(--red)]/40 text-[var(--red)] text-[13px] font-bold flex items-center justify-center gap-2 hover:bg-[var(--red)]/30 transition-all disabled:opacity-50">
-        <Zap size={14} fill="currentColor" /> {injecting ? 'Injecting...' : 'Inject Event'}
+        className="w-full py-2 rounded-md bg-[var(--red)]/10 border border-[var(--red)]/40 text-[var(--red)] text-[13px] font-bold flex items-center justify-center gap-2 hover:bg-[var(--red)]/20 transition-all disabled:opacity-50">
+        <Zap size={14} /> {injecting ? 'Injecting...' : 'Inject Controlled Event'}
       </button>
 
       {/* Result */}
@@ -565,6 +577,7 @@ function EventInjectionPanel() {
 // ─── Main Training Panel (tabs) ───
 export function TrainingPanel({ onRollback, initialTab = 'time' }: { onRollback: (id: string) => void; initialTab?: 'time' | 'score' | 'snapshot' | 'inject' }) {
   const [tab, setTab] = useState<'time' | 'score' | 'snapshot' | 'inject'>(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-base)]">
@@ -574,7 +587,7 @@ export function TrainingPanel({ onRollback, initialTab = 'time' }: { onRollback:
           ['time', 'Time', Clock],
           ['score', 'Score', BarChart3],
           ['snapshot', 'Snapshots', Save],
-          ['inject', 'Inject', Zap],
+          ['inject', 'Stress', Zap],
         ] as const).map(([id, label, Icon]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold transition-all border-b-2 ${
