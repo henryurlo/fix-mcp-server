@@ -27,6 +27,45 @@ const tone = {
 type Phase = 'brief' | 'diagnose' | 'approve' | 'inject' | 'agent' | 'resolved';
 type StepState = 'todo' | 'running' | 'done' | 'hold';
 
+const VIDEO_SCRIPT: Record<Phase, { scene: string; headline: string; voiceover: string; callout: string }> = {
+  brief: {
+    scene: '01 / Product',
+    headline: 'FIX-MCP turns a trading incident into a controlled workflow.',
+    voiceover: 'A desk operator loads a live-style FIX incident. The AI can investigate, but production control stays with the human.',
+    callout: 'Open a real desk incident',
+  },
+  diagnose: {
+    scene: '02 / Diagnose',
+    headline: 'The agent uses MCP tools to prove the cause.',
+    voiceover: 'Instead of guessing from an alert, the workflow checks sessions, affected orders, and reference data through bounded tools.',
+    callout: 'MCP evidence appears as tools run',
+  },
+  approve: {
+    scene: '03 / Human Gate',
+    headline: 'The workbook is approved as one auditable plan.',
+    voiceover: 'The agent proposes the recovery workbook. The operator reviews the evidence and approves the whole plan before execution.',
+    callout: 'Human accepts the full workbook',
+  },
+  inject: {
+    scene: '04 / Pressure Test',
+    headline: 'A stress injection changes the state.',
+    voiceover: 'Now we inject new pressure. The important behavior is that the plan pauses and re-triages instead of blindly continuing.',
+    callout: 'Inject pressure and force re-triage',
+  },
+  agent: {
+    scene: '05 / Agent Run',
+    headline: 'The agent executes only inside the approved boundary.',
+    voiceover: 'After approval, Agent Run completes the simulated recovery steps and records each MCP tool result in the trace.',
+    callout: 'Agent runs inside the approved path',
+  },
+  resolved: {
+    scene: '06 / Proof',
+    headline: 'The incident closes with evidence, not a claim.',
+    voiceover: 'The final state shows released flow, venue recovery, and an audit trail a human can review.',
+    callout: 'Close with proof, not a claim',
+  },
+};
+
 function fade(frame: number, start: number, duration = 16) {
   return interpolate(frame, [start, start + duration], [0, 1], {
     extrapolateLeft: 'clamp',
@@ -45,12 +84,7 @@ function phaseAt(frame: number): Phase {
 }
 
 function phaseCopy(phase: Phase) {
-  if (phase === 'brief') return 'Live incident loaded';
-  if (phase === 'diagnose') return 'MCP tools prove the blocker';
-  if (phase === 'approve') return 'Human approves the workbook';
-  if (phase === 'inject') return 'Stress changes the state';
-  if (phase === 'agent') return 'Agent runs inside the approved path';
-  return 'Evidence ready for review';
+  return VIDEO_SCRIPT[phase].headline;
 }
 
 function problemTitle(story: ScenarioStory) {
@@ -308,17 +342,52 @@ function Trace({ phase, frame }: { phase: Phase; frame: number }) {
 
 function Callout({ phase, frame }: { phase: Phase; frame: number }) {
   const byPhase = {
-    brief: { text: 'Open a real desk incident', left: 620, top: 116, color: C.blue },
-    diagnose: { text: 'Evidence appears as MCP tools run', left: 560, top: 448, color: C.blue },
-    approve: { text: 'Human accepts the whole workbook', left: 560, top: 360, color: C.green },
-    inject: { text: 'Inject pressure and watch the plan pause', left: 1080, top: 432, color: C.amber },
-    agent: { text: 'Agent executes inside the approved boundary', left: 1120, top: 610, color: C.green },
-    resolved: { text: 'Close with proof, not a claim', left: 1250, top: 760, color: C.green },
+    brief: { text: VIDEO_SCRIPT.brief.callout, left: 620, top: 116, color: C.blue },
+    diagnose: { text: VIDEO_SCRIPT.diagnose.callout, left: 560, top: 448, color: C.blue },
+    approve: { text: VIDEO_SCRIPT.approve.callout, left: 560, top: 360, color: C.green },
+    inject: { text: VIDEO_SCRIPT.inject.callout, left: 1080, top: 432, color: C.amber },
+    agent: { text: VIDEO_SCRIPT.agent.callout, left: 1120, top: 610, color: C.green },
+    resolved: { text: VIDEO_SCRIPT.resolved.callout, left: 1250, top: 760, color: C.green },
   }[phase];
   return (
     <div style={{ opacity: fade(frame, 8), position: 'absolute', left: byPhase.left, top: byPhase.top, display: 'flex', alignItems: 'center', gap: 12 }}>
       <div style={{ width: 16, height: 16, borderRadius: 8, background: byPhase.color, boxShadow: `0 0 ${18 + Math.sin(frame / 8) * 6}px ${byPhase.color}88` }} />
       <div style={{ background: C.ink, color: '#fff', borderRadius: 8, padding: '12px 14px', fontSize: 18, fontWeight: 950, boxShadow: '0 18px 45px #0b122033' }}>{byPhase.text}</div>
+    </div>
+  );
+}
+
+function IntroCard({ frame }: { frame: number }) {
+  const opacity = interpolate(frame, [0, 18, 82, 106], [0, 1, 1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const y = interpolate(frame, [0, 18], [16, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  return (
+    <div style={{ opacity, transform: `translateY(${y}px)`, position: 'absolute', left: 66, top: 104, width: 720, background: C.navy, color: '#fff', borderRadius: 10, padding: 28, boxShadow: '0 30px 80px #0b12204d' }}>
+      <div style={{ color: '#67e8f9', fontSize: 14, fontWeight: 950, textTransform: 'uppercase' }}>FIX-MCP product demo</div>
+      <div style={{ marginTop: 10, fontSize: 44, lineHeight: 1.05, fontWeight: 950 }}>AI incident response for a trading desk.</div>
+      <div style={{ marginTop: 16, color: '#cbd5e1', fontSize: 20, lineHeight: 1.34, fontWeight: 800 }}>
+        MCP tools gather evidence. An LLM builds the workbook. A human approves the plan before Agent Run executes.
+      </div>
+    </div>
+  );
+}
+
+function NarrationBar({ phase, frame }: { phase: Phase; frame: number }) {
+  const script = VIDEO_SCRIPT[phase];
+  const opacity = fade(frame, 12);
+  return (
+    <div style={{ opacity, position: 'absolute', left: 42, right: 42, bottom: 48, background: '#ffffffee', border: `1px solid ${C.line}`, borderRadius: 9, padding: '14px 18px', display: 'grid', gridTemplateColumns: '150px 1fr', gap: 18, boxShadow: '0 18px 50px #0b12201c' }}>
+      <div>
+        <div style={{ color: C.blue, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>{script.scene}</div>
+        <div style={{ color: C.muted, fontSize: 12, fontWeight: 900, marginTop: 4 }}>voiceover</div>
+      </div>
+      <div>
+        <div style={{ color: C.ink, fontSize: 21, fontWeight: 950 }}>{script.headline}</div>
+        <div style={{ color: C.text, fontSize: 16, lineHeight: 1.28, fontWeight: 780, marginTop: 4 }}>{script.voiceover}</div>
+      </div>
     </div>
   );
 }
@@ -358,7 +427,7 @@ function ApprovalOverlay({ phase, frame }: { phase: Phase; frame: number }) {
 function ResolutionCard({ phase, frame }: { phase: Phase; frame: number }) {
   const show = phase === 'resolved';
   return (
-    <div style={{ opacity: show ? fade(frame, 760) : 0, position: 'absolute', right: 52, bottom: 45, width: 455, background: C.navy, color: '#e2e8f0', borderRadius: 8, padding: 24, boxShadow: '0 24px 60px #0b122033' }}>
+    <div style={{ opacity: show ? fade(frame, 760) : 0, position: 'absolute', right: 52, bottom: 178, width: 455, background: C.navy, color: '#e2e8f0', borderRadius: 8, padding: 24, boxShadow: '0 24px 60px #0b122033' }}>
       <div style={{ color: '#86efac', fontSize: 13, fontWeight: 950, textTransform: 'uppercase' }}>Incident resolved</div>
       <div style={{ marginTop: 8, color: '#fff', fontSize: 32, lineHeight: 1.1, fontWeight: 950 }}>Approved automation. Human control. Auditable proof.</div>
       <div style={{ marginTop: 12, color: '#cbd5e1', fontSize: 15, fontWeight: 800 }}>The demo ends where a trading desk needs it to end: clear evidence and a decision trail.</div>
@@ -368,11 +437,19 @@ function ResolutionCard({ phase, frame }: { phase: Phase; frame: number }) {
 
 function Progress({ phase, frame }: { phase: Phase; frame: number }) {
   const progress = interpolate(frame, [0, 899], [3, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const activeLabel = {
+    brief: 'Load',
+    diagnose: 'Diagnose',
+    approve: 'Approve',
+    inject: 'Inject',
+    agent: 'Agent Run',
+    resolved: 'Resolve',
+  }[phase];
   return (
-    <div style={{ position: 'absolute', left: 20, right: 20, bottom: 22 }}>
+    <div style={{ position: 'absolute', left: 42, right: 42, bottom: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', color: C.muted, fontSize: 12, fontWeight: 950, marginBottom: 8 }}>
         {['Load', 'Diagnose', 'Approve', 'Inject', 'Agent Run', 'Resolve'].map((label) => (
-          <div key={label} style={{ color: phaseCopy(phase).toLowerCase().includes(label.toLowerCase().split(' ')[0]) ? C.blue : C.muted }}>{label}</div>
+          <div key={label} style={{ color: activeLabel === label ? C.blue : C.muted }}>{label}</div>
         ))}
       </div>
       <div style={{ height: 8, borderRadius: 20, background: '#d4dde7', overflow: 'hidden' }}>
@@ -405,6 +482,8 @@ export function ScenarioExecutiveBrief({ story = defaultStory }: { story?: Scena
       </div>
       <Callout phase={phase} frame={frame} />
       <Cursor phase={phase} frame={frame} />
+      <IntroCard frame={frame} />
+      <NarrationBar phase={phase} frame={frame} />
       <ApprovalOverlay phase={phase} frame={frame} />
       <ResolutionCard phase={phase} frame={frame} />
       <Progress phase={phase} frame={frame} />

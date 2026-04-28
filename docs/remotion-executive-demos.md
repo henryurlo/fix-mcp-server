@@ -40,6 +40,12 @@ Rendered files are written to `out/`.
 
 The scenario presentation data lives in `src/remotion/scenarioStories.ts`.
 
+The product-video script for the BATS walkthrough lives in:
+
+`docs/video-scripts/bats-startup-product-demo.md`
+
+The Remotion composition follows that script directly: each phase has a scene label, a voiceover line, a visual callout, and a required platform action.
+
 Each story contains:
 
 - `executiveAngle`: why the scenario matters to a financial-professional audience
