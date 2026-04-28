@@ -6,7 +6,7 @@ import { defaultStory, scenarioStories } from './scenarioStories';
 const WIDTH = 1920;
 const HEIGHT = 1080;
 const FPS = 30;
-const DURATION = 900;
+const DURATION = 4500;
 const compositionId = (id: string) => `scenario-${id.replace(/_/g, '-')}`;
 
 export function RemotionRoot() {

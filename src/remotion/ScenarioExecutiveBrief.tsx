@@ -19,18 +19,25 @@ const C = {
   navy: '#0f172a',
 };
 
-type Phase = 'open' | 'load' | 'investigate' | 'approve' | 'execute' | 'inject' | 'recover' | 'close';
+type Phase = 'open' | 'start' | 'select' | 'read' | 'launch' | 'inspect' | 'plan' | 'approve' | 'run' | 'trace' | 'inject' | 'pause' | 'recover' | 'verify' | 'close';
 type ToolStep = (typeof capture.steps)[number];
 
 const phaseFrames: Array<[Phase, number, number]> = [
-  ['open', 0, 92],
-  ['load', 92, 185],
-  ['investigate', 185, 320],
-  ['approve', 320, 430],
-  ['execute', 430, 610],
-  ['inject', 610, 720],
-  ['recover', 720, 835],
-  ['close', 835, 900],
+  ['open', 0, 300],
+  ['start', 300, 600],
+  ['select', 600, 900],
+  ['read', 900, 1200],
+  ['launch', 1200, 1500],
+  ['inspect', 1500, 1800],
+  ['plan', 1800, 2100],
+  ['approve', 2100, 2400],
+  ['run', 2400, 2820],
+  ['trace', 2820, 3120],
+  ['inject', 3120, 3420],
+  ['pause', 3420, 3720],
+  ['recover', 3720, 4020],
+  ['verify', 4020, 4320],
+  ['close', 4320, 4500],
 ];
 
 const scenarioScript: Record<Phase, {
@@ -43,72 +50,135 @@ const scenarioScript: Record<Phase, {
   command: string;
 }> = {
   open: {
-    label: '00 / Promise',
-    title: 'One incident. One agent. One human approval.',
-    operator: 'A desk lead needs BATS ready before extended-hours flow starts.',
-    agent: 'FIX-MCP turns the alert into an auditable recovery workflow.',
-    decision: 'No autonomous trading decisions.',
-    proof: 'The demo will show the exact MCP tool path.',
-    command: 'start_demo',
+    label: '00 / What you will do',
+    title: 'Use FIX-MCP to solve one desk incident.',
+    operator: 'You will load a scenario, ask the agent to investigate, approve the workbook, run recovery, inject pressure, and verify proof.',
+    agent: 'I will explain each click and show the MCP evidence behind the agent response.',
+    decision: 'This is a walkthrough, not a pitch.',
+    proof: 'Every major step stays visible on the platform.',
+    command: 'walkthrough_start',
   },
-  load: {
-    label: '01 / Start',
-    title: 'Start in Mission Control.',
-    operator: 'Select BATS Extended-Hours Startup.',
-    agent: 'I loaded the incident. BATS rejected logon and 14 orders are blocked.',
-    decision: 'Begin with the real desk state.',
-    proof: 'Scenario loaded from the simulator.',
+  start: {
+    label: '01 / Open the app',
+    title: 'Start on Mission Control.',
+    operator: 'Use this screen when you want to run or demonstrate an incident workflow.',
+    agent: 'Mission Control keeps the incident, workbook, agent conversation, and trace in one view.',
+    decision: 'The user should know where to begin.',
+    proof: 'The navigation highlights Mission Control.',
+    command: 'open Mission Control',
+  },
+  select: {
+    label: '02 / Choose scenario',
+    title: 'Select BATS Extended-Hours Startup.',
+    operator: 'Open the scenario selector and choose the easiest case: BATS Extended-Hours Startup.',
+    agent: 'Scenario loaded. BATS rejected logon and 14 orders are blocked.',
+    decision: 'Pick the smallest complete scenario first.',
+    proof: 'The simulator loads bats_startup_0200.',
     command: 'load_scenario bats_startup_0200',
   },
-  investigate: {
-    label: '02 / Investigate',
-    title: 'Ask the agent what broke.',
-    operator: 'Launch the investigator and let MCP gather facts.',
-    agent: 'BATS is down from a sequence mismatch. Orders are blocked, but IEX is healthy.',
-    decision: 'The user sees evidence before any recovery action.',
-    proof: 'Session and order tools returned the cause.',
+  read: {
+    label: '03 / Read the board',
+    title: 'Read the incident before clicking anything.',
+    operator: 'Check severity, time, affected venue, order count, mode, and control owner.',
+    agent: 'The first visible facts are BATS down, 14 blocked orders, and human control.',
+    decision: 'The user understands the problem before asking the agent to act.',
+    proof: 'Desk state is visible before recovery starts.',
+    command: 'review desk state',
+  },
+  launch: {
+    label: '04 / Launch agent',
+    title: 'Ask the agent to investigate.',
+    operator: 'Click the agent action and ask: what broke, what matters first, and what should I approve?',
+    agent: 'I will use MCP tools to check sessions and orders instead of guessing from the alert.',
+    decision: 'The agent investigates; it does not execute recovery yet.',
+    proof: 'MCP tool calls begin in the trace.',
+    command: 'launch_agent investigator',
+  },
+  inspect: {
+    label: '05 / Inspect evidence',
+    title: 'Read the MCP evidence.',
+    operator: 'Confirm the agent found a BATS sequence mismatch and quantified the blocked orders.',
+    agent: 'BATS expected sequence 2450 but received 2449. The order query found 14 affected orders.',
+    decision: 'Evidence comes before the workbook approval.',
+    proof: 'check_fix_sessions and query_orders are captured.',
     command: 'check_fix_sessions + query_orders',
   },
+  plan: {
+    label: '06 / Review plan',
+    title: 'Review the generated workbook.',
+    operator: 'Read the five proposed actions: check, quantify, reconnect, load symbols, validate.',
+    agent: 'This workbook is the contract. I can only run what the human approves.',
+    decision: 'No hidden action should be approved.',
+    proof: 'Every recovery action is listed before Agent Run.',
+    command: 'review workbook',
+  },
   approve: {
-    label: '03 / Human Gate',
-    title: 'Approve the workbook, not a mystery action.',
-    operator: 'Review five recovery steps, then approve all.',
+    label: '07 / Approve',
+    title: 'Approve the workbook as one package.',
+    operator: 'Click Approve all only after the evidence and recovery steps make sense.',
     agent: 'I will reconnect BATS, reset sequence if needed, load missing symbols, then validate orders.',
     decision: 'Human approval unlocks execution.',
     proof: 'The workbook is explicit before Agent Run.',
     command: 'approve_workbook',
   },
-  execute: {
-    label: '04 / Agent Run',
-    title: 'Agent Run executes the approved plan.',
+  run: {
+    label: '08 / Agent Run',
+    title: 'Run the approved workbook.',
     operator: 'Click Agent Run and watch the workbook complete.',
     agent: 'BATS reconnected. Sequence reset accepted. BITO and GBTC loaded. 14 orders validated.',
     decision: 'The agent stays inside the approved boundary.',
     proof: 'Each step writes MCP evidence to the trace.',
     command: 'fix_session_issue + load_ticker + validate_orders',
   },
+  trace: {
+    label: '09 / Trace',
+    title: 'Open the trace to audit what happened.',
+    operator: 'Use the trace panel to prove which MCP tools ran and what each tool returned.',
+    agent: 'The trace shows reconnect, sequence reset, symbol load, and order validation output.',
+    decision: 'The audit trail is part of the product, not an afterthought.',
+    proof: 'Captured MCP rows are visible.',
+    command: 'open Trace',
+  },
   inject: {
-    label: '05 / Pressure',
-    title: 'Now inject pressure.',
-    operator: 'Inject a BATS sequence gap after the normal run is clear.',
+    label: '10 / Inject',
+    title: 'Inject pressure after the normal path is clear.',
+    operator: 'Click Inject Event and choose a BATS sequence gap.',
     agent: 'New sequence gap detected. I paused the simulation and returned to triage.',
     decision: 'Pressure tests the recovery loop.',
     proof: 'The injected event is captured as a trace row.',
     command: 'inject_event seq_gap',
   },
+  pause: {
+    label: '11 / Pause',
+    title: 'Confirm the agent pauses and re-checks.',
+    operator: 'Do not continue blindly. Confirm the system changed mode to paused and re-triage.',
+    agent: 'The injected sequence gap changed state. I need to check BATS again before continuing.',
+    decision: 'This is the human-control moment.',
+    proof: 'The injected event is visible before recovery resumes.',
+    command: 'check_fix_sessions BATS',
+  },
   recover: {
-    label: '06 / Recover',
-    title: 'The agent re-checks before continuing.',
-    operator: 'Let the agent repair the injected sequence gap and resume.',
+    label: '12 / Recover',
+    title: 'Repair and resume.',
+    operator: 'Let the agent reset the BATS sequence and resume the simulation.',
     agent: 'BATS sequence is repaired. Simulation resumed. The injected event is recovered.',
     decision: 'The system does not blindly continue after state changes.',
     proof: 'Recovery, resume, and score are all recorded.',
     command: 'reset_sequence + resume_simulation',
   },
+  verify: {
+    label: '13 / Verify',
+    title: 'Verify the outcome.',
+    operator: 'Check BATS status, released orders, workbook completion, and score.',
+    agent: 'BATS is up, 14 orders are released, the workbook is complete, and the score is 1.00.',
+    decision: 'A good demo ends with operational proof.',
+    proof: 'Score and trace confirm recovery.',
+    command: 'score_scenario',
+  },
   close: {
-    label: '07 / Proof',
-    title: 'Close with proof an executive can trust.',
-    operator: 'Review released flow, venue state, score, and trace.',
+    label: '14 / Repeat',
+    title: 'Repeat this pattern for harder scenarios.',
+    operator: 'Use the same flow for every case: load, investigate, approve, run, inject, recover, verify.',
     agent: '14 orders released, BATS is up, final score is 1.00, and the trace is ready.',
     decision: 'The human keeps control; the agent keeps evidence.',
     proof: 'Audit trail survives the demo.',
@@ -170,58 +240,76 @@ function toolRows(phase: Phase) {
   ];
   const countByPhase: Record<Phase, number> = {
     open: 0,
-    load: 1,
-    investigate: 3,
+    start: 0,
+    select: 1,
+    read: 1,
+    launch: 2,
+    inspect: 3,
+    plan: 3,
     approve: 3,
-    execute: 8,
+    run: 8,
+    trace: 8,
     inject: 9,
+    pause: 9,
     recover: 10,
+    verify: 11,
     close: 11,
   };
   return rows.slice(0, countByPhase[phase]);
 }
 
 function activeEvidence(phase: Phase): ToolStep {
-  if (phase === 'load') return toolStep('list_scenarios');
-  if (phase === 'investigate') return toolStep('check_fix_sessions');
+  if (phase === 'select' || phase === 'read') return toolStep('list_scenarios');
+  if (phase === 'launch' || phase === 'inspect') return toolStep('check_fix_sessions');
+  if (phase === 'plan') return toolStep('query_orders');
   if (phase === 'approve') return toolStep('query_orders');
-  if (phase === 'execute') return toolStep('validate_orders');
+  if (phase === 'run' || phase === 'trace') return toolStep('validate_orders');
   if (phase === 'inject') return toolStep('inject_event');
+  if (phase === 'pause') return toolStep('check_fix_sessions', 1);
   if (phase === 'recover') return toolStep('resume_simulation');
-  if (phase === 'close') return toolStep('score_scenario');
+  if (phase === 'verify' || phase === 'close') return toolStep('score_scenario');
   return capture.steps[0];
 }
 
 function stateForMetric(label: string, phase: Phase) {
   if (label === 'BATS') {
-    return phase === 'execute' || phase === 'close' ? ['up', C.green] : phase === 'recover' ? ['recovering', C.amber] : ['down', C.red];
+    return phase === 'run' || phase === 'trace' || phase === 'verify' || phase === 'close' ? ['up', C.green] : phase === 'recover' ? ['recovering', C.amber] : ['down', C.red];
   }
   if (label === 'Orders') {
-    return phase === 'execute' || phase === 'recover' || phase === 'close' ? ['14 released', C.green] : ['14 blocked', C.amber];
+    return phase === 'run' || phase === 'trace' || phase === 'recover' || phase === 'verify' || phase === 'close' ? ['14 released', C.green] : ['14 blocked', C.amber];
   }
   if (label === 'Mode') {
     const mode: Record<Phase, string> = {
-      open: 'demo',
-      load: 'loaded',
-      investigate: 'diagnose',
+      open: 'guide',
+      start: 'ready',
+      select: 'loaded',
+      read: 'review',
+      launch: 'agent',
+      inspect: 'diagnose',
+      plan: 'plan',
       approve: 'approval',
-      execute: 'agent run',
+      run: 'agent run',
+      trace: 'audit',
       inject: 'paused',
+      pause: 're-triage',
       recover: 'repair',
+      verify: 'score',
       close: 'closed',
     };
-    return [mode[phase], phase === 'inject' ? C.amber : C.blue];
+    return [mode[phase], phase === 'inject' || phase === 'pause' ? C.amber : C.blue];
   }
   if (label === 'Control') return ['human', C.green];
   return ['', C.text];
 }
 
 function stepStatus(index: number, phase: Phase) {
-  if (phase === 'open' || phase === 'load') return index === 0 && phase === 'load' ? 'next' : 'wait';
-  if (phase === 'investigate') return index < 2 ? 'done' : index === 2 ? 'next' : 'wait';
+  if (phase === 'open' || phase === 'start') return 'wait';
+  if (phase === 'select' || phase === 'read') return index === 0 ? 'next' : 'wait';
+  if (phase === 'launch') return index === 0 ? 'done' : index === 1 ? 'next' : 'wait';
+  if (phase === 'inspect' || phase === 'plan') return index < 2 ? 'done' : 'ready';
   if (phase === 'approve') return 'ready';
-  if (phase === 'execute') return 'done';
-  if (phase === 'inject') return index < 5 ? 'done' : 'wait';
+  if (phase === 'run' || phase === 'trace') return 'done';
+  if (phase === 'inject' || phase === 'pause') return index < 5 ? 'done' : 'wait';
   return 'done';
 }
 
@@ -247,8 +335,8 @@ function TopBar({ phase }: { phase: Phase }) {
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ color: C.green, fontSize: 12, fontWeight: 950 }}>LIVE SIM</div>
         <div style={{ border: `1px solid ${C.line}`, borderRadius: 6, padding: '8px 12px', color: C.text, fontSize: 12, fontWeight: 900 }}>BATS Extended-Hours Startup</div>
-        <div style={{ border: `1px solid ${phase === 'inject' ? C.amber : C.line}`, borderRadius: 6, padding: '8px 12px', color: phase === 'inject' ? C.amber : C.text, fontSize: 12, fontWeight: 950 }}>Inject Event</div>
-        <div style={{ background: phase === 'execute' || phase === 'recover' ? C.green : '#f1f5f9', border: `1px solid ${phase === 'execute' || phase === 'recover' ? C.green : C.line}`, borderRadius: 6, padding: '8px 12px', color: phase === 'execute' || phase === 'recover' ? '#fff' : C.text, fontSize: 12, fontWeight: 950 }}>Agent Run</div>
+        <div style={{ border: `1px solid ${phase === 'inject' || phase === 'pause' ? C.amber : C.line}`, borderRadius: 6, padding: '8px 12px', color: phase === 'inject' || phase === 'pause' ? C.amber : C.text, fontSize: 12, fontWeight: 950 }}>Inject Event</div>
+        <div style={{ background: phase === 'run' || phase === 'recover' ? C.green : '#f1f5f9', border: `1px solid ${phase === 'run' || phase === 'recover' ? C.green : C.line}`, borderRadius: 6, padding: '8px 12px', color: phase === 'run' || phase === 'recover' ? '#fff' : C.text, fontSize: 12, fontWeight: 950 }}>Agent Run</div>
       </div>
     </div>
   );
@@ -258,10 +346,10 @@ function ScriptStrip({ phase, frame }: { phase: Phase; frame: number }) {
   const active = scenarioScript[phase];
   const lf = localFrame(frame, phase);
   return (
-    <div style={{ position: 'absolute', left: 30, right: 30, bottom: 28, background: '#fffffff2', border: `1px solid ${C.line}`, borderRadius: 8, boxShadow: '0 18px 45px #0f172a1c', display: 'grid', gridTemplateColumns: '160px 1fr 360px', gap: 18, padding: '15px 18px', opacity: fade(lf, 0) }}>
+    <div style={{ position: 'absolute', left: 30, right: 30, bottom: 28, background: '#fffffff2', border: `1px solid ${C.line}`, borderRadius: 8, boxShadow: '0 18px 45px #0f172a1c', display: 'grid', gridTemplateColumns: '180px 1fr 360px', gap: 18, padding: '15px 18px', opacity: fade(lf, 0) }}>
       <div>
         <div style={{ color: C.blue, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>{active.label}</div>
-        <div style={{ color: C.muted, fontSize: 12, fontWeight: 850, marginTop: 5 }}>scenario step</div>
+        <div style={{ color: C.muted, fontSize: 12, fontWeight: 850, marginTop: 5 }}>user action</div>
       </div>
       <div>
         <div style={{ color: C.ink, fontSize: 23, fontWeight: 950 }}>{active.title}</div>
@@ -279,11 +367,11 @@ function Hero({ phase, frame }: { phase: Phase; frame: number }) {
   const show = phase === 'open';
   const lf = localFrame(frame, phase);
   return (
-    <div style={{ opacity: show ? fade(lf, 4) : 0, pointerEvents: 'none', position: 'absolute', left: 92, top: 130, width: 780, background: C.navy, color: '#fff', borderRadius: 10, padding: 34, boxShadow: '0 28px 80px #0f172a40' }}>
-      <div style={{ color: '#67e8f9', fontSize: 13, fontWeight: 950, textTransform: 'uppercase' }}>Production demo script</div>
-      <div style={{ fontSize: 48, lineHeight: 1.02, fontWeight: 950, marginTop: 10 }}>Solve the BATS startup incident.</div>
+    <div style={{ opacity: show ? fade(lf, 4) : 0, pointerEvents: 'none', position: 'absolute', left: 92, top: 130, width: 820, background: C.navy, color: '#fff', borderRadius: 10, padding: 34, boxShadow: '0 28px 80px #0f172a40' }}>
+      <div style={{ color: '#67e8f9', fontSize: 13, fontWeight: 950, textTransform: 'uppercase' }}>How to use FIX-MCP</div>
+      <div style={{ fontSize: 48, lineHeight: 1.02, fontWeight: 950, marginTop: 10 }}>A guided walkthrough, click by click.</div>
       <div style={{ color: '#cbd5e1', fontSize: 20, lineHeight: 1.35, fontWeight: 760, marginTop: 16 }}>
-        The point is not an AI magic trick. The point is a controlled trading-ops workflow: evidence first, human approval, bounded agent execution, trace at the end.
+        Follow one complete BATS startup incident: load the case, launch the agent, approve the workbook, run recovery, inject pressure, and verify proof.
       </div>
     </div>
   );
@@ -323,15 +411,15 @@ function Workbook({ phase, frame }: { phase: Phase; frame: number }) {
   const lf = localFrame(frame, phase);
   const gateCopy = phase === 'approve'
     ? 'Approve all 5 steps'
-    : phase === 'open' || phase === 'load' || phase === 'investigate'
+    : phase === 'open' || phase === 'start' || phase === 'select' || phase === 'read' || phase === 'launch' || phase === 'inspect' || phase === 'plan'
       ? 'Execution remains locked until approval'
       : 'Workbook approved. Agent Run is bounded.';
   return (
     <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, overflow: 'hidden', minHeight: 450, opacity: fade(lf, 4) }}>
       <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.line}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ color: C.ink, fontSize: 15, fontWeight: 950 }}>Recovery Workbook</div>
-        <div style={{ color: phase === 'approve' || phase === 'execute' || phase === 'inject' || phase === 'recover' || phase === 'close' ? C.green : C.muted, fontSize: 12, fontWeight: 950 }}>
-          {phase === 'approve' ? 'ready for approval' : phase === 'execute' || phase === 'inject' || phase === 'recover' || phase === 'close' ? 'approved' : 'agent generated'}
+        <div style={{ color: phase === 'approve' || phase === 'run' || phase === 'trace' || phase === 'inject' || phase === 'pause' || phase === 'recover' || phase === 'verify' || phase === 'close' ? C.green : C.muted, fontSize: 12, fontWeight: 950 }}>
+          {phase === 'approve' ? 'ready for approval' : phase === 'run' || phase === 'trace' || phase === 'inject' || phase === 'pause' || phase === 'recover' || phase === 'verify' || phase === 'close' ? 'approved' : 'agent generated'}
         </div>
       </div>
       {workbook.map((step, index) => {
@@ -369,8 +457,8 @@ function AgentPanel({ phase, frame }: { phase: Phase; frame: number }) {
           <div style={{ color: '#67e8f9', fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>Agent conversation</div>
           <div style={{ color: '#94a3b8', fontSize: 12, fontWeight: 850, marginTop: 4 }}>bounded by MCP tools</div>
         </div>
-        <div style={{ background: phase === 'execute' || phase === 'recover' ? '#087a55' : '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: 6, padding: '8px 10px', fontSize: 12, fontWeight: 950 }}>
-          {phase === 'execute' || phase === 'recover' ? 'running' : phase === 'close' ? 'complete' : 'advising'}
+        <div style={{ background: phase === 'run' || phase === 'recover' ? '#087a55' : '#1e293b', border: '1px solid #334155', color: '#fff', borderRadius: 6, padding: '8px 10px', fontSize: 12, fontWeight: 950 }}>
+          {phase === 'run' || phase === 'recover' ? 'running' : phase === 'verify' || phase === 'close' ? 'complete' : 'advising'}
         </div>
       </div>
       <div style={{ marginTop: 18, background: '#172033', border: '1px solid #334155', borderRadius: 8, padding: 15 }}>
@@ -414,14 +502,16 @@ function EvidenceTrace({ phase, frame }: { phase: Phase; frame: number }) {
 }
 
 function DecisionPanel({ phase, frame }: { phase: Phase; frame: number }) {
-  const show = phase === 'approve' || phase === 'inject';
+  const show = phase === 'approve' || phase === 'inject' || phase === 'pause';
   const lf = localFrame(frame, phase);
   const copy = phase === 'approve'
     ? ['Human approval gate', 'Approve the workbook', 'The agent cannot execute recovery until the operator approves the full plan.']
-    : ['Pressure injection', 'Sequence gap injected', 'The simulation pauses. The agent must re-check state before continuing.'];
+    : phase === 'pause'
+      ? ['Pause and re-triage', 'Do not continue blindly', 'The injected state change must be inspected before the agent resumes recovery.']
+      : ['Pressure injection', 'Sequence gap injected', 'The simulation pauses. The agent must re-check state before continuing.'];
   return (
-    <div style={{ opacity: show ? fade(lf, 10) : 0, position: 'absolute', right: 70, top: phase === 'close' ? 172 : 290, width: 500, background: C.panel, border: `2px solid ${phase === 'inject' ? C.amber : C.green}`, borderRadius: 9, padding: 22, boxShadow: '0 24px 70px #0f172a33' }}>
-      <div style={{ color: phase === 'inject' ? C.amber : C.green, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>{copy[0]}</div>
+    <div style={{ opacity: show ? fade(lf, 10) : 0, position: 'absolute', right: 70, top: 290, width: 500, background: C.panel, border: `2px solid ${phase === 'inject' || phase === 'pause' ? C.amber : C.green}`, borderRadius: 9, padding: 22, boxShadow: '0 24px 70px #0f172a33' }}>
+      <div style={{ color: phase === 'inject' || phase === 'pause' ? C.amber : C.green, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>{copy[0]}</div>
       <div style={{ color: C.ink, fontSize: 31, lineHeight: 1.08, fontWeight: 950, marginTop: 8 }}>{copy[1]}</div>
       <div style={{ color: C.text, fontSize: 16, lineHeight: 1.35, fontWeight: 760, marginTop: 10 }}>{copy[2]}</div>
       {phase === 'approve' && (
@@ -435,8 +525,8 @@ function DecisionPanel({ phase, frame }: { phase: Phase; frame: number }) {
 }
 
 function Progress({ phase, frame }: { phase: Phase; frame: number }) {
-  const progress = interpolate(frame, [0, 899], [2, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const labels: Phase[] = ['load', 'investigate', 'approve', 'execute', 'inject', 'recover', 'close'];
+  const progress = interpolate(frame, [0, 4499], [2, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const labels: Phase[] = ['start', 'select', 'launch', 'approve', 'run', 'trace', 'inject', 'recover', 'verify', 'close'];
   return (
     <div style={{ position: 'absolute', left: 30, right: 30, bottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', color: C.muted, fontSize: 11, fontWeight: 950, marginBottom: 7 }}>
@@ -454,12 +544,19 @@ function Progress({ phase, frame }: { phase: Phase; frame: number }) {
 function Cursor({ phase, frame }: { phase: Phase; frame: number }) {
   const positions: Record<Phase, [number, number]> = {
     open: [1470, 32],
-    load: [1540, 32],
-    investigate: [1175, 540],
+    start: [425, 35],
+    select: [1540, 32],
+    read: [1275, 160],
+    launch: [1660, 360],
+    inspect: [760, 610],
+    plan: [360, 360],
     approve: [1240, 615],
-    execute: [1810, 32],
+    run: [1810, 32],
+    trace: [760, 610],
     inject: [1705, 32],
+    pause: [1190, 535],
     recover: [1810, 32],
+    verify: [1450, 610],
     close: [1450, 770],
   };
   const [left, top] = positions[phase];
@@ -500,8 +597,8 @@ export function ScenarioExecutiveBrief({ story = defaultStory }: { story?: Scena
                     <div style={{ color: C.blue, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>Decision</div>
                     <div style={{ color: C.ink, fontSize: 25, lineHeight: 1.1, fontWeight: 950, marginTop: 7 }}>{scenarioScript[phase].decision}</div>
                   </div>
-                  <div style={{ border: `1px solid ${phase === 'inject' ? C.amber : C.line}`, borderRadius: 8, background: phase === 'inject' ? '#b45f0610' : C.raised, padding: 16 }}>
-                    <div style={{ color: phase === 'inject' ? C.amber : C.green, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>Proof</div>
+                  <div style={{ border: `1px solid ${phase === 'inject' || phase === 'pause' ? C.amber : C.line}`, borderRadius: 8, background: phase === 'inject' || phase === 'pause' ? '#b45f0610' : C.raised, padding: 16 }}>
+                    <div style={{ color: phase === 'inject' || phase === 'pause' ? C.amber : C.green, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>Proof</div>
                     <div style={{ color: C.ink, fontSize: 25, lineHeight: 1.1, fontWeight: 950, marginTop: 7 }}>{scenarioScript[phase].proof}</div>
                   </div>
                 </div>
