@@ -1,36 +1,29 @@
 import React from 'react';
-import {
-  AbsoluteFill,
-  Easing,
-  interpolate,
-  Sequence,
-  spring,
-  useCurrentFrame,
-  useVideoConfig,
-} from 'remotion';
+import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
 import { ScenarioStory, defaultStory } from './scenarioStories';
 
-const COLORS = {
+const C = {
+  page: '#eef2f5',
+  panel: '#ffffff',
   ink: '#111827',
   text: '#334155',
   muted: '#64748b',
   line: '#d8dee6',
-  panel: '#ffffff',
-  page: '#f4f6f8',
   cyan: '#006f8f',
   green: '#047857',
   amber: '#b45309',
   red: '#b91c1c',
   navy: '#0f172a',
-  slate: '#475569',
 };
 
-const toneColor = {
-  neutral: COLORS.slate,
-  good: COLORS.green,
-  warn: COLORS.amber,
-  bad: COLORS.red,
+const tone = {
+  neutral: C.text,
+  good: C.green,
+  warn: C.amber,
+  bad: C.red,
 };
+
+type StepState = 'todo' | 'running' | 'done' | 'hold';
 
 function fade(frame: number, start: number, duration = 18) {
   return interpolate(frame, [start, start + duration], [0, 1], {
@@ -40,69 +33,74 @@ function fade(frame: number, start: number, duration = 18) {
   });
 }
 
-function useLocalFrame() {
-  return useCurrentFrame();
+function phaseAt(frame: number) {
+  if (frame < 120) return 'load';
+  if (frame < 270) return 'investigate';
+  if (frame < 420) return 'approve';
+  if (frame < 570) return 'inject';
+  if (frame < 760) return 'agent';
+  return 'close';
 }
 
-function stepIn(frame: number, index: number) {
-  return fade(frame, 8 + index * 10, 16);
+function scenarioProblem(story: ScenarioStory) {
+  if (story.id.includes('bats')) return 'BATS logon rejected';
+  if (story.id.includes('venue')) return 'NYSE latency degraded';
+  if (story.id.includes('triage')) return 'ARCA down + symbol risk';
+  if (story.category.toLowerCase().includes('algo')) return 'Algo drift requires review';
+  if (story.category.toLowerCase().includes('regulatory')) return 'Regulatory constraint active';
+  return story.title;
 }
 
-function Shell({
-  children,
-  kicker,
-  title,
-  section,
-}: {
-  children: React.ReactNode;
-  kicker: string;
-  title: string;
-  section: string;
-}) {
-  return (
-    <AbsoluteFill style={{ background: COLORS.page, color: COLORS.ink, fontFamily: 'Inter, Arial, sans-serif' }}>
-      <div style={{ display: 'flex', height: '100%', flexDirection: 'column', padding: '46px 56px 42px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start', marginBottom: 28 }}>
-          <div>
-            <div style={{ color: COLORS.cyan, fontSize: 18, fontWeight: 900, letterSpacing: 1.4, textTransform: 'uppercase' }}>
-              {kicker}
-            </div>
-            <div style={{ fontSize: 48, lineHeight: 1.04, fontWeight: 950, letterSpacing: 0, marginTop: 8 }}>
-              {title}
-            </div>
-          </div>
-          <div style={{ minWidth: 230, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: '12px 16px', background: COLORS.panel }}>
-            <div style={{ color: COLORS.muted, fontSize: 13, fontWeight: 800, textTransform: 'uppercase' }}>FIX-MCP Demo</div>
-            <div style={{ color: COLORS.ink, fontSize: 20, fontWeight: 950, marginTop: 3 }}>{section}</div>
-          </div>
-        </div>
-        {children}
-      </div>
-    </AbsoluteFill>
-  );
+function scenarioTarget(story: ScenarioStory) {
+  if (story.id.includes('bats')) return 'BATS / BZX_GW';
+  if (story.id.includes('venue')) return 'NYSE';
+  if (story.id.includes('iex')) return 'IEX';
+  if (story.id.includes('dark')) return 'Dark Pool';
+  if (story.category.toLowerCase().includes('algo')) return 'Algo desk';
+  return 'Trading desk';
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: keyof typeof toneColor }) {
-  return (
-    <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: 18, minHeight: 138 }}>
-      <div style={{ color: COLORS.muted, fontSize: 14, fontWeight: 900, textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ color: toneColor[tone], fontSize: 31, lineHeight: 1.05, fontWeight: 950, marginTop: 10 }}>{value}</div>
-    </div>
-  );
+function runbookRows(story: ScenarioStory) {
+  const rows = [
+    ['Check sessions', 'check_fix_sessions', 'session'],
+    ['Quantify flow', 'query_orders', 'orders'],
+    ['Validate blockers', 'validate_orders', 'risk'],
+    ['Approve workbook', 'human_gate', 'approval'],
+    ['Run approved steps', 'agent_run', 'execution'],
+  ];
+  if (story.category.toLowerCase().includes('reference')) rows.splice(2, 0, ['Load reference data', 'load_ticker', 'symbols']);
+  if (story.category.toLowerCase().includes('algo')) rows.splice(1, 0, ['Inspect algo', 'check_algo_status', 'algo']);
+  return rows.slice(0, 6);
 }
 
-function StagePill({ label, active, done }: { label: string; active?: boolean; done?: boolean }) {
+function stepState(index: number, frame: number): StepState {
+  if (frame < 120) return index === 0 ? 'running' : 'todo';
+  if (frame < 270) return index <= 1 ? 'done' : index === 2 ? 'running' : 'todo';
+  if (frame < 420) return index <= 2 ? 'done' : index === 3 ? 'running' : 'todo';
+  if (frame < 570) return index <= 3 ? 'done' : 'hold';
+  if (frame < 760) return index <= 4 ? 'done' : index === 5 ? 'running' : 'todo';
+  return 'done';
+}
+
+function statusColor(state: StepState) {
+  if (state === 'done') return C.green;
+  if (state === 'running') return C.cyan;
+  if (state === 'hold') return C.amber;
+  return C.muted;
+}
+
+function StatusBadge({ state }: { state: StepState }) {
+  const label = state === 'done' ? 'DONE' : state === 'running' ? 'RUNNING' : state === 'hold' ? 'RE-TRIAGE' : 'PENDING';
   return (
     <div
       style={{
-        border: `1px solid ${active ? COLORS.cyan : done ? COLORS.green : COLORS.line}`,
-        background: active ? '#006f8f18' : done ? '#04785712' : COLORS.panel,
-        color: active ? COLORS.cyan : done ? COLORS.green : COLORS.text,
-        borderRadius: 8,
-        padding: '12px 14px',
-        fontSize: 16,
+        color: statusColor(state),
+        background: `${statusColor(state)}14`,
+        border: `1px solid ${statusColor(state)}55`,
+        borderRadius: 6,
+        padding: '5px 8px',
+        fontSize: 11,
         fontWeight: 900,
-        textAlign: 'center',
       }}
     >
       {label}
@@ -110,286 +108,231 @@ function StagePill({ label, active, done }: { label: string; active?: boolean; d
   );
 }
 
-function getRunbook(story: ScenarioStory) {
-  const base = [
-    { title: 'Brief the room', body: story.situation, tool: 'scenario_context' },
-    { title: 'Check the primary blocker', body: story.mcpEvidence, tool: 'MCP tools + Trace' },
-    { title: 'Quantify affected flow', body: story.systemImpact, tool: 'query_orders / validate_orders' },
-    { title: 'Approve workbook', body: story.humanDecision, tool: 'human approval gate' },
-  ];
-
-  if (story.category.toLowerCase().includes('algo')) {
-    base.splice(2, 0, {
-      title: 'Inspect algo health',
-      body: 'Compare schedule progress, venue quality, and execution drift before recommending action.',
-      tool: 'check_algo_status',
-    });
-  }
-
-  if (story.category.toLowerCase().includes('reference')) {
-    base.splice(3, 0, {
-      title: 'Validate reference data',
-      body: 'Confirm symbol, corporate action, or listing data before order release.',
-      tool: 'validate_orders',
-    });
-  }
-
-  return base.slice(0, 5);
-}
-
-function Opening({ story, start }: { story: ScenarioStory; start: number }) {
-  const frame = useLocalFrame();
-  const { fps } = useVideoConfig();
-  const scale = spring({ frame, fps, config: { damping: 180, stiffness: 110 } });
+function TopBar({ story, phase }: { story: ScenarioStory; phase: string }) {
   return (
-    <Shell kicker={`${story.time} / ${story.category}`} title={story.title} section="Executive Setup">
-      <div style={{ opacity: fade(frame, 0), transform: `translateY(${(1 - scale) * 30}px)` }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 0.65fr', gap: 22 }}>
-          <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: 30, minHeight: 450 }}>
-            <div style={{ color: story.severity === 'critical' ? COLORS.red : story.severity === 'high' ? COLORS.amber : COLORS.cyan, fontWeight: 950, textTransform: 'uppercase', fontSize: 18 }}>
-              {story.severity} incident
-            </div>
-            <div style={{ marginTop: 18, fontSize: 42, lineHeight: 1.12, fontWeight: 950 }}>{story.executiveAngle}</div>
-            <div style={{ marginTop: 28, color: COLORS.text, fontSize: 27, lineHeight: 1.35, fontWeight: 700 }}>{story.situation}</div>
-          </div>
-          <div style={{ display: 'grid', gap: 14 }}>
-            {story.metrics.map((metric) => (
-              <MetricCard key={metric.label} {...metric} />
-            ))}
-          </div>
-        </div>
+    <div style={{ height: 64, borderBottom: `1px solid ${C.line}`, background: C.panel, display: 'flex', alignItems: 'center', padding: '0 22px', gap: 16 }}>
+      <div style={{ fontSize: 22, fontWeight: 950, color: C.ink }}>FIX-MCP</div>
+      <div style={{ color: C.muted, fontWeight: 800, fontSize: 13 }}>AI Trading Ops Simulator</div>
+      <div style={{ marginLeft: 18, display: 'flex', gap: 6 }}>
+        {['Desk', 'Incidents', 'Builder'].map((tab) => (
+          <div key={tab} style={{ padding: '8px 12px', borderRadius: 6, background: tab === 'Desk' ? '#006f8f14' : 'transparent', color: tab === 'Desk' ? C.cyan : C.muted, fontWeight: 900, fontSize: 13 }}>{tab}</div>
+        ))}
       </div>
-    </Shell>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: C.green, fontWeight: 900 }}>● LIVE</div>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 6, padding: '8px 12px', fontSize: 12, fontWeight: 900, color: C.text }}>{story.title}</div>
+        <div style={{ border: `1px solid ${phase === 'inject' ? C.amber : C.line}`, color: phase === 'inject' ? C.amber : C.text, borderRadius: 6, padding: '8px 12px', fontSize: 12, fontWeight: 950 }}>Inject Stress</div>
+        <div style={{ border: `1px solid ${phase === 'agent' ? C.green : C.line}`, color: phase === 'agent' ? C.green : C.text, borderRadius: 6, padding: '8px 12px', fontSize: 12, fontWeight: 950 }}>Agent Run</div>
+      </div>
+    </div>
   );
 }
 
-function DeskMap({ story, start }: { story: ScenarioStory; start: number }) {
-  const frame = useLocalFrame();
-  const pulse = interpolate(Math.sin(frame / 8), [-1, 1], [0.4, 1]);
-  const badColor = story.severity === 'critical' ? COLORS.red : COLORS.amber;
-  const nodes = [
-    { label: 'Operator', x: 80, y: 164, color: COLORS.cyan, sub: 'human decision owner' },
-    { label: 'LLM Copilot', x: 360, y: 164, color: COLORS.slate, sub: 'summarize + propose' },
-    { label: 'MCP Tools', x: 650, y: 164, color: COLORS.green, sub: 'bounded actions' },
-    { label: 'FIX / OMS', x: 980, y: 82, color: badColor, sub: 'incident surface' },
-    { label: 'Trace Evidence', x: 980, y: 270, color: COLORS.navy, sub: 'audit trail' },
-  ];
+function Metric({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <Shell kicker="Live Desk Model" title="The User Sees What Changes" section="System Walkthrough">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 22 }}>
-        <div style={{ position: 'relative', height: 560, background: COLORS.panel, border: `1px solid ${COLORS.line}`, borderRadius: 8, overflow: 'hidden' }}>
-          <svg width="100%" height="100%" viewBox="0 0 1240 560" style={{ position: 'absolute', inset: 0 }}>
-            <line x1="250" y1="208" x2="360" y2="208" stroke="#94a3b8" strokeWidth="5" />
-            <line x1="530" y1="208" x2="650" y2="208" stroke="#94a3b8" strokeWidth="5" />
-            <line x1="830" y1="200" x2="980" y2="130" stroke="#94a3b8" strokeWidth="5" />
-            <line x1="830" y1="220" x2="980" y2="315" stroke="#94a3b8" strokeWidth="5" />
-          </svg>
-          {nodes.map((node, index) => (
-            <div
-              key={node.label}
-              style={{
-                position: 'absolute',
-                left: node.x,
-                top: node.y,
-                width: 200,
-                height: 112,
-                opacity: stepIn(frame, index),
-                borderRadius: 8,
-                border: `3px solid ${node.color}`,
-                background: '#f9fafb',
-                padding: 16,
-                boxShadow: node.label === 'FIX / OMS' ? `0 0 ${28 * pulse}px ${node.color}55` : 'none',
-              }}
-            >
-              <div style={{ color: node.color, fontSize: 24, fontWeight: 950 }}>{node.label}</div>
-              <div style={{ color: COLORS.muted, fontSize: 14, fontWeight: 800, marginTop: 8 }}>{node.sub}</div>
-            </div>
-          ))}
-          <div style={{ position: 'absolute', left: 42, right: 42, bottom: 34, color: COLORS.text, fontSize: 27, lineHeight: 1.3, fontWeight: 800 }}>
-            {story.systemImpact}
-          </div>
-        </div>
-        <div style={{ background: COLORS.navy, borderRadius: 8, padding: 24, color: '#e2e8f0' }}>
-          <div style={{ color: '#67e8f9', fontSize: 18, fontWeight: 950, textTransform: 'uppercase' }}>What makes this a demo</div>
-          {['Scenario is visible', 'MCP calls are bounded', 'Human approval is explicit', 'Trace proves every action'].map((line, i) => (
-            <div key={line} style={{ opacity: stepIn(frame, i + 1), marginTop: 24, borderTop: '1px solid #334155', paddingTop: 18 }}>
-              <div style={{ fontSize: 28, fontWeight: 950 }}>{line}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Shell>
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: '#f9fafb', padding: 14 }}>
+      <div style={{ color: C.muted, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ color, marginTop: 6, fontSize: 25, fontWeight: 950 }}>{value}</div>
+    </div>
   );
 }
 
-function RunbookWalkthrough({ story, start }: { story: ScenarioStory; start: number }) {
-  const frame = useLocalFrame();
-  const steps = getRunbook(story);
-  const active = Math.min(steps.length - 1, Math.floor(frame / 38));
+function ScenarioHeader({ story, phase }: { story: ScenarioStory; phase: string }) {
+  const isClosed = phase === 'close';
+  const activeLabel =
+    phase === 'load' ? 'Scenario loaded' :
+    phase === 'investigate' ? 'Investigator running' :
+    phase === 'approve' ? 'Workbook approval' :
+    phase === 'inject' ? 'Stress injected' :
+    phase === 'agent' ? 'Agent executing approved steps' :
+    'Incident closed';
   return (
-    <Shell kicker="Workbook Walkthrough" title="How The Operator Drives The Scenario" section="Runbook">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 440px', gap: 22 }}>
-        <div style={{ display: 'grid', gap: 12 }}>
-          {steps.map((step, index) => (
-            <div
-              key={step.title}
-              style={{
-                opacity: stepIn(frame, index),
-                display: 'grid',
-                gridTemplateColumns: '72px 1fr 260px',
-                gap: 18,
-                alignItems: 'center',
-                background: COLORS.panel,
-                border: `2px solid ${active === index ? COLORS.cyan : index < active ? COLORS.green : COLORS.line}`,
-                borderRadius: 8,
-                padding: 16,
-              }}
-            >
-              <div style={{ color: active === index ? COLORS.cyan : index < active ? COLORS.green : COLORS.muted, fontSize: 34, fontWeight: 950 }}>
-                {String(index + 1).padStart(2, '0')}
-              </div>
-              <div>
-                <div style={{ fontSize: 25, fontWeight: 950 }}>{step.title}</div>
-                <div style={{ color: COLORS.text, fontSize: 17, lineHeight: 1.32, fontWeight: 700, marginTop: 5 }}>{step.body}</div>
-              </div>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', color: COLORS.cyan, fontSize: 15, fontWeight: 900, textAlign: 'right' }}>{step.tool}</div>
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: C.panel, padding: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ background: story.severity === 'critical' ? '#b91c1c18' : '#b4530918', color: story.severity === 'critical' ? C.red : C.amber, padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>
+              {story.severity}
             </div>
-          ))}
+            <div style={{ color: C.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 900 }}>{story.time}</div>
+            <div style={{ color: C.cyan, fontSize: 12, fontWeight: 950 }}>{activeLabel}</div>
+          </div>
+          <div style={{ marginTop: 12, fontSize: 35, fontWeight: 950, color: C.ink }}>{scenarioProblem(story)}</div>
+          <div style={{ marginTop: 8, fontSize: 17, fontWeight: 750, color: C.text, maxWidth: 920 }}>{story.situation}</div>
         </div>
-        <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: 22 }}>
-          <div style={{ color: COLORS.muted, fontSize: 14, fontWeight: 950, textTransform: 'uppercase' }}>Operator Controls</div>
-          <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-            <StagePill label="Investigator" done={active > 0} active={active === 0} />
-            <StagePill label="Approve Workbook" done={active > 2} active={active === 2 || active === 3} />
-            <StagePill label="Agent Run" active={active >= 4} />
-          </div>
-          <div style={{ marginTop: 28, color: COLORS.text, fontSize: 24, lineHeight: 1.35, fontWeight: 800 }}>
-            The demo walks the audience through what the human approves and what the agent is allowed to execute.
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 150px)', gap: 10, alignSelf: 'stretch' }}>
+          {story.metrics.map((m, i) => {
+            const resolved = [
+              { label: 'Released', value: '14', tone: 'good' as const },
+              { label: 'BATS', value: 'up', tone: 'good' as const },
+              { label: 'Evidence', value: 'ready', tone: 'good' as const },
+            ][i];
+            const metric = isClosed ? resolved : m;
+            return <Metric key={m.label} label={metric.label} value={metric.value} color={tone[metric.tone]} />;
+          })}
         </div>
       </div>
-    </Shell>
+    </div>
   );
 }
 
-function InjectionBranch({ story, start }: { story: ScenarioStory; start: number }) {
-  const frame = useLocalFrame();
-  const changed = frame > 68;
+function RunbookRail({ story, frame }: { story: ScenarioStory; frame: number }) {
   return (
-    <Shell kicker="Stress Injection" title="Then We Change The System On Purpose" section="Injector">
-      <div style={{ display: 'grid', gridTemplateColumns: '0.95fr 1.05fr', gap: 22 }}>
-        <div style={{ background: COLORS.navy, borderRadius: 8, padding: 28, color: '#e2e8f0' }}>
-          <div style={{ color: '#fbbf24', fontSize: 18, fontWeight: 950, textTransform: 'uppercase' }}>Injected Event</div>
-          <div style={{ marginTop: 18, fontSize: 39, lineHeight: 1.12, fontWeight: 950 }}>{story.injector}</div>
-          <div style={{ marginTop: 32, display: 'grid', gap: 12 }}>
-            <StagePill label="Baseline understood" done />
-            <StagePill label="Inject pressure" active={!changed} />
-            <StagePill label="Re-triage before action" active={changed} />
-          </div>
-        </div>
-        <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: 26 }}>
-          <div style={{ color: COLORS.muted, fontSize: 14, fontWeight: 950, textTransform: 'uppercase' }}>What The Viewer Sees</div>
-          <div style={{ marginTop: 22, display: 'grid', gap: 16 }}>
-            {[
-              ['Before injection', 'The workbook is valid for the verified baseline incident.'],
-              ['State changes', 'A controlled event adds new pressure to sessions, orders, or market structure.'],
-              ['Agent behavior', 'The agent must re-check scope instead of blindly continuing.'],
-              ['Human role', 'The operator chooses whether to continue, revise, or stop.'],
-            ].map(([label, body], index) => (
-              <div key={label} style={{ opacity: stepIn(frame, index), borderLeft: `5px solid ${index === 1 && changed ? COLORS.red : COLORS.cyan}`, paddingLeft: 16 }}>
-                <div style={{ fontSize: 25, fontWeight: 950 }}>{label}</div>
-                <div style={{ color: COLORS.text, fontSize: 20, lineHeight: 1.35, fontWeight: 700, marginTop: 4 }}>{body}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: C.panel, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.line}`, display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 13, color: C.muted, fontWeight: 950, textTransform: 'uppercase' }}>Workbook</div>
+        <div style={{ fontSize: 12, color: C.cyan, fontWeight: 950 }}>Human approved path</div>
       </div>
-    </Shell>
+      {runbookRows(story).map(([label, tool, domain], i) => {
+        const state = stepState(i, frame);
+        return (
+          <div key={label} style={{ display: 'grid', gridTemplateColumns: '34px 1fr auto', gap: 12, alignItems: 'center', padding: '13px 14px', borderBottom: `1px solid ${C.line}`, background: state === 'running' ? '#006f8f10' : state === 'done' ? '#0478570c' : C.panel }}>
+            <div style={{ width: 26, height: 26, borderRadius: 13, background: `${statusColor(state)}18`, color: statusColor(state), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 950 }}>{i + 1}</div>
+            <div>
+              <div style={{ color: C.ink, fontSize: 15, fontWeight: 950 }}>{label}</div>
+              <div style={{ marginTop: 3, color: C.muted, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{tool} · {domain}</div>
+            </div>
+            <StatusBadge state={state} />
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-function AgentRunEvidence({ story, start }: { story: ScenarioStory; start: number }) {
-  const frame = useLocalFrame();
+function MainWorkspace({ story, phase, frame }: { story: ScenarioStory; phase: string; frame: number }) {
+  const showInjection = phase === 'inject' || phase === 'agent' || phase === 'close';
+  const mode =
+    phase === 'close' ? 'Closed' :
+    phase === 'agent' ? 'Agent Run' :
+    phase === 'inject' ? 'Re-triage' :
+    phase === 'approve' ? 'Approve' :
+    'Investigate';
+  return (
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: C.panel, overflow: 'hidden', minHeight: 432 }}>
+      <div style={{ height: 42, borderBottom: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 8 }}>
+        {['Case Study', 'Trace', 'FIX Wire'].map((tab) => (
+          <div key={tab} style={{ padding: '6px 10px', borderRadius: 6, color: tab === 'Trace' && (phase === 'agent' || phase === 'close') ? C.cyan : C.text, background: tab === 'Trace' && (phase === 'agent' || phase === 'close') ? '#006f8f14' : 'transparent', fontSize: 12, fontWeight: 950 }}>{tab}</div>
+        ))}
+      </div>
+      <div style={{ padding: 16, display: 'grid', gridTemplateColumns: phase === 'load' ? '1fr' : '1fr 320px', gap: 14 }}>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: '#f9fafb', padding: 16 }}>
+          <div style={{ color: C.muted, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>Desk state</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 12 }}>
+            <Metric label="Target" value={scenarioTarget(story)} color={phase === 'close' ? C.green : C.red} />
+            <Metric label="Mode" value={mode} color={phase === 'close' || phase === 'agent' ? C.green : C.cyan} />
+            <Metric label="Evidence" value={phase === 'load' ? 'Pending' : 'Trace live'} color={phase === 'load' ? C.muted : C.green} />
+            <Metric label="Authority" value="Human" color={C.green} />
+          </div>
+          <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ border: `1px solid ${C.line}`, background: C.panel, borderRadius: 8, padding: 14 }}>
+              <div style={{ color: C.cyan, fontSize: 13, fontWeight: 950 }}>Copilot finding</div>
+              <div style={{ color: C.ink, fontSize: 24, lineHeight: 1.16, fontWeight: 950, marginTop: 8 }}>{story.mcpEvidence}</div>
+            </div>
+            <div style={{ border: `1px solid ${showInjection ? C.amber : C.line}`, background: showInjection ? '#b4530910' : C.panel, borderRadius: 8, padding: 14 }}>
+              <div style={{ color: showInjection ? C.amber : C.muted, fontSize: 13, fontWeight: 950 }}>{showInjection ? 'Injected pressure' : 'Next decision'}</div>
+              <div style={{ color: C.ink, fontSize: 24, lineHeight: 1.16, fontWeight: 950, marginTop: 8 }}>{showInjection ? story.injector : story.humanDecision}</div>
+            </div>
+          </div>
+        </div>
+        {phase !== 'load' && (
+          <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: C.navy, color: '#e2e8f0', padding: 16 }}>
+            <div style={{ color: '#67e8f9', fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>SRE Copilot</div>
+            <div style={{ marginTop: 14, color: '#fff', fontSize: 22, lineHeight: 1.22, fontWeight: 950 }}>
+              {phase === 'investigate' && 'First: prove the blocker, then quantify affected flow.'}
+              {phase === 'approve' && 'Workbook is ready. Human approval required before execution.'}
+              {phase === 'inject' && 'State changed. Re-triage before continuing.'}
+              {phase === 'agent' && 'Executing approved steps. Stopping on scope change.'}
+              {phase === 'close' && 'Evidence captured. Scenario can be reviewed.'}
+            </div>
+            <div style={{ marginTop: 20, display: 'grid', gap: 8 }}>
+              {['No production authority', 'MCP tools only', 'Trace every step'].map((x, i) => (
+                <div key={x} style={{ opacity: fade(frame, 80 + i * 20), border: '1px solid #334155', borderRadius: 6, padding: '9px 10px', color: '#cbd5e1', fontSize: 13, fontWeight: 850 }}>{x}</div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TraceTable({ phase, frame }: { phase: string; frame: number }) {
   const rows = [
-    ['check_fix_sessions', 'session state confirmed', 'PASS'],
-    ['query_orders', 'affected flow quantified', 'PASS'],
-    ['validate_orders', 'release blockers checked', 'PASS'],
-    ['inject_event', 'stress state recorded', 'RE-TRIAGE'],
-    ['score_scenario', 'workbook evidence complete', 'DONE'],
+    ['check_fix_sessions', 'BATS down / sequence issue', 'ok'],
+    ['query_orders', 'blocked flow quantified', 'ok'],
+    ['validate_orders', 'release blockers checked', 'ok'],
+    ['inject_event', 'reject spike recorded', phase === 'inject' ? 'warn' : 'ok'],
+    ['score_scenario', 'evidence complete', phase === 'close' ? 'ok' : 'pending'],
   ];
   return (
-    <Shell kicker="Agent Run + Evidence" title="The Agent Works, The Human Watches" section="Proof">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 22 }}>
-        <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.line}`, borderRadius: 8, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr 160px', background: '#eef2f5', padding: '14px 18px', color: COLORS.muted, fontSize: 14, fontWeight: 950, textTransform: 'uppercase' }}>
-            <div>MCP Tool</div>
-            <div>Evidence</div>
-            <div>Status</div>
-          </div>
-          {rows.map(([tool, evidence, status], index) => (
-            <div key={tool} style={{ opacity: stepIn(frame, index), display: 'grid', gridTemplateColumns: '270px 1fr 160px', padding: '18px', borderTop: `1px solid ${COLORS.line}`, alignItems: 'center' }}>
-              <div style={{ color: COLORS.cyan, fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 950 }}>{tool}</div>
-              <div style={{ color: COLORS.text, fontSize: 20, fontWeight: 750 }}>{evidence}</div>
-              <div style={{ color: status === 'RE-TRIAGE' ? COLORS.amber : COLORS.green, fontSize: 18, fontWeight: 950 }}>{status}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ background: COLORS.navy, borderRadius: 8, padding: 26, color: '#e2e8f0' }}>
-          <div style={{ color: '#86efac', fontSize: 18, fontWeight: 950, textTransform: 'uppercase' }}>Agent Run Boundary</div>
-          <div style={{ fontSize: 34, lineHeight: 1.18, fontWeight: 950, marginTop: 20 }}>{story.agentRun}</div>
-          <div style={{ fontSize: 22, lineHeight: 1.35, color: '#cbd5e1', marginTop: 28, fontWeight: 750 }}>
-            The agent never claims production authority. It executes simulated MCP tools and produces auditable evidence.
-          </div>
-        </div>
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: C.panel, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr 110px', padding: '10px 14px', background: '#eef2f5', color: C.muted, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>
+        <div>Tool</div><div>Evidence</div><div>Status</div>
       </div>
-    </Shell>
+      {rows.map(([tool, evidence, state], i) => {
+        const visible = phase === 'load' ? i < 1 : phase === 'investigate' ? i < 2 : phase === 'approve' ? i < 3 : phase === 'inject' ? i < 4 : i < 5;
+        const color = state === 'warn' ? C.amber : state === 'pending' ? C.muted : C.green;
+        return (
+          <div key={tool} style={{ opacity: visible ? fade(frame, 60 + i * 14) : 0.18, display: 'grid', gridTemplateColumns: '230px 1fr 110px', padding: '10px 14px', borderTop: `1px solid ${C.line}`, alignItems: 'center' }}>
+            <div style={{ color: C.cyan, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 950 }}>{tool}</div>
+            <div style={{ color: C.text, fontSize: 14, fontWeight: 750 }}>{evidence}</div>
+            <div style={{ color, fontSize: 12, fontWeight: 950 }}>{state === 'warn' ? 'RE-TRIAGE' : state === 'pending' ? 'PENDING' : 'PASS'}</div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-function ExecutiveClose({ story, start }: { story: ScenarioStory; start: number }) {
-  const frame = useLocalFrame();
+function ApprovalOverlay({ phase, frame }: { phase: string; frame: number }) {
+  const show = phase === 'approve';
   return (
-    <Shell kicker="Close The Room" title="What This Proves" section="Executive Close">
-      <div style={{ opacity: fade(frame, 0), display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
-        <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: 34 }}>
-          <div style={{ color: COLORS.green, fontWeight: 950, textTransform: 'uppercase', fontSize: 18 }}>Outcome</div>
-          <div style={{ color: COLORS.ink, fontSize: 43, lineHeight: 1.12, fontWeight: 950, marginTop: 16 }}>{story.outcome}</div>
-        </div>
-        <div style={{ background: COLORS.navy, borderRadius: 8, padding: 34, color: '#e2e8f0' }}>
-          <div style={{ color: '#67e8f9', fontWeight: 950, textTransform: 'uppercase', fontSize: 18 }}>Demo Path</div>
-          {['Load scenario', 'Run Investigator', 'Approve workbook', 'Inject pressure', 'Run agent under supervision', 'Show trace + FIX evidence'].map((item, index) => (
-            <div key={item} style={{ opacity: stepIn(frame, index), display: 'flex', gap: 14, alignItems: 'center', marginTop: 18 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 14, background: '#047857', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 950 }}>{index + 1}</div>
-              <div style={{ fontSize: 25, fontWeight: 900 }}>{item}</div>
-            </div>
-          ))}
-        </div>
+    <div style={{ opacity: show ? fade(frame, 300) : 0, position: 'absolute', left: 520, top: 342, width: 520, background: C.panel, border: `2px solid ${C.green}`, borderRadius: 8, padding: 20, boxShadow: '0 18px 50px #0f172a33' }}>
+      <div style={{ color: C.green, fontSize: 13, fontWeight: 950, textTransform: 'uppercase' }}>Human approval gate</div>
+      <div style={{ marginTop: 8, fontSize: 28, fontWeight: 950, color: C.ink }}>Approve full workbook?</div>
+      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ background: C.green, color: '#fff', borderRadius: 6, padding: '11px 12px', textAlign: 'center', fontWeight: 950 }}>Approve</div>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 6, padding: '11px 12px', textAlign: 'center', fontWeight: 950 }}>Hold</div>
       </div>
-    </Shell>
+    </div>
   );
 }
+
+function CompletionOverlay({ phase, frame }: { phase: string; frame: number }) {
+  const show = phase === 'close';
+  return (
+    <div style={{ opacity: show ? fade(frame, 760) : 0, position: 'absolute', right: 52, bottom: 48, width: 430, background: C.navy, color: '#e2e8f0', borderRadius: 8, padding: 22, boxShadow: '0 18px 50px #0f172a33' }}>
+      <div style={{ color: '#86efac', fontSize: 13, fontWeight: 950, textTransform: 'uppercase' }}>Incident resolved</div>
+      <div style={{ marginTop: 8, fontSize: 28, fontWeight: 950, lineHeight: 1.12 }}>{storylessClose}</div>
+      <div style={{ marginTop: 12, color: '#cbd5e1', fontSize: 15, fontWeight: 750 }}>Trace, workbook, and FIX evidence are ready for review.</div>
+    </div>
+  );
+}
+
+const storylessClose = 'Approved automation, human control, auditable proof.';
 
 export function ScenarioExecutiveBrief({ story = defaultStory }: { story?: ScenarioStory }) {
+  const frame = useCurrentFrame();
+  const phase = phaseAt(frame);
+  const progress = interpolate(frame, [0, 899], [4, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+
   return (
-    <AbsoluteFill>
-      <Sequence from={0} durationInFrames={150}>
-        <Opening story={story} start={0} />
-      </Sequence>
-      <Sequence from={150} durationInFrames={150}>
-        <DeskMap story={story} start={150} />
-      </Sequence>
-      <Sequence from={300} durationInFrames={180}>
-        <RunbookWalkthrough story={story} start={300} />
-      </Sequence>
-      <Sequence from={480} durationInFrames={150}>
-        <InjectionBranch story={story} start={480} />
-      </Sequence>
-      <Sequence from={630} durationInFrames={150}>
-        <AgentRunEvidence story={story} start={630} />
-      </Sequence>
-      <Sequence from={780} durationInFrames={120}>
-        <ExecutiveClose story={story} start={780} />
-      </Sequence>
+    <AbsoluteFill style={{ background: C.page, fontFamily: 'Inter, Arial, sans-serif', color: C.ink }}>
+      <TopBar story={story} phase={phase} />
+      <div style={{ padding: 20, display: 'grid', gap: 14 }}>
+        <ScenarioHeader story={story} phase={phase} />
+        <div style={{ display: 'grid', gridTemplateColumns: '420px 1fr', gap: 14 }}>
+          <RunbookRail story={story} frame={frame} />
+          <MainWorkspace story={story} phase={phase} frame={frame} />
+        </div>
+        <TraceTable phase={phase} frame={frame} />
+        <div style={{ height: 8, borderRadius: 99, background: '#d8dee6', overflow: 'hidden' }}>
+          <div style={{ width: `${progress}%`, height: '100%', background: phase === 'inject' ? C.amber : phase === 'close' ? C.green : C.cyan }} />
+        </div>
+      </div>
+      <ApprovalOverlay phase={phase} frame={frame} />
+      <CompletionOverlay phase={phase} frame={frame} />
     </AbsoluteFill>
   );
 }
