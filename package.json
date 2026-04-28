@@ -5,9 +5,14 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "video:studio": "remotion studio src/remotion/index.ts",
+    "video:compositions": "remotion compositions src/remotion/index.ts",
+    "video:render": "remotion render src/remotion/index.ts ExecutiveScenarioDemo out/executive-scenario-demo.mp4",
+    "video:render:bats": "remotion render src/remotion/index.ts scenario-bats-startup-0200 out/bats-startup-executive-demo.mp4"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.452",
     "axios": "^1.15.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.8.0",
@@ -15,6 +20,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "reactflow": "^11.11.4",
+    "remotion": "^4.0.452",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.12"
   },

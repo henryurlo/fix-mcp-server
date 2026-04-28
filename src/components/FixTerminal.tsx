@@ -956,23 +956,25 @@ export default function FixTerminal() {
 
   const lineColor = (type: TerminalLine['type']) => {
     switch (type) {
-      case 'error': return 'text-[var(--red)]';
-      case 'header': return 'text-[var(--cyan)]';
-      case 'success': return 'text-[var(--green)]';
-      default: return 'text-[var(--text-primary)]';
+      case 'error': return 'text-[#fca5a5]';
+      case 'header': return 'text-[#67e8f9]';
+      case 'success': return 'text-[#86efac]';
+      case 'output': return 'text-[#cbd5e1]';
+      default: return 'text-[#e2e8f0]';
     }
   };
 
   return (
     <div
-      className="h-full flex flex-col bg-[#050810] border border-[var(--border-dim)] rounded-lg overflow-hidden cursor-text"
+      className="h-full flex flex-col bg-[#0f172a] border border-[#334155] rounded-lg overflow-hidden cursor-text shadow-inner"
       onClick={() => inputRef.current?.focus()}
     >
       {/* Terminal header */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-surface)] border-b border-[var(--border-dim)] shrink-0">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#111827] border-b border-[#334155] shrink-0">
         <div className="flex items-center gap-1.5">
-          <Terminal size={11} className="text-[var(--cyan)]" />
-          <span className="text-[9px] font-mono text-[var(--text-muted)]">FIX-MCP Terminal</span>
+          <Terminal size={11} className="text-[#67e8f9]" />
+          <span className="text-[10px] font-mono text-[#cbd5e1]">FIX-MCP Terminal</span>
+          <span className="hidden sm:inline text-[10px] text-[#94a3b8]">manual desk commands and evidence checks</span>
         </div>
         <button
           onClick={(e) => {
@@ -980,15 +982,15 @@ export default function FixTerminal() {
             const text = lines.map(l => l.text).join('\n');
             navigator.clipboard.writeText(text);
           }}
-          className="p-1 rounded hover:bg-[var(--bg-hover)]"
+          className="p-1 rounded hover:bg-[#1f2937]"
           title="Copy all output"
         >
-          <Copy size={10} className="text-[var(--text-dim)]" />
+          <Copy size={10} className="text-[#94a3b8]" />
         </button>
       </div>
 
       {/* Terminal output */}
-      <div ref={terminalRef} className="flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-[1.6]">
+      <div ref={terminalRef} className="flex-1 overflow-y-auto p-3 font-mono text-[12px] leading-[1.65]">
         {lines.map((line, i) => (
           <div key={i} className={`${lineColor(line.type)} whitespace-pre-wrap break-words`}>
             {line.text}
@@ -997,29 +999,29 @@ export default function FixTerminal() {
       </div>
 
       {/* Shortcut bar */}
-      <div className="flex items-center gap-1 px-2 py-1 bg-[#030610] border-t border-[var(--border-dim)] overflow-x-auto shrink-0">
+      <div className="flex items-center gap-1 px-2 py-1 bg-[#111827] border-t border-[#334155] overflow-x-auto shrink-0">
         {LOG_SHORTCUTS.slice(0, 4).map((sc, i) => (
           <button key={i} onClick={() => runCommand(sc.cmd)}
-            className="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-mono bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--cyan)] hover:border-[var(--cyan)]/30 transition-colors"
+            className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono bg-[#0f172a] border border-[#334155] text-[#cbd5e1] hover:text-[#67e8f9] hover:border-[#67e8f9]/40 transition-colors"
             title={sc.desc}>
             {sc.label}
           </button>
         ))}
         <button onClick={() => runCommand('shortcuts')}
-          className="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-mono bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--amber)] hover:border-[var(--amber)]/30 transition-colors"
+          className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-mono bg-[#0f172a] border border-[#334155] text-[#cbd5e1] hover:text-[#fbbf24] hover:border-[#fbbf24]/40 transition-colors"
           title="Show all shortcuts">
           More...
         </button>
       </div>
 
       {/* Input line */}
-      <div className="flex items-center px-3 py-2 bg-[#030610] border-t border-[var(--border-dim)] shrink-0">
-        <span className="text-[var(--cyan)] font-mono text-[11px] mr-1 shrink-0 select-none">{cwd === '/opt/fix' ? '' : cwd.split('/').pop() + '/'}</span>
-        <span className="text-[var(--green)] font-mono text-[11px] mr-1.5 shrink-0 select-none">fix-cli&gt;</span>
+      <div className="flex items-center px-3 py-2 bg-[#111827] border-t border-[#334155] shrink-0">
+        <span className="text-[#67e8f9] font-mono text-[12px] mr-1 shrink-0 select-none">{cwd === '/opt/fix' ? '' : cwd.split('/').pop() + '/'}</span>
+        <span className="text-[#86efac] font-mono text-[12px] mr-1.5 shrink-0 select-none">fix-cli&gt;</span>
         <form onSubmit={handleInput} className="flex-1 flex items-center">
           <input
             ref={inputRef}
-            className="flex-1 bg-transparent text-[var(--text-primary)] font-mono text-[11px] outline-none caret-[var(--cyan)]"
+            className="flex-1 bg-transparent text-[#f8fafc] font-mono text-[12px] outline-none caret-[#67e8f9] placeholder:text-[#64748b]"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
