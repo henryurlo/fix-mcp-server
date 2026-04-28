@@ -52,3 +52,25 @@ Each story contains:
 - `outcome`: the executive close
 
 When a new scenario is added under `config/scenarios`, add a matching story entry so it can be previewed and rendered.
+
+## Storyboard Contract
+
+Each scenario demo must walk the viewer through the desk workflow, not merely summarize the incident.
+
+Required beats:
+
+1. **Desk opening** — show scenario time, severity, affected component, open orders, venue/client/regulatory pressure, and the first alert.
+2. **System map** — show the relationship between the operator, LLM copilot, MCP tools, FIX/OMS state, and trace evidence.
+3. **Baseline diagnosis** — walk through the runbook step by step: tool call, evidence returned, narrowed cause, and state impact.
+4. **Human approval gate** — make approval visually explicit. The agent may propose; the human decides.
+5. **Injection branch** — interrupt the baseline path with a controlled stress event and show what changed and what did not.
+6. **Agent Run branch** — show bounded execution of approved steps with visible trace rows, tool names, result badges, and stop/re-triage behavior.
+7. **Executive close** — show before/after state, residual risk, and why the demo proves governed automation rather than autonomous trading.
+
+Acceptance criteria:
+
+- The injection event is visible in the video, not only mentioned in copy.
+- The approval gate is visible before Agent Run.
+- Tool evidence is shown as a trace/workbook surface.
+- The video makes clear that production authority remains with the human.
+- The composition can be rendered for every scenario listed by `npm run video:compositions`.
