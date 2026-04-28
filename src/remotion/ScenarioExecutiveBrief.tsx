@@ -1,6 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { ScenarioStory, defaultStory } from './scenarioStories';
+import capture from '../../docs/demo-captures/bats-startup-real-run.json';
 
 const C = {
   page: '#e9eef3',
@@ -29,16 +30,16 @@ type StepState = 'todo' | 'running' | 'done' | 'hold';
 
 const VIDEO_SCRIPT: Record<Phase, { scene: string; headline: string; voiceover: string; callout: string }> = {
   brief: {
-    scene: '01 / Product',
-    headline: 'FIX-MCP turns a trading incident into a controlled workflow.',
-    voiceover: 'A desk operator loads a live-style FIX incident. The AI can investigate, but production control stays with the human.',
-    callout: 'Open a real desk incident',
+    scene: '01 / Start Here',
+    headline: 'Start in Mission Control and load a desk incident.',
+    voiceover: 'The user begins with a scenario selector, a live desk state, and an agent panel. This is the product surface, not a slide.',
+    callout: 'Select BATS Extended-Hours Startup',
   },
   diagnose: {
-    scene: '02 / Diagnose',
-    headline: 'The agent uses MCP tools to prove the cause.',
-    voiceover: 'Instead of guessing from an alert, the workflow checks sessions, affected orders, and reference data through bounded tools.',
-    callout: 'MCP evidence appears as tools run',
+    scene: '02 / Investigator',
+    headline: 'Launch the agent to inspect the real system state.',
+    voiceover: 'The first useful action is not injection. The agent checks FIX sessions and orders so the user understands the incident.',
+    callout: 'Agent runs check_fix_sessions and query_orders',
   },
   approve: {
     scene: '03 / Human Gate',
@@ -46,22 +47,22 @@ const VIDEO_SCRIPT: Record<Phase, { scene: string; headline: string; voiceover: 
     voiceover: 'The agent proposes the recovery workbook. The operator reviews the evidence and approves the whole plan before execution.',
     callout: 'Human accepts the full workbook',
   },
-  inject: {
-    scene: '04 / Pressure Test',
-    headline: 'A stress injection changes the state.',
-    voiceover: 'Now we inject new pressure. The important behavior is that the plan pauses and re-triages instead of blindly continuing.',
-    callout: 'Inject pressure and force re-triage',
-  },
   agent: {
-    scene: '05 / Agent Run',
-    headline: 'The agent executes only inside the approved boundary.',
-    voiceover: 'After approval, Agent Run completes the simulated recovery steps and records each MCP tool result in the trace.',
-    callout: 'Agent runs inside the approved path',
+    scene: '04 / Agent Run',
+    headline: 'Agent Run executes the approved recovery path.',
+    voiceover: 'After approval, the agent reconnects BATS, resets sequence state, loads ETF symbols, and validates the book.',
+    callout: 'Watch the approved workbook complete',
+  },
+  inject: {
+    scene: '05 / Pressure Test',
+    headline: 'Only after the normal run do we inject pressure.',
+    voiceover: 'The injection is a test. It creates a BATS sequence gap and proves the agent pauses to re-check state before continuing.',
+    callout: 'Inject pressure and force re-triage',
   },
   resolved: {
     scene: '06 / Proof',
     headline: 'The incident closes with evidence, not a claim.',
-    voiceover: 'The final state shows released flow, venue recovery, and an audit trail a human can review.',
+    voiceover: 'The user sees the injected event resolved, simulation resumed, a score report, and the trace that proves every tool call.',
     callout: 'Close with proof, not a claim',
   },
 };
@@ -78,8 +79,8 @@ function phaseAt(frame: number): Phase {
   if (frame < 110) return 'brief';
   if (frame < 270) return 'diagnose';
   if (frame < 410) return 'approve';
-  if (frame < 560) return 'inject';
-  if (frame < 760) return 'agent';
+  if (frame < 590) return 'agent';
+  if (frame < 760) return 'inject';
   return 'resolved';
 }
 
@@ -126,8 +127,8 @@ function stepState(index: number, frame: number): StepState {
   if (frame < 110) return index === 0 ? 'running' : 'todo';
   if (frame < 270) return index <= 1 ? 'done' : index === 2 ? 'running' : 'todo';
   if (frame < 410) return index <= 2 ? 'done' : index === 3 ? 'running' : 'todo';
-  if (frame < 560) return index <= 3 ? 'done' : 'hold';
-  if (frame < 760) return index <= 4 ? 'done' : index === 5 ? 'running' : 'todo';
+  if (frame < 590) return index <= 4 ? 'done' : index === 5 ? 'running' : 'todo';
+  if (frame < 760) return index <= 4 ? 'done' : 'hold';
   return 'done';
 }
 
@@ -144,8 +145,8 @@ function focus(frame: number) {
     brief: { x: 0, y: 0, scale: 1 },
     diagnose: { x: 0, y: 0, scale: 1.012 },
     approve: { x: 0, y: 0, scale: 1.012 },
-    inject: { x: 0, y: 0, scale: 1.012 },
     agent: { x: 0, y: -8, scale: 1.012 },
+    inject: { x: 0, y: 0, scale: 1.012 },
     resolved: { x: 0, y: 0, scale: 1 },
   }[phase];
   const ease = spring({ frame, fps: 30, config: { damping: 190, stiffness: 80, mass: 0.7 } });
@@ -154,8 +155,22 @@ function focus(frame: number) {
   };
 }
 
+function captureStep(tool: string, occurrence = 0) {
+  const matches = capture.steps.filter((step) => step.tool === tool);
+  return matches[occurrence] || matches[0] || capture.steps[0];
+}
+
+function evidenceForPhase(phase: Phase) {
+  if (phase === 'brief') return captureStep('list_scenarios');
+  if (phase === 'diagnose') return captureStep('query_orders');
+  if (phase === 'approve') return captureStep('validate_orders');
+  if (phase === 'agent') return captureStep('fix_session_issue', 0);
+  if (phase === 'inject') return captureStep('inject_event');
+  return captureStep('score_scenario');
+}
+
 function metricSet(story: ScenarioStory, phase: Phase) {
-  if (phase === 'resolved') {
+  if (phase === 'agent' || phase === 'resolved') {
     return [
       { label: 'Released', value: '14', tone: 'good' as const },
       { label: 'Venue', value: 'up', tone: 'good' as const },
@@ -251,7 +266,8 @@ function Workbook({ story, frame }: { story: ScenarioStory; frame: number }) {
 }
 
 function Workspace({ story, phase, frame }: { story: ScenarioStory; phase: Phase; frame: number }) {
-  const injected = phase === 'inject' || phase === 'agent' || phase === 'resolved';
+  const injected = phase === 'inject' || phase === 'resolved';
+  const evidence = evidenceForPhase(phase);
   const mode =
     phase === 'resolved' ? 'Closed' :
     phase === 'agent' ? 'Agent Run' :
@@ -274,7 +290,7 @@ function Workspace({ story, phase, frame }: { story: ScenarioStory; phase: Phase
         <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, background: '#f8fafc', padding: 16 }}>
           <div style={{ color: C.muted, fontSize: 12, fontWeight: 950, textTransform: 'uppercase' }}>Desk state</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 12 }}>
-            <Metric label="Target" value={phase === 'resolved' ? 'BATS up' : 'BATS / BZX_GW'} color={phase === 'resolved' ? C.green : C.red} />
+            <Metric label="Target" value={phase === 'agent' || phase === 'resolved' ? 'BATS up' : 'BATS / BZX_GW'} color={phase === 'agent' || phase === 'resolved' ? C.green : C.red} />
             <Metric label="Mode" value={mode} color={phase === 'resolved' || phase === 'agent' ? C.green : C.blue} />
             <Metric label="Trace" value={phase === 'brief' ? 'Pending' : 'Live'} color={phase === 'brief' ? C.muted : C.green} />
             <Metric label="Owner" value="Human" color={C.green} />
@@ -296,14 +312,14 @@ function Workspace({ story, phase, frame }: { story: ScenarioStory; phase: Phase
             {phase === 'brief' && 'Load the incident. Show the live desk.'}
             {phase === 'diagnose' && 'Start with facts, not guesses.'}
             {phase === 'approve' && 'One approval unlocks the workbook.'}
-            {phase === 'inject' && 'New pressure means new triage.'}
             {phase === 'agent' && 'Run only what was approved.'}
+            {phase === 'inject' && 'New pressure means new triage.'}
             {phase === 'resolved' && 'Proof is ready.'}
           </div>
-          <div style={{ marginTop: 22, display: 'grid', gap: 8 }}>
-            {['bounded tools', 'human control', 'auditable trace'].map((item, i) => (
-              <div key={item} style={{ opacity: fade(frame, 40 + i * 18), border: '1px solid #34445d', borderRadius: 6, padding: '10px 11px', fontSize: 13, fontWeight: 900, color: '#cbd5e1' }}>{item}</div>
-            ))}
+          <div style={{ marginTop: 18, border: '1px solid #34445d', borderRadius: 7, padding: 12 }}>
+            <div style={{ color: '#67e8f9', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 950 }}>{evidence.tool}</div>
+            <div style={{ color: '#e2e8f0', fontSize: 14, lineHeight: 1.28, fontWeight: 850, marginTop: 7 }}>{evidence.summary}</div>
+            <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.3, fontWeight: 800, marginTop: 8 }}>{evidence.note}</div>
           </div>
         </div>
       </div>
@@ -313,13 +329,18 @@ function Workspace({ story, phase, frame }: { story: ScenarioStory; phase: Phase
 
 function Trace({ phase, frame }: { phase: Phase; frame: number }) {
   const rows = [
-    ['check_fix_sessions', 'sequence mismatch found', 'ok'],
-    ['query_orders', '14 orders blocked', 'ok'],
-    ['load_ticker', 'ETF symbols loaded', 'ok'],
-    ['inject_event', 'reject spike recorded', phase === 'inject' ? 'hold' : 'ok'],
-    ['score_scenario', 'evidence complete', phase === 'resolved' ? 'ok' : 'wait'],
+    ['list_scenarios', captureStep('list_scenarios').summary, 'ok'],
+    ['check_fix_sessions', 'BATS down; expected 2450, got 2449', 'ok'],
+    ['query_orders', captureStep('query_orders').summary, 'ok'],
+    ['approve_workbook', 'human approved full workbook', phase === 'approve' ? 'hold' : 'ok'],
+    ['fix_session_issue', 'BATS reconnect released 8 stuck orders', 'ok'],
+    ['load_ticker', 'BITO and GBTC loaded; 2 orders released', 'ok'],
+    ['validate_orders', '14 PASS, 0 FAIL', 'ok'],
+    ['inject_event', captureStep('inject_event').summary, phase === 'inject' ? 'hold' : 'ok'],
+    ['resume_simulation', captureStep('resume_simulation').summary, phase === 'resolved' ? 'ok' : 'wait'],
+    ['score_scenario', 'Overall Score: 1.00 (A)', phase === 'resolved' ? 'ok' : 'wait'],
   ];
-  const count = phase === 'brief' ? 1 : phase === 'diagnose' ? 3 : phase === 'approve' ? 3 : phase === 'inject' ? 4 : 5;
+  const count = phase === 'brief' ? 1 : phase === 'diagnose' ? 3 : phase === 'approve' ? 4 : phase === 'agent' ? 7 : phase === 'inject' ? 8 : 10;
   return (
     <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, overflow: 'hidden' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr 110px', padding: '10px 14px', background: '#eef3f7', color: C.muted, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>
@@ -345,8 +366,8 @@ function Callout({ phase, frame }: { phase: Phase; frame: number }) {
     brief: { text: VIDEO_SCRIPT.brief.callout, left: 620, top: 116, color: C.blue },
     diagnose: { text: VIDEO_SCRIPT.diagnose.callout, left: 560, top: 448, color: C.blue },
     approve: { text: VIDEO_SCRIPT.approve.callout, left: 560, top: 360, color: C.green },
-    inject: { text: VIDEO_SCRIPT.inject.callout, left: 1080, top: 432, color: C.amber },
     agent: { text: VIDEO_SCRIPT.agent.callout, left: 1120, top: 610, color: C.green },
+    inject: { text: VIDEO_SCRIPT.inject.callout, left: 1080, top: 432, color: C.amber },
     resolved: { text: VIDEO_SCRIPT.resolved.callout, left: 1250, top: 760, color: C.green },
   }[phase];
   return (
@@ -397,8 +418,8 @@ function Cursor({ phase, frame }: { phase: Phase; frame: number }) {
     brief: [1456, 32],
     diagnose: [250, 300],
     approve: [690, 470],
-    inject: [1742, 32],
     agent: [1840, 32],
+    inject: [1742, 32],
     resolved: [1510, 842],
   }[phase];
   const pulse = interpolate(Math.sin(frame / 6), [-1, 1], [0.85, 1.18]);
@@ -441,14 +462,14 @@ function Progress({ phase, frame }: { phase: Phase; frame: number }) {
     brief: 'Load',
     diagnose: 'Diagnose',
     approve: 'Approve',
-    inject: 'Inject',
     agent: 'Agent Run',
+    inject: 'Inject',
     resolved: 'Resolve',
   }[phase];
   return (
     <div style={{ position: 'absolute', left: 42, right: 42, bottom: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', color: C.muted, fontSize: 12, fontWeight: 950, marginBottom: 8 }}>
-        {['Load', 'Diagnose', 'Approve', 'Inject', 'Agent Run', 'Resolve'].map((label) => (
+        {['Load', 'Diagnose', 'Approve', 'Agent Run', 'Inject', 'Resolve'].map((label) => (
           <div key={label} style={{ color: activeLabel === label ? C.blue : C.muted }}>{label}</div>
         ))}
       </div>

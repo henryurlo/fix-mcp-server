@@ -44,7 +44,17 @@ The product-video script for the BATS walkthrough lives in:
 
 `docs/video-scripts/bats-startup-product-demo.md`
 
-The Remotion composition follows that script directly: each phase has a scene label, a voiceover line, a visual callout, and a required platform action.
+The real MCP capture for that walkthrough lives in:
+
+`docs/demo-captures/bats-startup-real-run.json`
+
+Regenerate it with:
+
+```bash
+.venv/bin/python scripts/capture_demo_run.py
+```
+
+The Remotion composition follows the script and capture directly: each phase has a scene label, a voiceover line, a visual callout, a required platform action, and captured tool evidence.
 
 Each story contains:
 

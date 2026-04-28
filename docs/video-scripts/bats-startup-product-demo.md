@@ -23,9 +23,9 @@ The product is not “AI trades for you.” The product is governed incident res
 1. Present the product and the incident.
 2. Diagnose with MCP tools.
 3. Approve the workbook.
-4. Inject pressure to prove the system can re-triage.
-5. Run the agent inside the approved boundary.
-6. Close with evidence.
+4. Run the agent inside the approved boundary.
+5. Inject pressure to prove the system can re-triage.
+6. Re-check, recover, resume, and close with evidence.
 
 ## Timed Script
 
@@ -33,12 +33,26 @@ The product is not “AI trades for you.” The product is governed incident res
 | --- | --- | --- | --- |
 | 0:00-0:04 | Product intro | “FIX-MCP is AI incident response for a trading desk.” | Show the platform behind a short title card. |
 | 0:04-0:09 | Product model | “MCP tools gather evidence. An LLM builds the workbook. A human approves the plan before Agent Run executes.” | Reveal the live incident console. |
-| 0:09-0:14 | Load incident | “A desk operator loads a live-style FIX incident. The AI can investigate, but production control stays with the human.” | Show BATS logon rejected, blocked orders, venue state, and owner. |
-| 0:14-0:23 | Diagnose | “Instead of guessing from an alert, the workflow checks sessions, affected orders, and reference data through bounded tools.” | Workbook steps advance; trace rows appear. |
+| 0:09-0:14 | Load incident | “The user begins in Mission Control by selecting BATS Extended-Hours Startup.” | Show scenario selector, BATS logon rejected, blocked orders, venue state, and owner. |
+| 0:14-0:23 | Diagnose | “The first action is to launch the agent/investigator, not inject pressure. It checks sessions and orders through MCP.” | Workbook steps advance; real trace rows appear from the captured run. |
 | 0:23-0:30 | Approval gate | “The agent proposes the recovery workbook. The operator reviews the evidence and approves the whole plan before execution.” | Show the approval modal and the human gate. |
-| 0:30-0:39 | Stress injection | “Now we inject new pressure. The important behavior is that the plan pauses and re-triages instead of blindly continuing.” | Highlight Inject Stress, show reject spike, mark later steps as paused. |
-| 0:39-0:51 | Agent Run | “After approval, Agent Run completes the simulated recovery steps and records each MCP tool result in the trace.” | Highlight Agent Run, show completed workbook and trace evidence. |
-| 0:51-1:00 | Proof close | “The final state shows released flow, venue recovery, and an audit trail a human can review.” | Show released orders, BATS up, evidence ready, and the final proof card. |
+| 0:30-0:39 | Agent Run | “After approval, Agent Run reconnects BATS, resets sequence state, loads BITO and GBTC, and validates 14 orders.” | Highlight Agent Run, show completed workbook and trace evidence. |
+| 0:39-0:51 | Stress injection | “Only after the normal run do we inject a BATS sequence gap to prove the system pauses and re-triages.” | Highlight Inject Stress, show `EVENT INJECTED: seq_gap`, mark the plan paused. |
+| 0:51-1:00 | Proof close | “The agent re-checks BATS, resolves the injected sequence gap, resumes simulation, and closes with score plus trace.” | Show resumed simulation, score report, BATS up, evidence ready, and the final proof card. |
+
+## Captured Evidence
+
+The current Remotion video is backed by a real local MCP run captured at:
+
+`docs/demo-captures/bats-startup-real-run.json`
+
+Regenerate it with:
+
+```bash
+.venv/bin/python scripts/capture_demo_run.py
+```
+
+The capture includes scenario load, session diagnosis, order query, BATS reconnect, sequence reset, BITO/GBTC ticker loads, order validation, sequence-gap injection, re-check, recovery, resume, score report, and trace.
 
 ## Production Notes
 
@@ -46,7 +60,8 @@ The product is not “AI trades for you.” The product is governed incident res
 - Use one spoken idea per scene.
 - Use short callouts to direct the eye, not to explain the whole product.
 - Approval must be visible before Agent Run.
-- Injection must visibly interrupt the plan.
+- Injection must happen after the normal Agent Run path is clear.
+- Injection must visibly interrupt the plan and trigger re-triage.
 - The ending must prove outcome: recovered state plus trace evidence.
 
 ## Current Render
