@@ -18,7 +18,7 @@ The story is simple: BATS rejects Logon after a maintenance reset, overnight GTC
 | 0:27-0:40 | Show workbook steps, then approve workbook. | "The agent proposes a workbook. The human approves the whole recovery plan before any state-changing command runs." |
 | 0:40-0:53 | Agent Run executes. Steps flip complete. Progress reaches resolved. | "Now the approved runbook executes: reconnect BATS, reset sequence if needed, load the missing ETF symbols, and verify the orders are released." |
 | 0:53-1:03 | Open Trace tab. Tool inputs and outputs are visible. | "Every tool call leaves evidence: inputs, outputs, FIX context, and the manual command equivalent." |
-| 1:03-1:12 | Open Stress Lab and inject a controlled reject spike. | "Only after the baseline incident is understood, the operator injects pressure to test resilience and watch the agent re-triage." |
+| 1:03-1:12 | Run Stress Test with a controlled reject spike. | "Only after the baseline incident is understood, the operator injects pressure to test resilience and watch the agent re-triage." |
 | 1:12-1:15 | Final frame: README/GitHub URL and contact. | "FIX-MCP is open source. Built for trading desks that need AI with controls, not magic." |
 
 ## Recording Notes
@@ -27,7 +27,7 @@ The story is simple: BATS rejects Logon after a maintenance reset, overnight GTC
 - Keep captions on.
 - Keep the copilot panel visible when the agent is working.
 - Do not show every scenario. The scenario catalog is a supporting screen, not the story.
-- Do not spend time explaining Stress Lab before the baseline recovery.
+- Do not spend time explaining Stress Test controls before the baseline recovery.
 - Use Trace as the proof moment.
 
 ## Voice Direction

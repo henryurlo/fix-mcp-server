@@ -191,7 +191,7 @@ export default function Home() {
               <button onClick={stressTestCurrentScenario} disabled={!canInjectFromHeader}
                 title={canInjectFromHeader ? 'Inject a controlled event into the active scenario.' : 'Finish the baseline workbook before injecting a stress event.'}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--amber-dim)]/40 text-[var(--amber)] border border-[var(--amber)]/30 text-[13px] font-semibold hover:bg-[var(--amber-dim)] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                <FlaskConical size={12} /> Inject Event
+                <FlaskConical size={12} /> Stress Test
               </button>
               <button onClick={handleReset}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--red-dim)]/40 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-all">
@@ -553,7 +553,7 @@ function MissionControlTab({
                   {[
                     ['1', 'Load incident', 'Choose any category from the catalog below.'],
                     ['2', 'Investigator', 'Ask the LLM to summarize impact and first action.'],
-                    ['3', 'Approve workbook', 'Run the full recovery plan through bounded MCP tools.'],
+                    ['3', 'Approve & run workbook', 'Execute the full bounded recovery plan with visible MCP output.'],
                     ['4', 'Stress test', 'Inject pressure only after the baseline incident is understood.'],
                   ].map(([n, title, desc]) => (
                     <div key={n} className="flex gap-3 border-t border-[var(--border-dim)] py-2 first:border-t-0 first:pt-0">
@@ -613,93 +613,78 @@ function MissionControlTab({
     <div className="h-full flex flex-col bg-[var(--bg-void)]">
       {/* ── Compact Hero ── */}
       <div className="border-b border-[var(--border-dim)] bg-[var(--bg-base)] px-4 py-3">
-        <div className="grid items-start gap-3 xl:grid-cols-[1.45fr_0.95fr]">
-          <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="rounded border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-0.5 text-[10px] font-mono text-[var(--cyan)]">ACTIVE INCIDENT</span>
-              <span className="rounded border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{scenario}</span>
-              <span className="rounded border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{activeScenario?.simulated_time || '—'}</span>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <h1 className="text-[22px] leading-tight font-bold text-[var(--text-primary)]">{activeTitle}</h1>
-                <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-[var(--text-secondary)]">
-                  {activeScenario?.description || activeScenario?.runbook?.narrative || 'Live trading operations incident loaded.'}
-                </p>
-              </div>
-              <div className="hidden xl:flex flex-col gap-1.5 min-w-[160px]">
-                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Lens</div>
-                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">{activeScenario?.categories?.join(' · ') || 'ops incident'}</div>
-                </div>
-                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Guided by</div>
-                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">Copilot + MCP tools</div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Notional pressure</div>
-                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{open_count}</div>
-                <div className="text-[11px] text-[var(--text-muted)]">open orders at risk</div>
-              </div>
-              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Venue health</div>
-                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{downCount + degradedCount}</div>
-                <div className="text-[11px] text-[var(--text-muted)]">{downCount} down · {degradedCount} degraded</div>
-              </div>
-              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Runbook</div>
-                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{totalSteps}</div>
-                <div className="text-[11px] text-[var(--text-muted)]">recovery steps</div>
-              </div>
-              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Progress</div>
-                <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{progressPct}%</div>
-                <div className="text-[11px] text-[var(--text-muted)]">{doneCount}/{totalSteps} done</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Desk Workflow</div>
-                <div className="text-[16px] font-bold text-[var(--text-primary)]">Baseline first. Pressure test second.</div>
-              </div>
-              <button onClick={onOpenScenarioBuilder} className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
-                Create / Load
-              </button>
-            </div>
-            <div className="mt-3 grid gap-2 lg:grid-cols-3">
-              {[
-                ['1', 'Investigate', 'Ask Copilot what broke, then read the MCP evidence.', 'cyan'],
-                ['2', 'Approve + run', 'Approve the workbook and execute the baseline recovery.', 'green'],
-                ['3', 'Stress lab', 'Inject pressure only after the baseline path is understood.', 'amber'],
-              ].map(([step, title, desc, tone]) => (
-                <div key={step} className={`rounded-md border bg-[var(--bg-surface)] p-2.5 ${tone === 'cyan' ? 'border-[var(--cyan)]/25' : tone === 'green' ? 'border-[var(--green)]/25' : 'border-[var(--amber)]/25'}`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`flex h-5 w-5 items-center justify-center rounded text-[11px] font-bold ${tone === 'cyan' ? 'bg-[var(--cyan-dim)] text-[var(--cyan)]' : tone === 'green' ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'bg-[var(--amber-dim)] text-[var(--amber)]'}`}>{step}</span>
-                    <span className="text-[13px] font-bold text-[var(--text-primary)]">{title}</span>
+        <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-4 shadow-sm">
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="min-w-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="rounded border border-[var(--cyan)]/30 bg-[var(--cyan-dim)] px-2 py-0.5 text-[10px] font-mono text-[var(--cyan)]">ACTIVE INCIDENT</span>
+                    <span className="rounded border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{scenario}</span>
+                    <span className="rounded border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{activeScenario?.simulated_time || '—'}</span>
+                    <span className="rounded border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] font-mono text-[var(--text-dim)]">{activeScenario?.categories?.join(' · ') || 'ops incident'}</span>
                   </div>
-                  <div className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-secondary)]">{desc}</div>
+                  <h1 className="text-[22px] leading-tight font-bold text-[var(--text-primary)]">{activeTitle}</h1>
+                  <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-[var(--text-secondary)]">
+                    {activeScenario?.description || activeScenario?.runbook?.narrative || 'Live trading operations incident loaded.'}
+                  </p>
                 </div>
-              ))}
-            </div>
-            <div className="mt-3 rounded-md border border-[var(--cyan)]/25 bg-[var(--cyan-dim)]/10 p-2.5">
-              <div className="text-[11px] uppercase tracking-wide text-[var(--cyan)] font-bold">Current first move</div>
-              <div className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">{activeScenario?.hints?.diagnosis_path || 'Use the copilot to summarize the blast radius, then follow the runbook.'}</div>
-            </div>
-            <div className="mt-2 rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Resolution board</div>
-                  <div className="text-[12px] text-[var(--text-secondary)] mt-0.5">See finished steps with MCP output and mapped FIX/manual commands.</div>
+                <button onClick={onOpenScenarioBuilder} className="hidden md:inline-flex rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                  Change incident
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Notional pressure</div>
+                  <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{open_count}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">open orders at risk</div>
                 </div>
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Venue health</div>
+                  <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{downCount + degradedCount}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">{downCount} down · {degradedCount} degraded</div>
+                </div>
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Runbook</div>
+                  <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{totalSteps}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">recovery steps</div>
+                </div>
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">Progress</div>
+                  <div className="mt-0.5 text-[18px] font-bold text-[var(--text-primary)]">{progressPct}%</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">{doneCount}/{totalSteps} done</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] p-3">
+              <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Operator plan</div>
+              <div className="mt-2 space-y-2">
+                {[
+                  { n: '1', title: 'Investigate', desc: doneCount > 0 ? 'Evidence captured' : 'Ask Copilot to identify impact, cause, and first action.', complete: doneCount > 0 },
+                  { n: '2', title: 'Approve & run workbook', desc: allDone ? 'Workbook executed' : 'Approve the full bounded recovery path before execution.', complete: allDone },
+                  { n: '3', title: 'Prove in Trace', desc: showEvidenceBoard ? 'Evidence board visible' : 'Open Trace or Evidence before discussing outcome.', complete: showEvidenceBoard },
+                  { n: '4', title: 'Stress test', desc: allDone ? 'Ready for controlled injection' : 'Locked until baseline recovery is complete.', complete: allDone },
+                ].map(({ n, title, desc, complete }) => (
+                  <div key={n} className="flex gap-2 rounded-md border border-[var(--border-dim)] bg-[var(--bg-base)] p-2">
+                    <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold ${complete ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'bg-[var(--cyan-dim)] text-[var(--cyan)]'}`}>
+                      {complete ? <CheckCircle2 size={12} /> : n}
+                    </span>
+                    <div>
+                      <div className="text-[12px] font-bold text-[var(--text-primary)]">{title}</div>
+                      <div className="text-[11px] leading-snug text-[var(--text-muted)]">{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => setBottomTab('trace')}
+                  className="flex-1 rounded-md border border-[var(--border-dim)] bg-[var(--bg-base)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                  Open Trace
+                </button>
                 <button onClick={() => setShowEvidenceBoard(v => !v)}
-                  className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
-                  {showEvidenceBoard ? 'Hide' : 'Show'} Evidence
+                  className="flex-1 rounded-md border border-[var(--border-dim)] bg-[var(--bg-base)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
+                  {showEvidenceBoard ? 'Hide' : 'Show'} Proof
                 </button>
               </div>
             </div>
@@ -772,7 +757,7 @@ function MissionControlTab({
             <div className="relative group">
               <button onClick={() => { setTrainingInitialTab('time'); setShowTraining(!showTraining); }}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-semibold transition-all ${showTraining ? 'bg-[var(--green-dim)] text-[var(--green)] border border-[var(--green)]/30' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-                <GraduationCap size={13} /> Stress Lab
+                <GraduationCap size={13} /> Stress Test
               </button>
               <div className="pointer-events-none invisible group-hover:visible absolute right-0 top-full mt-2 z-50 w-64 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-bright)] shadow-2xl">
                 <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Opens controlled stress testing: inject a venue outage, reject spike, LULD halt, sequence gap, or SLA breach after the operator understands the base incident.</p>
@@ -967,7 +952,7 @@ function MissionControlTab({
               <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[340px]'}`}>
                 <div className="px-3 py-2.5 border-b border-[var(--border-dim)]">
                   <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Operator Rail</div>
-                  <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">{showTraining ? 'Stress Lab Controls' : 'Next best action'}</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">{showTraining ? 'Stress Test Controls' : 'Next best action'}</div>
                   <LiveTelemetryStrip />
                 </div>
                 <div className="p-2.5 space-y-2 border-b border-[var(--border-dim)]">
@@ -978,15 +963,15 @@ function MissionControlTab({
                   </button>
                   <button onClick={() => runWorkbook('advisor')} disabled={heroAction !== null || totalSteps === 0}
                     className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20 disabled:opacity-50">
-                    {heroAction === 'workbook' ? <Loader2 size={12} className="animate-spin" /> : <BookOpenCheck size={12} />} Approve Workbook
+                    {heroAction === 'workbook' ? <Loader2 size={12} className="animate-spin" /> : <BookOpenCheck size={12} />} Approve & Run
                   </button>
                   <button onClick={startAgentRun} disabled={heroAction !== null || totalSteps === 0}
                     className="w-full rounded-lg border border-[var(--purple)]/40 bg-[var(--purple-dim)]/10 text-[var(--purple)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--purple-dim)]/20 disabled:opacity-50">
-                    {heroAction === 'agent-run' ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Agent Run
+                    {heroAction === 'agent-run' ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Agent Run: Approved Steps
                   </button>
                   <div className="pt-2 mt-2 border-t border-[var(--border-dim)]">
                     <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--amber)]">Stress lab</div>
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--amber)]">Stress test</div>
                       <div className="text-[10px] text-[var(--text-dim)]">{allDone ? 'Ready' : 'after baseline'}</div>
                     </div>
                     <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">Use this only to prove resilience after the base incident is understood or resolved.</p>
@@ -994,11 +979,11 @@ function MissionControlTab({
                   <button onClick={startGuidedStress} disabled={heroAction !== null || !allDone}
                     title={allDone ? 'Inject a controlled event and ask Copilot to re-triage.' : 'Finish the baseline workbook before injecting stress.'}
                     className="w-full rounded-lg border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50 disabled:cursor-not-allowed">
-                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Inject Event
+                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Run Stress Test
                   </button>
                   <button onClick={() => { setTrainingInitialTab('inject'); setShowTraining(true); }}
                     className="w-full rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:border-[var(--amber)]/40 hover:text-[var(--amber)]">
-                    <GraduationCap size={12} /> Open Stress Lab
+                    <GraduationCap size={12} /> Configure Stress Test
                   </button>
                 </div>
 
@@ -1019,9 +1004,9 @@ function MissionControlTab({
                         </div>
                         <ol className="mt-3 space-y-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
                           <li><b className="text-[var(--text-primary)]">1.</b> Read the case brief and run Investigator.</li>
-                          <li><b className="text-[var(--text-primary)]">2.</b> Approve Workbook to execute the complete MCP plan.</li>
+                          <li><b className="text-[var(--text-primary)]">2.</b> Use Approve & Run for the human-approved workbook path.</li>
                           <li><b className="text-[var(--text-primary)]">3.</b> Open Trace to prove every tool call and output.</li>
-                          <li><b className="text-[var(--text-primary)]">4.</b> Use Inject Event from Stress Lab only after the baseline case is clear.</li>
+                          <li><b className="text-[var(--text-primary)]">4.</b> Run Stress Test only after the baseline case is clear.</li>
                         </ol>
                       </div>
                       <button

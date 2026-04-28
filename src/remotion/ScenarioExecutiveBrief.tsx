@@ -50,37 +50,37 @@ const scenarioScript: Record<Phase, {
   command: string;
 }> = {
   open: {
-    label: '00 / What you will do',
-    title: 'Use FIX-MCP to solve one desk incident.',
-    operator: 'You will load a scenario, ask the agent to investigate, approve the workbook, run recovery, inject pressure, and verify proof.',
-    agent: 'I will explain each click and show the MCP evidence behind the agent response.',
-    decision: 'This is a walkthrough, not a pitch.',
-    proof: 'Every major step stays visible on the platform.',
-    command: 'walkthrough_start',
+    label: '00 / Scenario goal',
+    title: 'Recover a failed BATS startup.',
+    operator: 'The desk must restore BATS after a rejected Logon, protect overnight GTC flow, and prove the recovery with MCP evidence.',
+    agent: 'I will investigate first, propose a bounded workbook, wait for approval, then execute only the approved recovery.',
+    decision: 'One concrete desk problem, start to finish.',
+    proof: 'The capture is backed by a real local MCP run.',
+    command: 'bats_startup_walkthrough',
   },
   start: {
-    label: '01 / Open the app',
-    title: 'Start on Mission Control.',
-    operator: 'Use this screen when you want to run or demonstrate an incident workflow.',
-    agent: 'Mission Control keeps the incident, workbook, agent conversation, and trace in one view.',
-    decision: 'The user should know where to begin.',
-    proof: 'The navigation highlights Mission Control.',
-    command: 'open Mission Control',
+    label: '01 / Operator view',
+    title: 'Start from the incident console.',
+    operator: 'Mission Control shows the active case, recovery workbook, agent conversation, and trace evidence in one workspace.',
+    agent: 'I have no recovery authority yet. I can only read state and explain what I find.',
+    decision: 'Start with the operational surface.',
+    proof: 'The console exposes case state before action.',
+    command: 'open incident console',
   },
   select: {
-    label: '02 / Choose scenario',
-    title: 'Select BATS Extended-Hours Startup.',
-    operator: 'Open the scenario selector and choose the easiest case: BATS Extended-Hours Startup.',
-    agent: 'Scenario loaded. BATS rejected logon and 14 orders are blocked.',
-    decision: 'Pick the smallest complete scenario first.',
+    label: '02 / Load case',
+    title: 'Load BATS Extended-Hours Startup.',
+    operator: 'Select bats_startup_0200, the overnight case where BATS rejects session recovery before the 04:00 ET flow begins.',
+    agent: 'Scenario loaded. BATS is down, 8 venue orders are stuck, 6 more orders remain in scope, and IEX is healthy.',
+    decision: 'Pick the smallest complete recovery story.',
     proof: 'The simulator loads bats_startup_0200.',
     command: 'load_scenario bats_startup_0200',
   },
   read: {
     label: '03 / Read the board',
     title: 'Read the incident before clicking anything.',
-    operator: 'Check severity, time, affected venue, order count, mode, and control owner.',
-    agent: 'The first visible facts are BATS down, 14 blocked orders, and human control.',
+    operator: 'Check time, affected venue, order scope, fallback venue, and who controls execution.',
+    agent: 'The important facts are BATS down, sequence recovery needed, 14 orders in scope, and human control.',
     decision: 'The user understands the problem before asking the agent to act.',
     proof: 'Desk state is visible before recovery starts.',
     command: 'review desk state',
@@ -88,8 +88,8 @@ const scenarioScript: Record<Phase, {
   launch: {
     label: '04 / Launch agent',
     title: 'Ask the agent to investigate.',
-    operator: 'Click the agent action and ask: what broke, what matters first, and what should I approve?',
-    agent: 'I will use MCP tools to check sessions and orders instead of guessing from the alert.',
+    operator: 'Ask what broke, what matters first, and what evidence should be trusted before approval.',
+    agent: 'I will call MCP tools to check sessions and affected orders instead of guessing from the alert text.',
     decision: 'The agent investigates; it does not execute recovery yet.',
     proof: 'MCP tool calls begin in the trace.',
     command: 'launch_agent investigator',
@@ -97,8 +97,8 @@ const scenarioScript: Record<Phase, {
   inspect: {
     label: '05 / Inspect evidence',
     title: 'Read the MCP evidence.',
-    operator: 'Confirm the agent found a BATS sequence mismatch and quantified the blocked orders.',
-    agent: 'BATS expected sequence 2450 but received 2449. The order query found 14 affected orders.',
+    operator: 'Confirm the agent found the BATS sequence mismatch and quantified the orders before any recovery action.',
+    agent: 'BATS expected sequence 2450 but received 2449. The order query found 14 orders in scope.',
     decision: 'Evidence comes before the workbook approval.',
     proof: 'check_fix_sessions and query_orders are captured.',
     command: 'check_fix_sessions + query_orders',
@@ -106,16 +106,16 @@ const scenarioScript: Record<Phase, {
   plan: {
     label: '06 / Review plan',
     title: 'Review the generated workbook.',
-    operator: 'Read the five proposed actions: check, quantify, reconnect, load symbols, validate.',
-    agent: 'This workbook is the contract. I can only run what the human approves.',
+    operator: 'Read the five proposed actions: verify state, quantify flow, reconnect BATS, load missing ETF symbols, validate orders.',
+    agent: 'This workbook is the contract. I can run only the steps the human approves.',
     decision: 'No hidden action should be approved.',
     proof: 'Every recovery action is listed before Agent Run.',
     command: 'review workbook',
   },
   approve: {
     label: '07 / Approve',
-    title: 'Approve the workbook as one package.',
-    operator: 'Click Approve all only after the evidence and recovery steps make sense.',
+    title: 'Approve the bounded recovery path.',
+    operator: 'Approve all five steps only after the evidence and recovery sequence make sense.',
     agent: 'I will reconnect BATS, reset sequence if needed, load missing symbols, then validate orders.',
     decision: 'Human approval unlocks execution.',
     proof: 'The workbook is explicit before Agent Run.',
@@ -124,8 +124,8 @@ const scenarioScript: Record<Phase, {
   run: {
     label: '08 / Agent Run',
     title: 'Run the approved workbook.',
-    operator: 'Click Agent Run and watch the workbook complete.',
-    agent: 'BATS reconnected. Sequence reset accepted. BITO and GBTC loaded. 14 orders validated.',
+    operator: 'Click Agent Run and watch each approved step write evidence back to the trace.',
+    agent: 'BATS reconnected. Sequence reset accepted. BITO and GBTC loaded. Fourteen orders validated.',
     decision: 'The agent stays inside the approved boundary.',
     proof: 'Each step writes MCP evidence to the trace.',
     command: 'fix_session_issue + load_ticker + validate_orders',
@@ -133,25 +133,25 @@ const scenarioScript: Record<Phase, {
   trace: {
     label: '09 / Trace',
     title: 'Open the trace to audit what happened.',
-    operator: 'Use the trace panel to prove which MCP tools ran and what each tool returned.',
+    operator: 'Use the trace panel to prove which MCP tools ran, with arguments, result summaries, and status.',
     agent: 'The trace shows reconnect, sequence reset, symbol load, and order validation output.',
     decision: 'The audit trail is part of the product, not an afterthought.',
     proof: 'Captured MCP rows are visible.',
     command: 'open Trace',
   },
   inject: {
-    label: '10 / Inject',
-    title: 'Inject pressure after the normal path is clear.',
-    operator: 'Click Inject Event and choose a BATS sequence gap.',
-    agent: 'New sequence gap detected. I paused the simulation and returned to triage.',
-    decision: 'Pressure tests the recovery loop.',
-    proof: 'The injected event is captured as a trace row.',
+    label: '10 / Stress test',
+    title: 'Inject pressure after baseline recovery.',
+    operator: 'Now inject a BATS sequence gap. This is a controlled test, not part of the original incident.',
+    agent: 'New sequence gap detected. I paused the simulation and returned to triage instead of continuing blindly.',
+    decision: 'Stress tests must restart diagnosis.',
+    proof: 'The injected event is captured as a trace row and changes mode.',
     command: 'inject_event seq_gap',
   },
   pause: {
-    label: '11 / Pause',
+    label: '11 / Re-triage',
     title: 'Confirm the agent pauses and re-checks.',
-    operator: 'Do not continue blindly. Confirm the system changed mode to paused and re-triage.',
+    operator: 'Confirm the system changed mode to paused/re-triage before letting any recovery continue.',
     agent: 'The injected sequence gap changed state. I need to check BATS again before continuing.',
     decision: 'This is the human-control moment.',
     proof: 'The injected event is visible before recovery resumes.',
@@ -160,7 +160,7 @@ const scenarioScript: Record<Phase, {
   recover: {
     label: '12 / Recover',
     title: 'Repair and resume.',
-    operator: 'Let the agent reset the BATS sequence and resume the simulation.',
+    operator: 'Approve the repair for the injected state, then resume the simulation.',
     agent: 'BATS sequence is repaired. Simulation resumed. The injected event is recovered.',
     decision: 'The system does not blindly continue after state changes.',
     proof: 'Recovery, resume, and score are all recorded.',
@@ -169,16 +169,16 @@ const scenarioScript: Record<Phase, {
   verify: {
     label: '13 / Verify',
     title: 'Verify the outcome.',
-    operator: 'Check BATS status, released orders, workbook completion, and score.',
+    operator: 'Check BATS status, released orders, workbook completion, score, and trace history.',
     agent: 'BATS is up, 14 orders are released, the workbook is complete, and the score is 1.00.',
     decision: 'A good demo ends with operational proof.',
     proof: 'Score and trace confirm recovery.',
     command: 'score_scenario',
   },
   close: {
-    label: '14 / Repeat',
-    title: 'Repeat this pattern for harder scenarios.',
-    operator: 'Use the same flow for every case: load, investigate, approve, run, inject, recover, verify.',
+    label: '14 / Close',
+    title: 'End with the BATS case solved.',
+    operator: 'The viewer has seen the whole BATS workflow: load, investigate, approve, run, stress test, re-triage, recover, verify.',
     agent: '14 orders released, BATS is up, final score is 1.00, and the trace is ready.',
     decision: 'The human keeps control; the agent keeps evidence.',
     proof: 'Audit trail survives the demo.',
@@ -321,6 +321,8 @@ function statusColor(status: string) {
 }
 
 function TopBar({ phase }: { phase: Phase }) {
+  const stressActive = phase === 'inject' || phase === 'pause';
+  const runActive = phase === 'run' || phase === 'recover';
   return (
     <div style={{ height: 70, background: C.panel, borderBottom: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', padding: '0 30px', gap: 22 }}>
       <div style={{ fontSize: 24, fontWeight: 950, color: C.ink }}>FIX-MCP</div>
@@ -335,8 +337,8 @@ function TopBar({ phase }: { phase: Phase }) {
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ color: C.green, fontSize: 12, fontWeight: 950 }}>LIVE SIM</div>
         <div style={{ border: `1px solid ${C.line}`, borderRadius: 6, padding: '8px 12px', color: C.text, fontSize: 12, fontWeight: 900 }}>BATS Extended-Hours Startup</div>
-        <div style={{ border: `1px solid ${phase === 'inject' || phase === 'pause' ? C.amber : C.line}`, borderRadius: 6, padding: '8px 12px', color: phase === 'inject' || phase === 'pause' ? C.amber : C.text, fontSize: 12, fontWeight: 950 }}>Inject Event</div>
-        <div style={{ background: phase === 'run' || phase === 'recover' ? C.green : '#f1f5f9', border: `1px solid ${phase === 'run' || phase === 'recover' ? C.green : C.line}`, borderRadius: 6, padding: '8px 12px', color: phase === 'run' || phase === 'recover' ? '#fff' : C.text, fontSize: 12, fontWeight: 950 }}>Agent Run</div>
+        <div style={{ border: `1px solid ${stressActive ? C.amber : C.line}`, borderRadius: 6, padding: '8px 12px', color: stressActive ? C.amber : C.text, fontSize: 12, fontWeight: 950 }}>Stress Test</div>
+        <div style={{ background: runActive ? C.green : '#f1f5f9', border: `1px solid ${runActive ? C.green : C.line}`, borderRadius: 6, padding: '8px 12px', color: runActive ? '#fff' : C.text, fontSize: 12, fontWeight: 950 }}>Agent Run</div>
       </div>
     </div>
   );
@@ -368,10 +370,10 @@ function Hero({ phase, frame }: { phase: Phase; frame: number }) {
   const lf = localFrame(frame, phase);
   return (
     <div style={{ opacity: show ? fade(lf, 4) : 0, pointerEvents: 'none', position: 'absolute', left: 92, top: 130, width: 820, background: C.navy, color: '#fff', borderRadius: 10, padding: 34, boxShadow: '0 28px 80px #0f172a40' }}>
-      <div style={{ color: '#67e8f9', fontSize: 13, fontWeight: 950, textTransform: 'uppercase' }}>How to use FIX-MCP</div>
-      <div style={{ fontSize: 48, lineHeight: 1.02, fontWeight: 950, marginTop: 10 }}>A guided walkthrough, click by click.</div>
+      <div style={{ color: '#67e8f9', fontSize: 13, fontWeight: 950, textTransform: 'uppercase' }}>BATS startup scenario</div>
+      <div style={{ fontSize: 48, lineHeight: 1.02, fontWeight: 950, marginTop: 10 }}>Recover the desk, then prove it.</div>
       <div style={{ color: '#cbd5e1', fontSize: 20, lineHeight: 1.35, fontWeight: 760, marginTop: 16 }}>
-        Follow one complete BATS startup incident: load the case, launch the agent, approve the workbook, run recovery, inject pressure, and verify proof.
+        Follow one complete BATS incident: diagnose the rejected Logon, approve the recovery workbook, run bounded Agent Run, inject a sequence gap, re-triage, and verify the trace.
       </div>
     </div>
   );
@@ -398,7 +400,7 @@ function IncidentHeader({ phase, frame }: { phase: Phase; frame: number }) {
           <div style={{ color: C.blue, fontSize: 12, fontWeight: 950 }}>EXTENDED-HOURS STARTUP</div>
         </div>
         <div style={{ color: C.ink, fontSize: 39, lineHeight: 1.05, fontWeight: 950, marginTop: 10 }}>BATS logon rejected</div>
-        <div style={{ color: C.text, fontSize: 18, fontWeight: 760, marginTop: 7 }}>Sequence mismatch blocks 14 orders while IEX remains available as fallback.</div>
+        <div style={{ color: C.text, fontSize: 18, fontWeight: 760, marginTop: 7 }}>Sequence mismatch blocks BATS flow while IEX remains available as fallback.</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         {['BATS', 'Orders', 'Mode', 'Control'].map((label) => <Metric key={label} label={label} phase={phase} />)}
