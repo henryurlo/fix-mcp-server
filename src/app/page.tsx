@@ -138,6 +138,7 @@ export default function Home() {
   }, [available_scenarios, scenario]);
 
   const titleName = scenarioContext?.title ?? (scenario ? scenario.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : '');
+  const canInjectFromHeader = trackedSteps.length > 0 && trackedSteps.every((step) => step.status === 'done');
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Auto-show onboarding for first-time visitors
@@ -187,9 +188,10 @@ export default function Home() {
           </select>
           {scenario && (
             <>
-              <button onClick={stressTestCurrentScenario}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--amber-dim)]/40 text-[var(--amber)] border border-[var(--amber)]/30 text-[13px] font-semibold hover:bg-[var(--amber-dim)] transition-all">
-                <FlaskConical size={12} /> Stress Test
+              <button onClick={stressTestCurrentScenario} disabled={!canInjectFromHeader}
+                title={canInjectFromHeader ? 'Inject a controlled event into the active scenario.' : 'Finish the baseline workbook before injecting a stress event.'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--amber-dim)]/40 text-[var(--amber)] border border-[var(--amber)]/30 text-[13px] font-semibold hover:bg-[var(--amber-dim)] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                <FlaskConical size={12} /> Inject Event
               </button>
               <button onClick={handleReset}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--red-dim)]/40 text-[var(--red)] border border-[var(--red)]/30 text-[13px] font-semibold hover:bg-[var(--red-dim)] transition-all">
@@ -516,12 +518,10 @@ function MissionControlTab({
   async function startAgentRun() {
     setHeroAction('agent-run');
     try {
-      await injectStressEvent();
       const chat = useChat.getState();
       if (!chat.isOpen) chat.toggleOpen();
-      await chat.openWithPrompt(`Agent Run for ${activeScenario?.title || scenario}: pressure was injected into the simulated desk. Work through the recovery plan using MCP tools, explain each decision, and stop if human approval is required.`);
+      await chat.openWithPrompt(`Agent Run for ${activeScenario?.title || scenario}: execute the approved workbook using MCP tools, explain each decision, and stop if human approval is required.`);
       await runWorkbook('agent');
-      setShowTraining(true);
       setBottomTab('trace');
     } finally {
       setHeroAction(null);
@@ -663,47 +663,32 @@ function MissionControlTab({
           </div>
 
           <div className="rounded-lg border border-[var(--border-base)] bg-[var(--bg-base)] p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Desk Workflow</div>
-                <div className="text-[16px] font-bold text-[var(--text-primary)]">Human-led AI response</div>
+                <div className="text-[16px] font-bold text-[var(--text-primary)]">Baseline first. Pressure test second.</div>
               </div>
               <button onClick={onOpenScenarioBuilder} className="rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] hover:border-[var(--cyan)]/30 hover:text-[var(--cyan)] transition-colors">
                 Create / Load
               </button>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button onClick={startGuidedLaunch} disabled={heroAction !== null}
-                className="rounded-md border border-[var(--cyan)]/30 bg-[var(--cyan-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--cyan-dim)]/30 disabled:opacity-50">
-                <div className="flex items-center gap-1.5 text-[var(--cyan)] font-bold text-[13px]">
-                  {heroAction === 'launching' ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Investigator
+            <div className="mt-3 grid gap-2 lg:grid-cols-3">
+              {[
+                ['1', 'Investigate', 'Ask Copilot what broke, then read the MCP evidence.', 'cyan'],
+                ['2', 'Approve + run', 'Approve the workbook and execute the baseline recovery.', 'green'],
+                ['3', 'Stress lab', 'Inject pressure only after the baseline path is understood.', 'amber'],
+              ].map(([step, title, desc, tone]) => (
+                <div key={step} className={`rounded-md border bg-[var(--bg-surface)] p-2.5 ${tone === 'cyan' ? 'border-[var(--cyan)]/25' : tone === 'green' ? 'border-[var(--green)]/25' : 'border-[var(--amber)]/25'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`flex h-5 w-5 items-center justify-center rounded text-[11px] font-bold ${tone === 'cyan' ? 'bg-[var(--cyan-dim)] text-[var(--cyan)]' : tone === 'green' ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'bg-[var(--amber-dim)] text-[var(--amber)]'}`}>{step}</span>
+                    <span className="text-[13px] font-bold text-[var(--text-primary)]">{title}</span>
+                  </div>
+                  <div className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-secondary)]">{desc}</div>
                 </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Start the LLM review: impact, root cause, and first action.</div>
-              </button>
-              <button onClick={() => runWorkbook('advisor')} disabled={heroAction !== null || totalSteps === 0}
-                className="rounded-md border border-[var(--green)]/30 bg-[var(--green-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--green-dim)]/30 disabled:opacity-50">
-                <div className="flex items-center gap-1.5 text-[var(--green)] font-bold text-[13px]">
-                  {heroAction === 'workbook' ? <Loader2 size={13} className="animate-spin" /> : <BookOpenCheck size={13} />} Approve Workbook
-                </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Approve the full recovery plan and execute all steps.</div>
-              </button>
-              <button onClick={startGuidedStress} disabled={heroAction !== null}
-                className="rounded-md border border-[var(--amber)]/30 bg-[var(--amber-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--amber-dim)]/30 disabled:opacity-50">
-                <div className="flex items-center gap-1.5 text-[var(--amber)] font-bold text-[13px]">
-                  {heroAction === 'stressing' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Inject Stress
-                </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Add a controlled reject spike after the baseline incident is loaded.</div>
-              </button>
-              <button onClick={startAgentRun} disabled={heroAction !== null || totalSteps === 0}
-                className="rounded-md border border-[var(--purple)]/30 bg-[var(--purple-dim)]/20 px-3 py-3 text-left transition-colors hover:bg-[var(--purple-dim)]/30 disabled:opacity-50">
-                <div className="flex items-center gap-1.5 text-[var(--purple)] font-bold text-[13px]">
-                  {heroAction === 'agent-run' ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />} Agent Run
-                </div>
-                <div className="mt-1 text-[12px] text-[var(--text-secondary)]">Inject pressure, let the agent work, and watch the trace.</div>
-              </button>
+              ))}
             </div>
-            <div className="mt-3 rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-2.5">
-              <div className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] font-bold">Most important first</div>
+            <div className="mt-3 rounded-md border border-[var(--cyan)]/25 bg-[var(--cyan-dim)]/10 p-2.5">
+              <div className="text-[11px] uppercase tracking-wide text-[var(--cyan)] font-bold">Current first move</div>
               <div className="mt-1 text-[12px] leading-relaxed text-[var(--text-secondary)]">{activeScenario?.hints?.diagnosis_path || 'Use the copilot to summarize the blast radius, then follow the runbook.'}</div>
             </div>
             <div className="mt-2 rounded-md border border-[var(--border-dim)] bg-[var(--bg-surface)] p-2.5">
@@ -982,17 +967,14 @@ function MissionControlTab({
               <div className={`bg-[var(--bg-base)] border-l border-[var(--border-dim)] flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden ${focusMode ? 'w-0 border-0' : 'w-[340px]'}`}>
                 <div className="px-3 py-2.5 border-b border-[var(--border-dim)]">
                   <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Operator Rail</div>
-                  <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">{showTraining ? 'Stress Test Controls' : 'Next best actions'}</div>
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">{showTraining ? 'Stress Lab Controls' : 'Next best action'}</div>
                   <LiveTelemetryStrip />
                 </div>
                 <div className="p-2.5 space-y-2 border-b border-[var(--border-dim)]">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-dim)]">Baseline workflow</div>
                   <button onClick={startGuidedLaunch} disabled={heroAction !== null}
                     className="w-full rounded-md bg-[var(--cyan)] text-white text-[12px] font-bold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--cyan)]/80 disabled:opacity-50">
                     {heroAction === 'launching' ? <Loader2 size={12} className="animate-spin" /> : <MessageSquare size={12} />} Investigator
-                  </button>
-                  <button onClick={startGuidedStress} disabled={heroAction !== null}
-                    className="w-full rounded-lg border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50">
-                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Inject Stress
                   </button>
                   <button onClick={() => runWorkbook('advisor')} disabled={heroAction !== null || totalSteps === 0}
                     className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20 disabled:opacity-50">
@@ -1002,9 +984,21 @@ function MissionControlTab({
                     className="w-full rounded-lg border border-[var(--purple)]/40 bg-[var(--purple-dim)]/10 text-[var(--purple)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--purple-dim)]/20 disabled:opacity-50">
                     {heroAction === 'agent-run' ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Agent Run
                   </button>
+                  <div className="pt-2 mt-2 border-t border-[var(--border-dim)]">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--amber)]">Stress lab</div>
+                      <div className="text-[10px] text-[var(--text-dim)]">{allDone ? 'Ready' : 'after baseline'}</div>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">Use this only to prove resilience after the base incident is understood or resolved.</p>
+                  </div>
+                  <button onClick={startGuidedStress} disabled={heroAction !== null || !allDone}
+                    title={allDone ? 'Inject a controlled event and ask Copilot to re-triage.' : 'Finish the baseline workbook before injecting stress.'}
+                    className="w-full rounded-lg border border-[var(--amber)]/40 bg-[var(--amber-dim)]/10 text-[var(--amber)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--amber-dim)]/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {heroAction === 'stressing' ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Inject Event
+                  </button>
                   <button onClick={() => { setTrainingInitialTab('inject'); setShowTraining(true); }}
-                    className="w-full rounded-lg border border-[var(--green)]/40 bg-[var(--green-dim)]/10 text-[var(--green)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:bg-[var(--green-dim)]/20">
-                    <GraduationCap size={12} /> Configure Stress Test
+                    className="w-full rounded-lg border border-[var(--border-dim)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[12px] font-semibold py-2 px-3 flex items-center justify-center gap-1.5 hover:border-[var(--amber)]/40 hover:text-[var(--amber)]">
+                    <GraduationCap size={12} /> Open Stress Lab
                   </button>
                 </div>
 
@@ -1027,7 +1021,7 @@ function MissionControlTab({
                           <li><b className="text-[var(--text-primary)]">1.</b> Read the case brief and run Investigator.</li>
                           <li><b className="text-[var(--text-primary)]">2.</b> Approve Workbook to execute the complete MCP plan.</li>
                           <li><b className="text-[var(--text-primary)]">3.</b> Open Trace to prove every tool call and output.</li>
-                          <li><b className="text-[var(--text-primary)]">4.</b> Use Inject Stress only to show resilience after the base case is clear.</li>
+                          <li><b className="text-[var(--text-primary)]">4.</b> Use Inject Event from Stress Lab only after the baseline case is clear.</li>
                         </ol>
                       </div>
                       <button
