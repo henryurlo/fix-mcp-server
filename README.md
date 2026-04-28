@@ -1,40 +1,75 @@
 # FIX-MCP
 
-AI trading operations command center built on MCP. FIX-MCP is an open-source professional demo that shows how a human operator and an AI agent can diagnose, approve, and resolve trading desk incidents through explicit MCP tools, runbooks, and auditable FIX-level evidence.
+[![CI](https://github.com/henryurlo/fix-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/henryurlo/fix-mcp-server/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-64%20passing-brightgreen)](tests/)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-trading--ops-purple)](https://modelcontextprotocol.io/)
+[![Docker](https://img.shields.io/badge/docker-compose-blue)](docker-compose.yml)
 
-The demo runs against a simulated broker-dealer environment. The product thesis is broader: MCP is the right interface for letting LLMs work with real operational systems while keeping the human responsible for approval, escalation, and final control.
+> **AI agents can write FIX messages. They cannot recover a stuck session, validate a NewOrderSingle, or pause a TWAP that is behind schedule. FIX-MCP gives them the trading-ops brain to do all three through explicit MCP tools, approval gates, and auditable evidence.**
 
----
+![FIX-MCP dashboard walkthrough](docs/img/dashboard-demo.png)
 
-## Operating Modes
+FIX-MCP is an open-source professional demo for AI-assisted trading operations. It gives Claude, GPT, Gemini, and any MCP-capable agent a controlled tool surface for diagnosing and resolving realistic FIX, OMS, reference-data, venue, and algo incidents while a human operator stays responsible for approval and final control.
 
-FIX-MCP is organized around four modes that map to real trading desk work:
+The demo runs against a simulated broker-dealer environment. The product thesis is broader: MCP is the right interface for letting LLMs work with real operational systems without giving them magic, unbounded access to the desk.
 
-| Mode | What It Shows | Human Role |
-|------|---------------|------------|
-| **Watchdog** | The system monitors sessions, orders, reference data, and market pressure, then raises contextual desk alerts instead of generic infrastructure noise. | Reviews the alert, decides whether to start the proposed response. |
-| **Investigator** | A human asks natural-language questions and the AI uses MCP tools to build scope, impact, and root-cause analysis. | Drives the investigation and challenges the evidence. |
-| **Advisor** | The AI proposes a complete recovery workbook: ordered steps, expected outcomes, MCP tools, and equivalent manual commands. | Approves the workbook step-by-step or all at once. |
-| **Agent Run** | A stress event is injected into the simulated market/host system and the agent works toward resolution while the operator watches the trace. | Observes, interrupts, approves, or takes back control. |
+## What It Includes
 
-This is the key pattern: the LLM does not get magic access to the desk. It works through MCP tools, domain prompts, resources, traces, and approval gates.
+- **22 MCP tools** for session repair, order triage, reference-data updates, venue state, algo management, scenario scoring, and trace capture.
+- **13 real-world desk scenarios** covering 02:05 ET pre-dawn startup through 16:32 ET after-hours dark-pool failures.
+- **Human-led workflow**: investigate, approve workbook, run approved recovery, then stress test only after the baseline path is understood.
+- **Mission Control dashboard** with case brief, workbook, operator rail, trace, FIX wire, terminal, manual runbook, and copilot panel.
+- **Production-shaped stack**: Python MCP server, REST API, Next.js console, PostgreSQL 16, Redis 7, Docker Compose, and async FIX TCP connector scaffolding.
 
-## Demo vs Production
+## Who This Is For
 
-| Component | Demo (This Project) | Production / Consulting Engagement |
-|-----------|--------------------|------------------------------------|
-| FIX sessions | Simulated Python objects | Connected to real FIX engine logs |
-| OMS | In-memory order state | Connected to real OMS database/API |
-| Reference data | Pre-loaded JSON files | Connected to real symbology feeds and vendors |
-| Monitoring | Scenario engine pre-loads problems | Connected to Datadog, Splunk, Grafana, or internal monitoring |
-| Alerts | Triggered by querying simulated state | Triggered by real-time event streams |
-| Execution | Updates in-memory state | Sends real FIX messages or calls approved OMS APIs |
-| MCP tools | Same tool surface | Same tool surface, different backend adapters |
-| Domain intelligence | Same prompts and trading logic | Same prompts and trading logic, tuned to the client environment |
+| You are... | FIX-MCP gives you... |
+|---|---|
+| **Broker-dealer ops engineer** | A working model for AI-assisted incident triage during market hours. |
+| **OMS / EMS vendor** | A reference implementation for adding MCP to trading workflows. |
+| **AI builder** | A domain-rich tool surface for agents that need to reason about trading operations. |
+| **VC / fintech evaluator** | A concrete artifact showing where AI-in-trading infrastructure is heading. |
 
-The professional engagement is the integration layer: wire the same MCP tools and trading operations knowledge into a firm's real FIX logs, OMS, reference data, monitoring, and approval workflows.
+## Featured Walkthrough — BATS Startup at 02:05 ET
 
----
+The desk loads `bats_startup_0200`.
+
+**Incident:** BATS Logon is rejected because the counterparty expects sequence `2450`, while the session was reset to `1`. Eight overnight GTC orders are blocked, two ETF symbols are missing from extended-hours reference data, and IEX is healthy as fallback.
+
+The operator asks the copilot to investigate. The agent uses MCP tools:
+
+```text
+list_scenarios       Scenario Loaded: bats_startup_0200
+check_fix_sessions   BATS down; sequence mismatch detected
+query_orders         ORDER QUERY — 14 order(s) found
+```
+
+The agent proposes a recovery workbook:
+
+```text
+1. Check BATS session
+2. Quantify blocked flow
+3. Reconnect BATS
+4. Reset BATS sequence if needed
+5. Load missing ETF symbols
+6. Validate orders released
+```
+
+The human approves the workbook. Agent Run executes only the approved path:
+
+```text
+fix_session_issue    BATS reconnect released stuck orders
+fix_session_issue    BATS reset_sequence accepted
+load_ticker          BITO loaded
+load_ticker          GBTC loaded
+validate_orders      14 PASS, 0 FAIL
+```
+
+Then, and only then, the operator uses **Stress Lab** to inject a sequence-gap event and prove the system pauses, re-triages, recovers, resumes, and records the trace.
+
+That is the operating pattern: **baseline first, pressure test second, evidence always.**
 
 ## Quick Start
 
@@ -46,134 +81,47 @@ docker compose up -d
 
 Open **http://localhost:3000**.
 
-**Login:** `henry` / `henry` (admin) · `admin` / `admin` · or click **Demo Mode**.
+Login with `henry` / `henry`, `admin` / `admin`, or click **Demo Mode**.
 
-| Service   | URL                    | What it serves                     |
-|-----------|------------------------|------------------------------------|
-| Mission Control | http://localhost:3000  | Sleek trading ops dashboard with scenario lifecycle |
-| REST API  | http://localhost:8000  | MCP tool dispatch, system status   |
-| MCP stdio | docker compose run      | For AI agents via MCP protocol     |
+| Service | URL | Purpose |
+|---|---|---|
+| Mission Control | http://localhost:3000 | Trading-ops dashboard and guided demo workflow |
+| REST API | http://localhost:8000 | MCP tool dispatch, scenarios, system status |
+| MCP stdio | `docker compose run --rm mcp-server` | Direct MCP protocol entry point |
 
-No Node or Python on your host — everything runs in containers.
+No Node or Python is required on your host for the Docker demo.
 
----
+## Python Development
 
-## Mission Control
-
-Mission Control is the professional demo surface.
-
-| Tab | Purpose |
-|-----|---------|
-| **Professional Path** | Start the guided scenario path and learn the core desk incidents |
-| **Mission Control** | Live topology, runbook workbook, stress injection, evidence board, terminal, trace |
-| **Scenario Builder** | Browse and create incident scenarios by severity, difficulty, and desk domain |
-
-### Core Layout
-
-```
-┌──────────────────┬─────────────────────────────────────┐
-│ Topology Graph   │ FIX Terminal                        │
-│ (ecosystem)      │ fix-cli> show sessions              │
-│                  │ fix-cli> query orders               │
-├──────────────────┼─────────────────────────────────────┤
-│ Runbook Panel    │ MCP Audit Log                       │
-│ (live steps)     │ [+ SRE Copilot slides in →]         │
-└──────────────────┴─────────────────────────────────────┘
+```bash
+python -m pip install -e ".[dev]"
+python -m fix_mcp.api
 ```
 
----
+In another terminal:
 
-## Scenarios
-
-**13 training scenarios** covering a full trading day (02:00–16:32 ET). Each includes:
-- **Runbook** — 4-6 diagnostic/fix steps with exact MCP tool calls
-- **Success criteria** — explicit conditions that define "resolved"
-- **Hints** — key problems, flag meanings, common mistakes
-- **Severity & difficulty** — from beginner to advanced
-
-| Scenario | Severity | Time | Est |
-|----------|----------|------|-----|
-| `morning_triage` | Critical | 06:15 | 25m |
-| `bats_startup_0200` | Medium | 02:05 | 15m |
-| `predawn_adrs_0430` | Medium | 04:35 | 15m |
-| `preopen_auction_0900` | High | 09:02 | 20m |
-| `open_volatility_0930` | High | 09:35 | 20m |
-| `venue_degradation_1030` | Critical | 10:32 | 30m |
-| `twap_slippage_1000` | High | 10:05 | 20m |
-| `ssr_and_split_1130` | Critical | 11:34 | 35m |
-| `vwap_vol_spike_1130` | Critical | 11:35 | 25m |
-| `iex_recovery_1400` | Medium | 14:03 | 15m |
-| `is_dark_failure_1415` | High | 14:15 | 25m |
-| `eod_moc_1530` | High | 15:31 | 20m |
-| `afterhours_dark_1630` | Medium | 16:32 | 15m |
-
----
-
-## MCP Tools (22)
-
-| Category | Tools |
-|----------|-------|
-| **Diagnostic** | `run_premarket_check`, `check_fix_sessions`, `check_ticker`, `query_orders`, `validate_orders`, `dump_session_state` |
-| **Session Recovery** | `fix_session_issue`, `session_heartbeat`, `reset_sequence` |
-| **Order Actions** | `send_order`, `cancel_replace`, `release_stuck_orders` |
-| **Algo Suite** | `send_algo_order`, `check_algo_status`, `modify_algo`, `cancel_algo` |
-| **Reference/Venue** | `update_ticker`, `load_ticker`, `update_venue_status`, `list_scenarios` |
-
----
-
-## AI Copilot
-
-The SRE Copilot is FIX-aware with:
-- Full decision trees for session diagnostics, order triage, and algo management
-- Scenario-specific context injection (situation, key problems, flag meanings, common mistakes, success criteria)
-- Human approval gates for irreversible operations and full workbook execution
-- Concise, actionable output — quantitative impact with FIX message types
-- Traceable MCP calls, manual-command equivalents, and evidence after every action
-
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────┐
-│              Mission Control (Next.js)       │
-│          http://localhost:3000               │
-└──────────────────────┬───────────────────────┘
-                       │ REST proxy
-┌──────────────────────▼───────────────────────┐
-│              REST API                        │
-│         http://localhost:8000                │
-│  /api/status /api/orders /api/                │
-│  /api/scenarios /api/scenario/{name}         │
-│  /api/tool (POST) /api/reset (POST)          │
-└──────────────────────┬───────────────────────┘
-                       │
-┌──────────────────────▼───────────────────────┐
-│        FIX Engine (Python)                   │
-│  OMS · FIXSessionManager                     │
-│  ReferenceDataStore · AlgoEngine             │
-└──────────────────────┬───────────────────────┘
-                       │
-┌──────────────────────▼───────────────────────┐
-│  PostgreSQL (orders) · Redis (pub/sub)       │
-└──────────────────────────────────────────────┘
+```bash
+npm install
+npm run dev
 ```
 
----
+The Next.js console reads `BACKEND_URL`, defaulting to `http://127.0.0.1:8000`.
 
-## Tech Stack
+## MCP Client Configuration
 
-- **Backend:** Python 3.11, MCP SDK, asyncio, stdlib `http.server`
-- **Frontend:** Next.js 16, React 19, React Flow, Zustand 5, Tailwind CSS v4, lucide icons
-- **Infra:** PostgreSQL 16, Redis 7, Docker Compose
-- **Protocol:** FIX 4.2 / 4.4 simulation
-- **AI:** OpenRouter API (any compatible model; default `qwen/qwen3.6-plus`)
+For a local MCP client that can launch the Python entry point:
 
----
+```json
+{
+  "mcpServers": {
+    "fix-mcp": {
+      "command": "fix-mcp-server"
+    }
+  }
+}
+```
 
-## MCP Integration (external clients)
-
-FIX-MCP is built on MCP, not a vendor-specific AI client. The Next.js console is the built-in demo UI, and MCP-compatible clients can connect to the same tool surface.
+For an HTTP-capable MCP client/proxy:
 
 ```json
 {
@@ -181,28 +129,46 @@ FIX-MCP is built on MCP, not a vendor-specific AI client. The Next.js console is
     "fix-mcp": {
       "command": "npx",
       "args": ["-y", "@anthropic-ai/mcp-remote@latest"],
-      "env": { "MCP_URL": "http://localhost:8000/mcp" }
+      "env": {
+        "MCP_URL": "http://localhost:8000/mcp"
+      }
     }
   }
 }
 ```
 
----
+## Demo vs Production
 
-## Development
+| Component | Demo | Production / Consulting Engagement |
+|---|---|---|
+| FIX sessions | Simulated Python objects | Real FIX engine logs and session controls |
+| OMS | In-memory order state | OMS database/API integration |
+| Reference data | Preloaded JSON | Vendor feeds, DTCC data, internal symbology |
+| Monitoring | Scenario engine preloads incidents | Datadog, Splunk, Grafana, or internal event streams |
+| Execution | Updates simulated state | Sends approved FIX messages or calls approved OMS APIs |
+| MCP tools | Same tool surface | Same interface, production adapters |
+| Domain intelligence | Same prompts and logic | Tuned to client workflows, venues, and controls |
 
-```bash
-# Backend (Python)
-pip install -e .
-python -m fix_mcp.api           # REST on :8000
+The professional work is the integration layer: wire the same MCP interface and trading-ops knowledge into a firm's real logs, OMS, reference data, monitoring, and approval workflow.
 
-# Frontend (Node)
-npm install
-npm run dev                     # Next.js on :3000
-```
+## Documentation
 
-The Next.js route handler reads `BACKEND_URL` — defaults to `http://127.0.0.1:8000` for local dev.
+- [Scenario catalog](docs/scenarios.md)
+- [Architecture](docs/architecture.md)
+- [Production integration notes](docs/production.md)
+- [Operator demo flow](docs/operator-demo-flow.md)
+- [Remotion demo scripts](docs/remotion-executive-demos.md)
 
----
+## Built By Henry Urlo
 
-Built by Henry Urlo.
+Built by **Henry Urlo**, a trading-infrastructure engineer with 15 years across institutional FIX, OMS, broker-dealer operations, and fintech systems at Nomura, Instinet, Lime Brokerage, tZERO, and Joseph Gunnar.
+
+FINRA Series 3, 7, 63.
+
+Available for retainer engagements with broker-dealers, OMS/EMS vendors, and fintech teams building AI-augmented trading operations.
+
+Contact: [henry@frontierdesk.io](mailto:henry@frontierdesk.io)
+
+## License
+
+MIT. See [LICENSE](LICENSE).
