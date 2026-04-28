@@ -43,6 +43,25 @@ _events: deque = deque(maxlen=100)
 _events_lock = threading.Lock()
 
 
+def _read_local_env_key(name: str) -> str:
+    """Read an ignored local env file without requiring a server restart."""
+    for filename in (".env.local", ".env"):
+        path = Path.cwd() / filename
+        if not path.exists():
+            continue
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                clean = line.strip()
+                if not clean or clean.startswith("#") or "=" not in clean:
+                    continue
+                key, value = clean.split("=", 1)
+                if key.strip() == name:
+                    return value.strip().strip('"').strip("'")
+        except OSError:
+            continue
+    return ""
+
+
 
 def _publish_event(tool: str, args: dict, result: str, ok: bool, source: str = "dashboard") -> None:
     """Append event to in-memory log and optionally publish to Redis."""
@@ -645,7 +664,7 @@ async def api_chat(request: Request):
     payload = await request.json()
     messages = payload.get("messages", [])
     model = payload.get("model", "openai/gpt-5.4")
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    api_key = os.environ.get("OPENROUTER_API_KEY", "") or _read_local_env_key("OPENROUTER_API_KEY")
     if not api_key:
         return JSONResponse({"error": "OPENROUTER_API_KEY not configured"}, status_code=500)
 
