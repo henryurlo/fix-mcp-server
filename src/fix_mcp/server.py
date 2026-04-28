@@ -1017,6 +1017,8 @@ async def _tool_check_fix_sessions(args: dict) -> list[TextContent]:
             lines.append(f"   Latency:      {s.latency_ms} ms")
             lines.append(f"   Heartbeat:    {hb_str}")
             lines.append(f"   Open Orders:  {venue_order_counts.get(s.venue.upper(), 0)}")
+            if s.error:
+                lines.append(f"   Last Error:   {s.error}")
 
             if s.has_sequence_gap:
                 gap = s.sequence_gap_size
@@ -1029,8 +1031,6 @@ async def _tool_check_fix_sessions(args: dict) -> list[TextContent]:
                 lines.append(
                     f"   [DOWN] Session is offline. {stuck_count} order(s) stuck at this venue."
                 )
-                if s.error:
-                    lines.append(f"   Error: {s.error}")
             elif s.status == "degraded":
                 lines.append(
                     f"   [WARN] Session degraded — high latency or partial connectivity."

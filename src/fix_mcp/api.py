@@ -52,7 +52,11 @@ def _read_local_env_key(name: str) -> str:
         try:
             for line in path.read_text(encoding="utf-8").splitlines():
                 clean = line.strip()
-                if not clean or clean.startswith("#") or "=" not in clean:
+                if not clean or clean.startswith("#"):
+                    continue
+                if "=" not in clean and clean.startswith(("sk-", "sk-or-")):
+                    return clean
+                if "=" not in clean:
                     continue
                 key, value = clean.split("=", 1)
                 if key.strip() == name:
@@ -664,6 +668,7 @@ async def api_chat(request: Request):
     payload = await request.json()
     messages = payload.get("messages", [])
     model = payload.get("model", "openai/gpt-5.4")
+    max_tokens = payload.get("max_tokens", 2048)
     api_key = os.environ.get("OPENROUTER_API_KEY", "") or _read_local_env_key("OPENROUTER_API_KEY")
     if not api_key:
         return JSONResponse({"error": "OPENROUTER_API_KEY not configured"}, status_code=500)
@@ -679,7 +684,7 @@ async def api_chat(request: Request):
                     "HTTP-Referer": "https://fix-mcp.local",
                     "X-Title": "FIX MCP Console",
                 },
-                json={"model": model, "messages": messages, "max_tokens": 2048},
+                json={"model": model, "messages": messages, "max_tokens": max_tokens},
             ) as resp:
                 data = await resp.json()
                 return JSONResponse(data)

@@ -498,15 +498,23 @@ export const useChat = create<ChatState>((set, get) => ({
           `### Start: ${ctx.hints?.diagnosis_path || 'Check session health.'}`,
           `### Success Criteria: ${ctx.success_criteria?.length || 0} conditions`,
           `### Runbook Steps:\n${stepSummary}`,
-          nextStep ? `### NEXT ACTION: The user should click "Run" on Step ${nextStep.step}: ${nextStep.title}. Guide them to do this.` : '### All steps completed.',
+          nextStep
+            ? `### Suggested Next Runbook Action: Step ${nextStep.step} — ${nextStep.title}. Mention this only when the user asks what to do next or approves action.`
+            : '### All steps completed.',
         ].filter(Boolean);
         scenarioContextMsg = parts.join('\n');
       }
+
+      const isBriefRequest = /\b(brief|concise|short|quick|summarize)\b/i.test(content);
+      const briefGuard = isBriefRequest
+        ? [{ role: 'system', content: 'The latest user message asks for a brief answer. Hard limit: 75 words. Answer the immediate question first, then ask at most one clarifying question.' }]
+        : [];
 
       const msgs = [
         { role: 'system', content: SYSTEM_PROMPT },
         ...(scenarioContextMsg ? [{ role: 'system', content: scenarioContextMsg }] : []),
         { role: 'system', content: `Current system state:\n${contextHint}` },
+        ...briefGuard,
         ...get().messages.filter((m) => m.role !== 'system').slice(-12).map((m) => ({ role: m.role, content: m.content })),
         { role: 'user', content },
       ];
@@ -525,7 +533,7 @@ export const useChat = create<ChatState>((set, get) => ({
             body: JSON.stringify({
               model: 'openai/gpt-5.4',
               messages: msgs,
-              max_tokens: 2048,
+              max_tokens: isBriefRequest ? 180 : 2048,
             }),
           })
         : await fetch('/api/chat', {
@@ -534,7 +542,7 @@ export const useChat = create<ChatState>((set, get) => ({
             body: JSON.stringify({
               model: 'openai/gpt-5.4',
               messages: msgs,
-              max_tokens: 2048,
+              max_tokens: isBriefRequest ? 180 : 2048,
             }),
           });
 
