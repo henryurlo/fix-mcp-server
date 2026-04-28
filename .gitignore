@@ -19,6 +19,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -43,4 +44,3 @@ next-env.d.ts
 __pycache__/
 .pytest_cache/
 experiment_results.json
-

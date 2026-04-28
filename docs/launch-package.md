@@ -21,14 +21,19 @@ The product is technically credible. The launch layer needs to communicate that 
 - README adds author credibility and consulting CTA.
 - Added `CHANGELOG.md`.
 - Added `LICENSE`.
+- Added release workflow for Python artifacts and GHCR Docker image publishing.
+- Added repeatable release preflight script at `scripts/check_release_ready.sh`.
+- Added issue templates for `Roadmap to v0.2` and `Help wanted: live demo deployment`.
+- Added the 75-second incident replay script at `docs/video-scripts/75-second-incident-replay.md`.
+- Fixed the Compose console healthcheck so it works in the Node Alpine container.
 
 ## Remaining Launch Checklist
 
 ### Packaging
 
-- Publish `fix-mcp-server` to PyPI.
-- Publish Docker images to GitHub Container Registry.
-- Tag `v0.1.0` after the packaging artifacts exist.
+- Configure PyPI Trusted Publishing or publish the built artifact manually.
+- Tag `v0.1.0` after `./scripts/check_release_ready.sh` passes.
+- Confirm the release workflow publishes the GHCR image from the tag.
 
 ### Visuals
 
@@ -43,7 +48,7 @@ The product is technically credible. The launch layer needs to communicate that 
 - Submit to the MCP registry or relevant MCP server index.
 - Add GitHub topics:
   `mcp`, `fix-protocol`, `model-context-protocol`, `trading-systems`, `oms`, `quickfix`, `algo-trading`, `claude-desktop`, `fintech`, `broker-dealer`.
-- Open two public issues:
+- Open two public issues using the templates in `.github/ISSUE_TEMPLATE`:
   `Roadmap to v0.2` and `Help wanted: live demo deployment`.
 
 ### Launch Posts
