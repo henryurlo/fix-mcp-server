@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { useAudit, AuditEntry } from './audit';
-import { SYSTEM_PROMPT } from './prompts';
+import { SYSTEM_PROMPT, SCENARIO_OVERLAYS, KNOWN_TOOLS } from './prompts';
 export type { AuditEntry };
 
 // ── Backend URL — Next.js dev server proxies /api/* to the Python backend
@@ -53,35 +53,7 @@ export interface EventEntry {
   tool: string;
   ok: boolean;
   source: string;
-  arguments?: Record<string, unknown>;
   summary: string;
-}
-
-export interface FixWireEntry {
-  ts: string;
-  type: string;
-  msg_type: string;
-  venue: string;
-  symbol: string;
-  side: string;
-  qty: string;
-  cl_ord_id: string;
-  raw: string;
-}
-
-export interface TriagePayload {
-  ts: string;
-  scenario: string;
-  event_type: string;
-  target: string;
-  stuck_order_count: number;
-  target_stuck_order_count: number;
-  down_venues: string[];
-  degraded_venues: string[];
-  seq_gap_venues: string[];
-  matched_runbook_step?: RunbookStep | null;
-  recommended_action: string;
-  narrative: string;
 }
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
@@ -166,9 +138,6 @@ interface SystemState {
   sessions: SessionInfo[];
   orders: OrderInfo[];
   events: EventEntry[];
-  fixWire: FixWireEntry[];
-  triage: TriagePayload | null;
-  triageNarrative: string;
   scenario: string | null;
   available_scenarios: ScenarioDef[];
   scenarioContext: ScenarioContext | null;
@@ -194,69 +163,20 @@ interface SystemState {
   mode: 'human' | 'agent' | 'mixed';
   loading: boolean;
   connected: boolean;
-  sseConnected: boolean;
   error: string | null;
   open_count: number;
   stuck_count: number;
   refresh: () => Promise<void>;
-  subscribeEvents: () => () => void;
   startScenario: (name: string) => Promise<void>;
   resetScenario: () => Promise<void>;
   callTool: (tool: string, args: Record<string, unknown>) => Promise<string>;
   setMode: (mode: 'human' | 'agent' | 'mixed') => Promise<void>;
 }
 
-let systemEventSource: EventSource | null = null;
-
-function normalizeStatusPayload(
-  statusRes: any,
-  ordersRes?: OrderInfo[] | null,
-  eventsRes?: EventEntry[] | null,
-  modeRes?: any | null,
-  wireRes?: FixWireEntry[] | null,
-): Partial<SystemState> {
-  const sessions: SessionInfo[] = (statusRes.sessions?.detail || []).map((s: any) => ({
-    venue: s.venue || '',
-    status: (s.status || 'active') as SessionInfo['status'],
-    latency_ms: s.latency_ms,
-    session_id: s.session_id,
-    last_sent_seq: s.last_sent_seq,
-    last_recv_seq: s.last_recv_seq,
-    expected_recv_seq: s.expected_recv_seq,
-    seq_gap: s.seq_gap,
-    error: s.error,
-    last_heartbeat: s.last_heartbeat,
-  }));
-
-  const normalizedScenario = statusRes.scenario && statusRes.scenario !== 'clear'
-    ? statusRes.scenario
-    : null;
-  const mode = (modeRes?.mode || statusRes.mode || 'human') as SystemState['mode'];
-
-  return {
-    sessions,
-    orders: ordersRes ?? [],
-    events: (eventsRes ?? []).slice(0, 50),
-    fixWire: (wireRes ?? []).slice(0, 200),
-    scenario: normalizedScenario,
-    available_scenarios: statusRes.available_scenarios || [],
-    mode,
-    controlMode: (mode === 'agent' ? 'agent' : mode === 'mixed' ? 'collab' : 'human') as ControlMode,
-    open_count: statusRes.orders?.open || 0,
-    stuck_count: statusRes.orders?.stuck || 0,
-    connected: true,
-    error: null,
-    loading: false,
-  };
-}
-
 export const useSystem = create<SystemState>((set, get) => ({
   sessions: [],
   orders: [],
   events: [],
-  fixWire: [],
-  triage: null,
-  triageNarrative: '',
   scenario: null,
   available_scenarios: [],
   scenarioContext: null,
@@ -364,28 +284,52 @@ export const useSystem = create<SystemState>((set, get) => ({
   mode: 'human',
   loading: false,
   connected: false,
-  sseConnected: false,
   error: null,
   open_count: 0,
   stuck_count: 0,
 
   refresh: async () => {
     try {
-      const [statusRes, ordersRes, eventsRes, modeRes, wireRes] = await Promise.all([
+      const [statusRes, ordersRes, eventsRes, modeRes] = await Promise.all([
         jsonFetch<any>('/api/status').catch(e => { console.error('/api/status failed:', e); return null; }),
         jsonFetch<OrderInfo[]>('/api/orders').catch(e => { console.error('/api/orders failed:', e); return null; }),
         jsonFetch<EventEntry[]>('/api/events').catch(e => { console.error('/api/events failed:', e); return null; }),
         jsonFetch('/api/mode').catch(e => { console.error('/api/mode failed:', e); return null; }),
-        jsonFetch<FixWireEntry[]>('/api/fix-wire').catch(e => { console.error('/api/fix-wire failed:', e); return null; }),
       ]);
 
       if (!statusRes) { set({ connected: false, error: '/api/status failed', loading: false }); return; }
+
+      const sessions: SessionInfo[] = (statusRes.sessions?.detail || []).map((s: any) => ({
+        venue: s.venue || '',
+        status: (s.status || 'active') as SessionInfo['status'],
+        latency_ms: s.latency_ms,
+        session_id: s.session_id,
+        last_sent_seq: s.last_sent_seq,
+        last_recv_seq: s.last_recv_seq,
+        expected_recv_seq: s.expected_recv_seq,
+        seq_gap: s.seq_gap,
+        error: s.error,
+        last_heartbeat: s.last_heartbeat,
+      }));
 
       const normalizedScenario = statusRes.scenario && statusRes.scenario !== 'clear'
         ? statusRes.scenario
         : null;
 
-      set(normalizeStatusPayload(statusRes, ordersRes, eventsRes, modeRes, wireRes));
+      set({
+        sessions,
+        orders: ordersRes ?? [],
+        events: (eventsRes ?? []).slice(0, 50),
+        scenario: normalizedScenario,
+        available_scenarios: statusRes.available_scenarios || [],
+        mode: (modeRes?.mode as SystemState['mode']) || 'human',
+        controlMode: (modeRes?.mode === 'agent' ? 'agent' : modeRes?.mode === 'mixed' ? 'collab' : 'human') as ControlMode,
+        open_count: statusRes.orders?.open || 0,
+        stuck_count: statusRes.orders?.stuck || 0,
+        connected: true,
+        error: null,
+        loading: false,
+      });
 
       // Fetch scenario context on first load (Docker-initiated scenario)
       if (normalizedScenario && !get().scenarioContext) {
@@ -413,82 +357,8 @@ export const useSystem = create<SystemState>((set, get) => ({
     }
   },
 
-  subscribeEvents: () => {
-    if (typeof window === 'undefined') return () => {};
-    if (systemEventSource) return () => {};
-
-    const es = new EventSource('/api/events/stream');
-    systemEventSource = es;
-    set({ sseConnected: false });
-
-    es.onopen = () => set({ sseConnected: true, connected: true, error: null });
-    es.onerror = () => set({ sseConnected: false });
-    es.onmessage = (message) => {
-      try {
-        const payload = JSON.parse(message.data);
-        if (payload.type === 'initial' || payload.type === 'state') {
-          const status = payload.status;
-          if (status) {
-            const normalizedScenario = status.scenario && status.scenario !== 'clear'
-              ? status.scenario
-              : null;
-            set(normalizeStatusPayload(status, payload.orders, payload.events, { mode: status.mode }, payload.wire));
-
-            if (normalizedScenario && get().scenarioContext?.name !== normalizedScenario) {
-              jsonFetch<ScenarioContext>(`/api/scenario/${normalizedScenario}`)
-                .then((ctx) => {
-                  set({ scenarioContext: ctx, scenarioState: 'diagnosing' });
-                  get().resetStepsForScenario(ctx.runbook?.steps || []);
-                })
-                .catch(() => {});
-            }
-
-            if (!normalizedScenario && (get().scenarioContext || get().trackedSteps.length || get().completedSteps.length)) {
-              set({
-                scenarioContext: null,
-                trackedSteps: [],
-                completedSteps: [],
-                scenarioState: 'idle',
-                locked: false,
-                triage: null,
-                triageNarrative: '',
-              });
-            }
-          }
-        } else if (payload.type === 'tool_execution' && payload.event) {
-          set((s) => ({
-            events: [payload.event as EventEntry, ...s.events.filter((e) => e.ts !== payload.event.ts)].slice(0, 50),
-          }));
-        } else if (payload.type === 'triage' && payload.triage) {
-          set({
-            triage: payload.triage as TriagePayload,
-            triageNarrative: payload.triage.narrative || '',
-          });
-        } else if (payload.type === 'mode') {
-          const mode = payload.mode === 'agent' || payload.mode === 'mixed' ? payload.mode : 'human';
-          set({
-            mode,
-            controlMode: mode === 'agent' ? 'agent' : mode === 'mixed' ? 'collab' : 'human',
-          });
-        } else if (payload.type === 'events_cleared') {
-          set({ events: [], triage: null, triageNarrative: '' });
-        }
-      } catch (err) {
-        console.error('SSE parse failed:', err);
-      }
-    };
-
-    return () => {
-      if (systemEventSource === es) {
-        es.close();
-        systemEventSource = null;
-        set({ sseConnected: false });
-      }
-    };
-  },
-
   startScenario: async (name: string) => {
-    set({ loading: true, scenarioState: 'loading', completedSteps: [], trackedSteps: [], alerts: [], triage: null, triageNarrative: '' });
+    set({ loading: true, scenarioState: 'loading', completedSteps: [], trackedSteps: [], alerts: [] });
     try {
       await jsonPost('/api/reset', { scenario: name });
       await get().refresh();
@@ -523,8 +393,6 @@ export const useSystem = create<SystemState>((set, get) => ({
         trackedSteps: [],
         locked: false,
         alerts: [],
-        triage: null,
-        triageNarrative: '',
         error: null,
         loading: false,
       });
@@ -538,10 +406,6 @@ export const useSystem = create<SystemState>((set, get) => ({
     const auditId = useAudit.getState().addEntry(tool, args);
     try {
       const res = await jsonPost('/api/tool', { tool, arguments: args });
-      if ((res as { triage?: TriagePayload }).triage) {
-        const triage = (res as { triage: TriagePayload }).triage;
-        set({ triage, triageNarrative: triage.narrative });
-      }
       useAudit.getState().completeEntry(auditId, (res as { output?: string }).output || 'Done', true);
       await get().refresh();
       return (res as { output?: string }).output || '';
@@ -553,132 +417,11 @@ export const useSystem = create<SystemState>((set, get) => ({
 
   setMode: async (mode: 'human' | 'agent' | 'mixed') => {
     await jsonPost('/api/mode', { mode });
-    set({ mode, controlMode: mode === 'agent' ? 'agent' : mode === 'mixed' ? 'collab' : 'human' });
+    set({ mode });
   },
 }));
 
 // ── Chat State ──────────────────────────────────────────────────────
-interface OpenRouterToolCall {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-interface OpenRouterMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content?: string | null;
-  tool_calls?: OpenRouterToolCall[];
-  tool_call_id?: string;
-  name?: string;
-}
-
-const OPENROUTER_TOOLS = [
-  {
-    type: 'function',
-    function: {
-      name: 'inject_event',
-      description: 'Inject a live demo event into the current FIX simulator. Use this for outage, dropped heartbeat, sequence gap, LULD, reject spike, client message, or SLA breach requests.',
-      parameters: {
-        type: 'object',
-        required: ['event_type'],
-        properties: {
-          event_type: { type: 'string', enum: ['venue_outage', 'luld', 'reject_spike', 'client_message', 'seq_gap', 'sla_breach'] },
-          target: { type: 'string', description: 'Venue or symbol target, e.g. BATS, NYSE, ARCA, IEX, GME.' },
-          delay_sec: { type: 'number', description: 'Duration or delay in seconds when the user gives one.' },
-          details: { type: 'string', description: 'Operator-facing details for the injected training event.' },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'fix_session_issue',
-      description: 'Recover a specific FIX session with reconnect, sequence reset, or resend request.',
-      parameters: {
-        type: 'object',
-        required: ['venue', 'action'],
-        properties: {
-          venue: { type: 'string' },
-          action: { type: 'string', enum: ['resend_request', 'reset_sequence', 'reconnect'] },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'list_scenarios',
-      description: 'List available scenarios or load a named scenario.',
-      parameters: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', enum: ['list', 'load'] },
-          scenario_name: { type: 'string' },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'score_scenario',
-      description: 'Compute KPI scoring for the active scenario.',
-      parameters: { type: 'object', properties: {} },
-    },
-  },
-] as const;
-
-const TOOL_CALL_BEHAVIOR_PROMPT = [
-  'Use structured tool calls whenever the user asks to change simulator state or run a supported MCP action.',
-  'For "drop heartbeat", "kill venue", "venue down", or outage requests, call inject_event with event_type="venue_outage", the venue as target, and delay_sec when a duration is present.',
-  'After tool results are available, narrate the operational outcome: state change, stuck order count, matched runbook step, and recommended next action.',
-].join('\n');
-
-function parseToolArguments(raw: string): Record<string, unknown> {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-async function requestChatCompletion(
-  key: string | null,
-  body: Record<string, unknown>,
-): Promise<any> {
-  const resp = key
-    ? await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`,
-          'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : '',
-          'X-Title': 'FIX-MCP',
-        },
-        body: JSON.stringify(body),
-      })
-    : await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-  if (!resp.ok) {
-    const e = await resp.text();
-    if (e.includes('OPENROUTER_API_KEY not configured')) {
-      throw new Error('LLM is not configured. Add an OpenRouter key in the Copilot key menu or set OPENROUTER_API_KEY on the server, then rerun Investigator.');
-    }
-    throw new Error(e);
-  }
-  return resp.json();
-}
-
 export interface ToolCallTrace {
   tool: string;
   args: Record<string, unknown>;
@@ -763,124 +506,70 @@ export const useChat = create<ChatState>((set, get) => ({
       }
 
       const isBriefRequest = /\b(brief|concise|short|quick|summarize)\b/i.test(content);
-      const briefGuard: OpenRouterMessage[] = isBriefRequest
+      const briefGuard = isBriefRequest
         ? [{ role: 'system', content: 'The latest user message asks for a brief answer. Hard limit: 75 words. Answer the immediate question first, then ask at most one clarifying question.' }]
         : [];
 
-      const msgs: OpenRouterMessage[] = [
+      const msgs = [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'system', content: TOOL_CALL_BEHAVIOR_PROMPT },
-        ...(scenarioContextMsg ? [{ role: 'system' as const, content: scenarioContextMsg }] : []),
+        ...(scenarioContextMsg ? [{ role: 'system', content: scenarioContextMsg }] : []),
         { role: 'system', content: `Current system state:\n${contextHint}` },
         ...briefGuard,
-        ...get().messages
-          .filter((m) => m.role === 'user' || m.role === 'assistant')
-          .slice(-12)
-          .map((m) => ({ role: m.role, content: m.content }) as OpenRouterMessage),
+        ...get().messages.filter((m) => m.role !== 'system').slice(-12).map((m) => ({ role: m.role, content: m.content })),
         { role: 'user', content },
       ];
 
       const key = get().openRouterKey;
-      const data = await requestChatCompletion(key, {
-        model: 'openai/gpt-5.4',
-        messages: msgs,
-        max_tokens: isBriefRequest ? 180 : 2048,
-        tools: OPENROUTER_TOOLS,
-        tool_choice: 'auto',
-        temperature: 0.2,
-      });
 
-      const message = data.choices?.[0]?.message || {};
-      const reply = message.content || '';
-      const rawToolCalls: OpenRouterToolCall[] = message.tool_calls || [];
-      const toolCalls: ToolCallTrace[] = rawToolCalls.map((tc) => ({
-        tool: tc.function.name,
-        args: parseToolArguments(tc.function.arguments),
-        status: useSystem.getState().controlMode === 'agent' ? 'executing' : 'proposed',
-      }));
+      const resp = key
+        ? await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${key}`,
+              'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : '',
+              'X-Title': 'FIX-MCP',
+            },
+            body: JSON.stringify({
+              model: 'openai/gpt-5.4',
+              messages: msgs,
+              max_tokens: isBriefRequest ? 180 : 2048,
+            }),
+          })
+        : await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'openai/gpt-5.4',
+              messages: msgs,
+              max_tokens: isBriefRequest ? 180 : 2048,
+            }),
+          });
+
+      if (!resp.ok) {
+        const e = await resp.text();
+        if (e.includes('OPENROUTER_API_KEY not configured')) {
+          throw new Error('LLM is not configured. Add an OpenRouter key in the Copilot key menu or set OPENROUTER_API_KEY on the server, then rerun Investigator.');
+        }
+        throw new Error(e);
+      }
+
+      const data: { choices?: { message?: { content: string } }[] } = await resp.json();
+      const reply = data.choices?.[0]?.message?.content || 'I could not process that request.';
+
+      const toolCalls: ToolCallTrace[] = KNOWN_TOOLS
+        .filter((t) => reply.includes(t))
+        .map((t) => ({ tool: t, args: {}, status: 'proposed' as const }));
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         role: 'assistant',
-        content: reply || (toolCalls.length ? `Executing ${toolCalls.map((tc) => tc.tool).join(', ')}...` : 'I could not process that request.'),
+        content: reply,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         timestamp: Date.now(),
       };
 
-      if (!rawToolCalls.length || useSystem.getState().controlMode !== 'agent') {
-        if (rawToolCalls.length && !reply) {
-          assistantMsg.content = 'I prepared a structured tool call. Switch to Agent mode to execute it automatically.';
-        }
-        set((s) => ({ messages: [...s.messages, assistantMsg], isTyping: false }));
-        return;
-      }
-
-      set((s) => ({ messages: [...s.messages, assistantMsg], isTyping: true }));
-
-      const toolMessages: OpenRouterMessage[] = [];
-      const completedCalls = [...toolCalls];
-      for (let i = 0; i < rawToolCalls.length; i += 1) {
-        const rawCall = rawToolCalls[i];
-        const parsedArgs = parseToolArguments(rawCall.function.arguments);
-        completedCalls[i] = { ...completedCalls[i], status: 'executing' };
-        set((s) => ({
-          messages: s.messages.map((m) => m.id === assistantMsg.id ? { ...m, toolCalls: [...completedCalls] } : m),
-        }));
-
-        try {
-          const result = await useSystem.getState().callTool(rawCall.function.name, parsedArgs);
-          completedCalls[i] = { ...completedCalls[i], status: 'success', result };
-          toolMessages.push({
-            role: 'tool',
-            tool_call_id: rawCall.id,
-            name: rawCall.function.name,
-            content: result,
-          });
-        } catch (err: unknown) {
-          const result = (err as Error).message;
-          completedCalls[i] = { ...completedCalls[i], status: 'error', result };
-          toolMessages.push({
-            role: 'tool',
-            tool_call_id: rawCall.id,
-            name: rawCall.function.name,
-            content: `ERROR: ${result}`,
-          });
-        }
-
-        set((s) => ({
-          messages: s.messages.map((m) => m.id === assistantMsg.id ? { ...m, toolCalls: [...completedCalls] } : m),
-        }));
-      }
-
-      let narrative = toolMessages.map((m) => m.content || '').join('\n\n');
-      try {
-        const finalData = await requestChatCompletion(key, {
-          model: 'openai/gpt-5.4',
-          messages: [
-            ...msgs,
-            { role: 'assistant', content: reply || null, tool_calls: rawToolCalls },
-            ...toolMessages,
-            {
-              role: 'system',
-              content: 'Write one concise desk-demo triage response. Include what changed, stuck order count, matched runbook step, and next action. Do not claim unresolved steps are complete.',
-            },
-          ],
-          max_tokens: isBriefRequest ? 180 : 700,
-          temperature: 0.2,
-        });
-        narrative = finalData.choices?.[0]?.message?.content || narrative;
-      } catch {
-        // The tool already ran; keep the deterministic backend triage output.
-      }
-
-      set((s) => ({
-        messages: s.messages.map((m) =>
-          m.id === assistantMsg.id
-            ? { ...m, content: narrative || assistantMsg.content, toolCalls: completedCalls }
-            : m
-        ),
-        isTyping: false,
-      }));
+      set((s) => ({ messages: [...s.messages, assistantMsg], isTyping: false }));
     } catch (err: unknown) {
       set((s) => ({
         messages: [...s.messages, {
