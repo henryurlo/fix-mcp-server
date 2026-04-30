@@ -19,7 +19,6 @@ import json
 import os
 import re
 import threading
-from contextlib import asynccontextmanager
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,7 +26,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse
 
 from fix_mcp import server
 from fix_mcp.server import get_tcp_integration, _trace_buffer
@@ -42,8 +41,6 @@ from fix_mcp.prompts.trading_ops import SCENARIO_PROMPTS
 _mode: str = "human"          # "human" | "agent" | "mixed"
 _events: deque = deque(maxlen=100)
 _events_lock = threading.Lock()
-_event_stream_clients: set[asyncio.Queue[dict[str, Any]]] = set()
-_event_stream_lock = threading.Lock()
 
 
 def _read_local_env_key(name: str) -> str:
@@ -77,12 +74,10 @@ def _publish_event(tool: str, args: dict, result: str, ok: bool, source: str = "
         "tool": tool,
         "ok": ok,
         "source": source,
-        "arguments": args,
         "summary": (result or "")[:200],
     }
     with _events_lock:
         _events.appendleft(event)
-    _broadcast_event({"type": "tool_execution", "event": event})
     redis_url = os.environ.get("REDIS_URL")
     if redis_url:
         try:
@@ -93,46 +88,9 @@ def _publish_event(tool: str, args: dict, result: str, ok: bool, source: str = "
             pass
 
 
-def _clear_events() -> None:
-    """Clear transient dashboard event history for a fresh demo run."""
-    with _events_lock:
-        _events.clear()
-    _broadcast_event({"type": "events_cleared", "ts": datetime.now(timezone.utc).isoformat()})
-    redis_url = os.environ.get("REDIS_URL")
-    if redis_url:
-        try:
-            import redis as _redis  # optional dependency
-            r = _redis.from_url(redis_url, socket_timeout=1)
-            r.delete("fix:events")
-        except Exception:
-            pass
-
-
 def _on_tool_call(name: str, args: dict, result: str, ok: bool, source: str) -> None:
     """Listener registered with server._tool_listeners — receives all tool calls."""
     _publish_event(name, args, result, ok, source)
-
-
-def _broadcast_event(payload: dict[str, Any]) -> None:
-    """Fan out an event payload to all connected SSE clients."""
-    with _event_stream_lock:
-        clients = list(_event_stream_clients)
-    stale: list[asyncio.Queue[dict[str, Any]]] = []
-    for queue in clients:
-        try:
-            queue.put_nowait(payload)
-        except asyncio.QueueFull:
-            stale.append(queue)
-        except RuntimeError:
-            stale.append(queue)
-    if stale:
-        with _event_stream_lock:
-            for queue in stale:
-                _event_stream_clients.discard(queue)
-
-
-def _sse_payload(payload: dict[str, Any]) -> str:
-    return f"data: {json.dumps(payload, default=str)}\n\n"
 
 
 # Register the listener once — works for both REST API calls (source="dashboard")
@@ -359,242 +317,11 @@ def _detail_payload() -> dict:
     }
 
 
-def _status_payload() -> dict:
-    sessions = server.session_manager.get_all_sessions()
-    algos = server.algo_engine.get_all()
-    active_algos = [a for a in algos if a.status in {"running", "paused", "stuck", "halted"}]
-    open_orders = [
-        o for o in server.oms.orders.values()
-        if o.status not in {"filled", "canceled", "rejected"}
-    ]
-    stuck_orders = [o for o in open_orders if o.status == "stuck"]
-    return {
-        "scenario": server.SCENARIO,
-        "is_algo_scenario": _is_algo_scenario(server.SCENARIO),
-        "available_scenarios": _scenario_metadata(),
-        "mode": _mode,
-        "sessions": {
-            "total": len(sessions),
-            "active": sum(1 for s in sessions if s.status == "active"),
-            "degraded": sum(1 for s in sessions if s.status == "degraded"),
-            "down": sum(1 for s in sessions if s.status == "down"),
-            "detail": _session_summary(),
-        },
-        "orders": {
-            "open": len(open_orders),
-            "stuck": len(stuck_orders),
-        },
-        "algos": {
-            "active": len(active_algos),
-            "total": len(algos),
-        },
-    }
-
-
-def _fix_wire_payload(limit: int = 200) -> list[dict[str, Any]]:
-    # Aggregate FIX wire messages from all orders + session-level events.
-    wire_events = []
-
-    for o in server.oms.orders.values():
-        for msg in o.fix_messages:
-            parts = {}
-            for seg in msg.split("|"):
-                if "=" in seg:
-                    k, v = seg.split("=", 1)
-                    parts[k] = v
-            msg_type = parts.get("35", "?")
-            msg_type_name = {
-                "A": "Logon", "0": "Heartbeat", "D": "NewOrderSingle",
-                "8": "ExecutionReport", "F": "OrderCancel", "G": "CancelReplace",
-                "2": "ResendRequest", "5": "Logout", "4": "SeqReset",
-                "1": "TestRequest", "3": "Reject", "9": "OrderCancelAck",
-            }.get(msg_type, f"Unknown({msg_type})")
-            symbol = parts.get("55", "")
-            side = parts.get("54", "")
-            wire_events.append({
-                "ts": parts.get("52", ""),
-                "type": msg_type_name,
-                "msg_type": msg_type,
-                "venue": getattr(o, "venue", ""),
-                "symbol": symbol,
-                "side": "Buy" if side == "1" else "Sell" if side == "2" else "",
-                "qty": parts.get("38", ""),
-                "cl_ord_id": parts.get("11", ""),
-                "raw": msg,
-            })
-
-    for s in server.session_manager.get_all_sessions():
-        wire_events.append({
-            "ts": s.last_heartbeat or "",
-            "type": "SessionState",
-            "msg_type": "HB",
-            "venue": s.venue,
-            "symbol": "",
-            "side": "",
-            "qty": "",
-            "cl_ord_id": "",
-            "raw": f"{s.venue} status={s.status} latency={s.latency_ms}ms seq={s.last_sent_seq}/{s.last_recv_seq}",
-        })
-
-    wire_events.sort(key=lambda e: e["ts"], reverse=True)
-    return wire_events[:limit]
-
-
-def _state_event_payload(reason: str) -> dict[str, Any]:
-    with _events_lock:
-        events = list(_events)
-    return {
-        "type": "state",
-        "reason": reason,
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "status": _status_payload(),
-        "orders": _order_summary(),
-        "events": events,
-        "wire": _fix_wire_payload(),
-    }
-
-
-def _publish_state_event(reason: str) -> None:
-    _broadcast_event(_state_event_payload(reason))
-
-
-def _match_runbook_step(preferred_tools: list[str], target: str = "") -> dict[str, Any] | None:
-    ctx = _scenario_context(server.SCENARIO)
-    steps = (ctx or {}).get("runbook", {}).get("steps", [])
-    target_upper = target.upper()
-    if target_upper:
-        for step in steps:
-            if step.get("tool") in preferred_tools and target_upper in json.dumps(step).upper():
-                return step
-    for tool in preferred_tools:
-        for step in steps:
-            if step.get("tool") == tool:
-                return step
-    return steps[0] if steps else None
-
-
-def _triage_recommendation(
-    target: str,
-    down_venues: list[str],
-    degraded_venues: list[str],
-    seq_gap_venues: list[str],
-    stuck_count: int,
-) -> tuple[list[str], str, dict[str, Any] | None]:
-    target_upper = target.upper()
-    affected = target_upper or (down_venues[0] if down_venues else degraded_venues[0] if degraded_venues else "")
-    preferred_tools = ["check_fix_sessions", "query_orders"]
-    action = "Run check_fix_sessions, then query_orders to confirm blast radius before recovery."
-
-    if affected in seq_gap_venues:
-        preferred_tools = ["dump_session_state", "fix_session_issue", "reset_sequence", "query_orders"]
-        action = (
-            f"Confirm the {affected} sequence gap, then use fix_session_issue with "
-            "action=resend_request or reset_sequence before releasing orders."
-        )
-    elif affected in down_venues:
-        preferred_tools = ["check_fix_sessions", "fix_session_issue", "query_orders", "release_stuck_orders"]
-        action = (
-            f"Send a heartbeat/test request to {affected}; if it stays down, reconnect with "
-            "fix_session_issue action=reconnect, then re-check stuck orders."
-        )
-    elif affected in degraded_venues:
-        preferred_tools = ["session_heartbeat", "dump_session_state", "query_orders"]
-        action = f"Probe {affected} heartbeat latency, dump session state, and hold releases until session health is green."
-    elif stuck_count:
-        preferred_tools = ["query_orders", "validate_orders", "release_stuck_orders"]
-        action = "Query stuck orders, confirm the blocker flag, and only release after the blocker clears."
-
-    return preferred_tools, action, _match_runbook_step(preferred_tools, affected)
-
-
-def _build_triage_payload(inject_args: dict[str, Any] | None = None, tool_output: str = "") -> dict[str, Any]:
-    inject_args = inject_args or {}
-    target = str(inject_args.get("target") or "").upper()
-    sessions = _session_summary()
-    open_orders = _order_summary()
-    stuck_orders = [o for o in open_orders if o.get("status") == "stuck"]
-    target_stuck = [o for o in stuck_orders if target and str(o.get("venue", "")).upper() == target]
-    down_venues = [s["venue"] for s in sessions if s.get("status") == "down"]
-    degraded_venues = [s["venue"] for s in sessions if s.get("status") == "degraded"]
-    seq_gap_venues = [s["venue"] for s in sessions if s.get("seq_gap")]
-    preferred_tools, recommended_action, matched = _triage_recommendation(
-        target=target,
-        down_venues=down_venues,
-        degraded_venues=degraded_venues,
-        seq_gap_venues=seq_gap_venues,
-        stuck_count=len(stuck_orders),
-    )
-
-    affected = target or (down_venues[0] if down_venues else degraded_venues[0] if degraded_venues else "")
-    event_type = inject_args.get("event_type", "state_change")
-    if affected and affected in down_venues:
-        first_sentence = f"{affected} set to DOWN."
-    elif affected and affected in degraded_venues:
-        first_sentence = f"{affected} is DEGRADED."
-    elif affected and affected in seq_gap_venues:
-        first_sentence = f"{affected} has a sequence gap."
-    else:
-        first_sentence = f"{event_type} recorded."
-
-    stuck_phrase = f"{len(target_stuck) if target_stuck else len(stuck_orders)} orders stuck."
-    if matched:
-        runbook_phrase = (
-            f"Runbook step {matched.get('step')}: {matched.get('title')} "
-            f"uses {matched.get('tool')}."
-        )
-    else:
-        runbook_phrase = f"Recommended tools: {', '.join(preferred_tools[:2])}."
-
-    narrative = f"{first_sentence} {stuck_phrase} {runbook_phrase} Recommended action: {recommended_action}"
-    return {
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "scenario": server.SCENARIO,
-        "event_type": event_type,
-        "target": target,
-        "session_status": sessions,
-        "down_venues": down_venues,
-        "degraded_venues": degraded_venues,
-        "seq_gap_venues": seq_gap_venues,
-        "stuck_order_count": len(stuck_orders),
-        "target_stuck_order_count": len(target_stuck),
-        "matched_runbook_step": matched,
-        "recommended_action": recommended_action,
-        "narrative": narrative,
-        "tool_output": tool_output,
-    }
-
-
-def _format_triage_for_tool_response(triage: dict[str, Any]) -> str:
-    matched = triage.get("matched_runbook_step") or {}
-    lines = [
-        "AUTO-TRIAGE",
-        f"  Summary: {triage['narrative']}",
-        f"  Stuck orders: {triage['stuck_order_count']}",
-        f"  Down venues: {', '.join(triage['down_venues']) or 'none'}",
-        f"  Degraded venues: {', '.join(triage['degraded_venues']) or 'none'}",
-    ]
-    if matched:
-        lines.append(
-            f"  Matched runbook: step {matched.get('step')} - "
-            f"{matched.get('title')} ({matched.get('tool')})"
-        )
-    lines.append(f"  Recommended action: {triage['recommended_action']}")
-    return "\n".join(lines)
-
-
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Start every local/demo server session with an empty operator trace."""
-    _trace_buffer.clear()
-    _clear_events()
-    yield
-
-
-app = FastAPI(title="fix-mcp-api", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="fix-mcp-api", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -629,7 +356,34 @@ async def health():
 
 @app.get("/api/status")
 async def api_status():
-    return JSONResponse(_status_payload())
+    sessions = server.session_manager.get_all_sessions()
+    algos = server.algo_engine.get_all()
+    active_algos = [a for a in algos if a.status in {"running", "paused", "stuck", "halted"}]
+    open_orders = [
+        o for o in server.oms.orders.values()
+        if o.status not in {"filled", "canceled", "rejected"}
+    ]
+    stuck_orders = [o for o in open_orders if o.status == "stuck"]
+    return JSONResponse({
+        "scenario": server.SCENARIO,
+        "is_algo_scenario": _is_algo_scenario(server.SCENARIO),
+        "available_scenarios": _scenario_metadata(),
+        "sessions": {
+            "total": len(sessions),
+            "active": sum(1 for s in sessions if s.status == "active"),
+            "degraded": sum(1 for s in sessions if s.status == "degraded"),
+            "down": sum(1 for s in sessions if s.status == "down"),
+            "detail": _session_summary(),
+        },
+        "orders": {
+            "open": len(open_orders),
+            "stuck": len(stuck_orders),
+        },
+        "algos": {
+            "active": len(active_algos),
+            "total": len(algos),
+        },
+    })
 
 
 @app.get("/api/sessions")
@@ -676,42 +430,6 @@ async def api_events():
         return JSONResponse(list(_events))
 
 
-@app.get("/api/events/stream")
-async def api_events_stream():
-    async def event_generator():
-        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=100)
-        with _event_stream_lock:
-            _event_stream_clients.add(queue)
-        try:
-            yield "retry: 1000\n\n"
-            yield _sse_payload({
-                **_state_event_payload("initial"),
-                "type": "initial",
-            })
-            while True:
-                try:
-                    payload = await asyncio.wait_for(queue.get(), timeout=15)
-                except asyncio.TimeoutError:
-                    payload = {
-                        "type": "heartbeat",
-                        "ts": datetime.now(timezone.utc).isoformat(),
-                    }
-                yield _sse_payload(payload)
-        finally:
-            with _event_stream_lock:
-                _event_stream_clients.discard(queue)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
 @app.get("/api/trace")
 async def api_trace(
     limit: int = Query(default=200),
@@ -733,13 +451,6 @@ async def api_trace_stats():
     return JSONResponse(_trace_buffer.stats())
 
 
-@app.post("/api/trace/clear")
-async def api_trace_clear():
-    _trace_buffer.clear()
-    _clear_events()
-    return JSONResponse({"ok": True})
-
-
 @app.get("/api/runbook")
 async def api_runbook(tool: str | None = Query(default=None)):
     if tool:
@@ -754,20 +465,60 @@ async def api_runbook_list():
     return JSONResponse({k: {"title": v["title"], "description": v["description"]} for k, v in MANUAL_RUNBOOK.items()})
 
 
-@app.post("/api/triage")
-async def api_triage(request: Request):
-    payload = await request.json()
-    tool_output = str(payload.get("tool_output") or payload.get("output") or "")
-    inject_args = payload.get("arguments") or payload.get("inject_args") or payload
-    triage = _build_triage_payload(inject_args if isinstance(inject_args, dict) else {}, tool_output)
-    _publish_event("auto_triage", {"after_tool": payload.get("after_tool", "manual")}, triage["narrative"], True)
-    _broadcast_event({"type": "triage", "triage": triage})
-    return JSONResponse({"ok": True, "triage": triage})
-
-
 @app.get("/api/fix-wire")
 async def api_fix_wire():
-    return JSONResponse(_fix_wire_payload())
+    # Aggregate FIX wire messages from all orders + session-level events
+    wire_events = []
+
+    # FIX messages from orders
+    for o in server.oms.orders.values():
+        for i, msg in enumerate(o.fix_messages):
+            # Parse key fields from the raw FIX message
+            parts = {}
+            for seg in msg.split("|"):
+                if "=" in seg:
+                    k, v = seg.split("=", 1)
+                    parts[k] = v
+            msg_type = parts.get("35", "?")
+            msg_type_name = {
+                "A": "Logon", "0": "Heartbeat", "D": "NewOrderSingle",
+                "8": "ExecutionReport", "F": "OrderCancel", "G": "CancelReplace",
+                "2": "ResendRequest", "5": "Logout", "4": "SeqReset",
+                "1": "TestRequest", "3": "Reject", "9": "OrderCancelAck",
+            }.get(msg_type, f"Unknown({msg_type})")
+            symbol = parts.get("55", "")
+            side = parts.get("54", "")
+            qty = parts.get("38", "")
+            venue = o.venue if hasattr(o, "venue") else ""
+            wire_events.append({
+                "ts": parts.get("52", ""),
+                "type": msg_type_name,
+                "msg_type": msg_type,
+                "venue": venue,
+                "symbol": symbol,
+                "side": "Buy" if side == "1" else "Sell" if side == "2" else "",
+                "qty": qty,
+                "cl_ord_id": parts.get("11", ""),
+                "raw": msg,
+            })
+
+    # Session-level heartbeat events
+    for s in server.session_manager.get_all_sessions():
+        wire_events.append({
+            "ts": s.last_heartbeat or "",
+            "type": "SessionState",
+            "msg_type": "HB",
+            "venue": s.venue,
+            "symbol": "",
+            "side": "",
+            "qty": "",
+            "cl_ord_id": "",
+            "raw": f"{s.venue} status={s.status} latency={s.latency_ms}ms seq={s.last_sent_seq}/{s.last_recv_seq}",
+        })
+
+    # Sort by timestamp descending, keep most recent
+    wire_events.sort(key=lambda e: e["ts"], reverse=True)
+    return JSONResponse(wire_events[:200])
 
 
 @app.get("/api/mcp/schema")
@@ -861,31 +612,17 @@ async def api_tool_post(request: Request):
     payload = await request.json()
     tool = payload.get("tool", "")
     arguments = payload.get("arguments", {})
-    trace_enabled = payload.get("trace", True) is not False
     # Tag this call as "dashboard" so the Activity tab can distinguish it
     # from Claude's MCP HTTP calls (which default to "claude").
-    token = server._call_source.set("dashboard" if trace_enabled else "dashboard_poll")
+    token = server._call_source.set("dashboard")
     try:
         result = await server.call_tool(tool, arguments)
         result_text = result[0].text
-        triage = None
-        output_text = result_text
-        if tool == "inject_event":
-            triage = _build_triage_payload(arguments, result_text)
-            triage_text = _format_triage_for_tool_response(triage)
-            output_text = f"{result_text}\n\n{triage_text}"
-            _publish_event("auto_triage", {"after_tool": tool, **arguments}, triage["narrative"], True)
-            _broadcast_event({"type": "triage", "triage": triage})
-        _publish_state_event(f"tool:{tool}")
         # _publish_event is called via _on_tool_call listener in server.call_tool
-        payload = {"output": output_text, "ok": True}
-        if triage:
-            payload["triage"] = triage
-        return JSONResponse(payload)
+        return JSONResponse({"output": result_text, "ok": True})
     except Exception as exc:
         # Fallback publish for catastrophic errors that bypass the listener
         _publish_event(tool, arguments, str(exc), False, "dashboard")
-        _publish_state_event(f"tool_error:{tool}")
         return JSONResponse({"output": str(exc), "ok": False}, status_code=400)
     finally:
         server._call_source.reset(token)
@@ -898,7 +635,6 @@ async def api_mode_post(request: Request):
     new_mode = payload.get("mode", "human")
     if new_mode in ("human", "agent", "mixed"):
         _mode = new_mode
-        _broadcast_event({"type": "mode", "mode": _mode, "ts": datetime.now(timezone.utc).isoformat()})
     return JSONResponse({"mode": _mode, "ok": True})
 
 
@@ -907,8 +643,6 @@ async def api_reset(request: Request):
     payload = await request.json()
     scenario = payload.get("scenario") or None
     active = server.reset_runtime(scenario)
-    _clear_events()
-    _publish_state_event("reset")
     return JSONResponse({"output": f"Scenario loaded: {active}", "scenario": active, "ok": True})
 
 
@@ -935,26 +669,12 @@ async def api_chat(request: Request):
     messages = payload.get("messages", [])
     model = payload.get("model", "openai/gpt-5.4")
     max_tokens = payload.get("max_tokens", 2048)
-    tools = payload.get("tools")
-    tool_choice = payload.get("tool_choice")
-    temperature = payload.get("temperature")
     api_key = os.environ.get("OPENROUTER_API_KEY", "") or _read_local_env_key("OPENROUTER_API_KEY")
     if not api_key:
         return JSONResponse({"error": "OPENROUTER_API_KEY not configured"}, status_code=500)
 
     try:
         import aiohttp
-        openrouter_payload: dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-        }
-        if tools is not None:
-            openrouter_payload["tools"] = tools
-        if tool_choice is not None:
-            openrouter_payload["tool_choice"] = tool_choice
-        if temperature is not None:
-            openrouter_payload["temperature"] = temperature
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -964,7 +684,7 @@ async def api_chat(request: Request):
                     "HTTP-Referer": "https://fix-mcp.local",
                     "X-Title": "FIX MCP Console",
                 },
-                json=openrouter_payload,
+                json={"model": model, "messages": messages, "max_tokens": max_tokens},
             ) as resp:
                 data = await resp.json()
                 return JSONResponse(data)
