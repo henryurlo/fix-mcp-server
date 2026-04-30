@@ -8,29 +8,16 @@ async function handler(request: NextRequest) {
   const url = `${BACKEND}${request.nextUrl.pathname}${request.nextUrl.search}`;
 
   try {
-    const headers = new Headers();
-    const contentType = request.headers.get('content-type');
-    const accept = request.headers.get('accept');
-    if (contentType) headers.set('Content-Type', contentType);
-    if (accept) headers.set('Accept', accept);
-
     const res = await fetch(url, {
       method: request.method,
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: ['POST', 'PUT', 'PATCH'].includes(request.method) ? await request.text() : null,
-      cache: 'no-store',
     });
 
-    const responseHeaders = new Headers();
-    responseHeaders.set('Content-Type', res.headers.get('content-type') || 'application/json');
-    responseHeaders.set('Cache-Control', res.headers.get('cache-control') || 'no-store');
-    if (res.headers.get('connection')) {
-      responseHeaders.set('Connection', res.headers.get('connection') as string);
-    }
-
-    return new Response(res.body, {
+    const body = await res.text();
+    return new Response(body, {
       status: res.status,
-      headers: responseHeaders,
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch (err: unknown) {
     console.error('Proxy error:', err);
